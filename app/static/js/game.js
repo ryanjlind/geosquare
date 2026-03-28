@@ -131,7 +131,7 @@ export async function submitGuess() {
         return;
     }
 
-    setGuessFeedback('Not in the square or population < 15,000');
+    setGuessFeedback('<br>Not in the square or population < 15,000');
 
     if (data.matched_city) {
         showIncorrectGuessedCity(data.matched_city);

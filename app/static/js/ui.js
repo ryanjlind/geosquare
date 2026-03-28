@@ -22,7 +22,7 @@ export function renderSidebar(data) {
 
         <div class="label">Gameplay</div>
         <div class="value">
-            Squares have a minimum total population of ${numberFmt(data.rules.min_total_population)}.<br>            
+            Squares have a minimum total population of ${numberFmt(data.rules.min_total_population)}.<br><br>
             At least ${numberFmt(data.rules.min_city_count)} cities have a population ≥ ${numberFmt(data.rules.min_city_population)}.<br><br>
             Try to name a city in each square. <br><br>
             The smaller the city you can name, the more points you will receive. <br><br>
