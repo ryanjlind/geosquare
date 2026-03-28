@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Geo Square</title>
+    <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
+</head>
+<body>
+    <div class="layout">
+        <div class="sidebar">
+            <h1>Geo Square</h1>
+            <div id="meta"></div>
+            <div class="sidebar-divider"></div>
+            <div id="guessBox">
+                <div id="guessControls">
+                    <input id="guessInput" type="search" name="goawaybrowsers" placeholder="Enter a city..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"> 
+                    <button id="guessBtn">Submit</button>
+                    <button id="passBtn">Pass</button>
+                </div>
+            </div>
+            <div id="guessFeedback"></div>
+            <div class="sidebar-divider"></div>
+            <table id="roundTable">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>City</th>
+                        <th>Pop.</th>
+                        <th>Rank</th>
+                        <th>Pts</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="4"><b>Total</b></td>
+                        <td id="totalPoints">0</td>
+                    </tr>
+                </tfoot>
+            </table>        
+            <button id="nextBtn" style="display:none;">Next</button>
+        </div>
+        <div id="cesiumContainer"></div>
+    </div>
+    <div id="statsOverlay" class="stats-overlay" style="display:none;">
+        <div class="stats-backdrop"></div>
+        <div class="stats-modal">
+            <button id="statsCloseBtn" class="stats-close-btn" type="button">×</button>
+            <div class="stats-title">Your Stats</div>
+
+            <div class="stats-grid">
+                <div class="stats-card">
+                    <div class="stats-card-label">Game Streak</div>
+                    <div id="statsCurrentStreak" class="stats-card-value">0</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-card-label">Average Score</div>
+                    <div id="statsAverageScore" class="stats-card-value">0</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-card-label">Best Score</div>
+                    <div id="statsBestScore" class="stats-card-value">0</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-card-label">Games Played</div>
+                    <div id="statsGamesPlayed" class="stats-card-value">0</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-card-label">Longest Streak</div>
+                    <div id="statsLongestStreak" class="stats-card-value">0</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-card-label">Median Score</div>
+                    <div id="statsMedianScore" class="stats-card-value">0</div>
+                </div>
+            </div>
+
+            <div class="stats-chart-wrap">
+                <div class="stats-section-title">Last 20 Games</div>
+                <svg id="statsChart" class="stats-chart" viewBox="0 0 640 220" preserveAspectRatio="none"></svg>
+            </div>
+
+            <div class="stats-bottom-grid">
+                <div class="stats-card">
+                    <div class="stats-card-label">Last Score</div>
+                    <div id="statsLastScore" class="stats-card-value">0</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-card-label">Best Guess</div>
+                    <div id="statsBestGuess" class="stats-card-value stats-best-guess">—</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        window.CESIUM_ION_TOKEN = {{ cesium_ion_token|tojson }};
+    </script>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

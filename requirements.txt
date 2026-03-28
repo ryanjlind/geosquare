@@ -1,0 +1,8 @@
+Flask==3.0.3
+gunicorn==23.0.0
+pyodbc==5.1.0
+python-dotenv==1.0.1
+Shapely==2.0.6
+pandas==2.2.3
+python-dotenv==1.0.1
+pyshp==2.3.1

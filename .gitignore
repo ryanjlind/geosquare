@@ -1,1 +1,6 @@
+.env
 venv/**
+data/**
+ne_land/**
+scripts/**
+*.pyc
