@@ -1,8 +1,8 @@
-# Geo Square
+# GeoSquare
 
 Flask + SQL Server + Azure App Service for a daily geography game.
 
-## TEch Stack
+## Tech Stack
 
 - Flask app served by Gunicorn
 - Azure App Service on Linux

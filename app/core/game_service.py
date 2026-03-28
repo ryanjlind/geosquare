@@ -20,6 +20,7 @@ from app.core.game_queries import (
     find_city_anywhere,
     get_best_guess_for_user,
     get_completed_sessions_for_user,
+    get_round_stats_for_sessions
 )
 from app.core.matching import find_matching_city
 from app.core.scoring import compute_score
@@ -413,13 +414,19 @@ def get_player_stats_payload(user_id: int) -> tuple[dict, int]:
                 'games_played': 0,
                 'current_streak': 0,
                 'longest_streak': 0,
+                'perfect_days': 0,
+                'perfect_streak': 0,
                 'average_score': 0,
-                'median_score': 0,
                 'best_score': 0,
+                'best_score_game_date': None,
                 'last_score': 0,
+                'last_game_date': None,
                 'graph_points': [],
                 'best_guess': None,
             }, 200
+
+        session_ids = [int(row.SessionId) for row in sessions]
+        round_stats = get_round_stats_for_sessions(cur, session_ids)
 
         scores = [int(row.TotalScore) for row in sessions]
         game_dates = [row.GameDate for row in sessions]
@@ -427,22 +434,51 @@ def get_player_stats_payload(user_id: int) -> tuple[dict, int]:
         games_played = len(scores)
         average_score = round(sum(scores) / games_played)
 
-        sorted_scores = sorted(scores)
-        mid = games_played // 2
-        if games_played % 2 == 1:
-            median_score = int(sorted_scores[mid])
-        else:
-            median_score = round((sorted_scores[mid - 1] + sorted_scores[mid]) / 2)
-
         current_streak, longest_streak = _compute_streaks(game_dates)
 
-        graph_points = [
-            {
+        perfect_days = 0
+        perfect_streak = 0
+        solved_counts_by_session_id = {}
+        perfect_flags = []
+
+        for row in sessions:
+            round_stat = round_stats.get(int(row.SessionId))
+            solved_rounds = int(round_stat['solved_rounds']) if round_stat else 0
+            total_rounds = int(round_stat['total_rounds']) if round_stat else 0
+
+            solved_counts_by_session_id[int(row.SessionId)] = solved_rounds
+
+            is_perfect = total_rounds > 0 and solved_rounds == total_rounds
+            perfect_flags.append(is_perfect)
+
+            if is_perfect:
+                perfect_days += 1
+
+        for is_perfect in reversed(perfect_flags):
+            if not is_perfect:
+                break
+            perfect_streak += 1
+
+        best_score_index = max(range(len(sessions)), key=lambda i: int(sessions[i].TotalScore))
+        best_score = int(sessions[best_score_index].TotalScore)
+        best_score_game_date = sessions[best_score_index].GameDate.isoformat()
+        last_score = int(sessions[-1].TotalScore)
+        last_game_date = sessions[-1].GameDate.isoformat()
+
+        graph_points = []
+
+        for row in sessions[-20:]:
+            rs = round_stats.get(row.SessionId)
+
+            solved = int(rs['solved_rounds']) if rs else 0
+            total = int(rs['total_rounds']) if rs else 0
+
+            graph_points.append({
                 'game_date': row.GameDate.isoformat(),
-                'score': int(row.TotalScore),
-            }
-            for row in sessions[-20:]
-        ]
+                'solved': solved,
+                'points': int(row.TotalScore),
+                'is_perfect': solved == total
+            })
 
         conn.commit()
 
@@ -450,10 +486,13 @@ def get_player_stats_payload(user_id: int) -> tuple[dict, int]:
             'games_played': games_played,
             'current_streak': current_streak,
             'longest_streak': longest_streak,
+            'perfect_days': perfect_days,
+            'perfect_streak': perfect_streak,
             'average_score': average_score,
-            'median_score': median_score,
-            'best_score': max(scores),
-            'last_score': scores[-1],
+            'best_score': best_score,
+            'best_score_game_date': best_score_game_date,
+            'last_score': last_score,
+            'last_game_date': last_game_date,
             'graph_points': graph_points,
             'best_guess': {
                 'city_name': best_guess.CityName,
@@ -462,4 +501,4 @@ def get_player_stats_payload(user_id: int) -> tuple[dict, int]:
                 'game_date': best_guess.GameDate.isoformat(),
                 'round_number': int(best_guess.RoundNumber),
             } if best_guess else None,
-        }, 200    
+        }, 200

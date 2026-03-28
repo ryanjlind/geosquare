@@ -303,3 +303,27 @@ def get_best_guess_for_user(cur, user_id: int, through_game_date: str):
         ORDER BY gg.Score DESC, g.GameDate DESC, gg.GuessId DESC
     """, user_id, through_game_date)
     return cur.fetchone()
+
+def get_round_stats_for_sessions(cur, session_ids: list[int]) -> dict[int, dict]:
+    if not session_ids:
+        return {}
+
+    placeholders = ','.join(['?'] * len(session_ids))
+
+    cur.execute(f"""
+        SELECT
+            gsr.SessionId,
+            COUNT(*) AS TotalRounds,
+            SUM(CASE WHEN gsr.Score > 0 THEN 1 ELSE 0 END) AS SolvedRounds
+        FROM dbo.GameSessionRounds gsr
+        WHERE gsr.SessionId IN ({placeholders})
+        GROUP BY gsr.SessionId
+    """, *session_ids)
+
+    return {
+        int(row.SessionId): {
+            'total_rounds': int(row.TotalRounds),
+            'solved_rounds': int(row.SolvedRounds),
+        }
+        for row in cur.fetchall()
+    }

@@ -3,14 +3,17 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Geo Square</title>
+    <title>GeoSquare</title>
     <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/game.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/stats.css') }}">
 </head>
 <body>
     <div class="layout">
         <div class="sidebar">
-            <h1>Geo Square</h1>
+            <h1>GeoSquare</h1>
             <div id="meta"></div>
             <div class="sidebar-divider"></div>
             <div id="guessBox">
@@ -48,49 +51,62 @@
         <div class="stats-backdrop"></div>
         <div class="stats-modal">
             <button id="statsCloseBtn" class="stats-close-btn" type="button">×</button>
-            <div class="stats-title">Your Stats</div>
+            <div id="statsTitle" class="stats-title">Game Complete!</div>
+
+            <div id="statsTodayCard" class="stats-today-card">
+                <div id="statsGameDate" class="stats-game-date">—</div>
+                <div class="stats-today-grid">
+                    <div>
+                        <div class="stats-card-label">Squares Solved</div>
+                        <div id="statsTodaySolved" class="stats-today-score">0 / 5</div>
+                    </div>
+                    <div>
+                        <div class="stats-card-label">Points</div>
+                        <div id="statsTodayPoints" class="stats-today-secondary">0</div>
+                    </div>
+                    <div>
+                        <div class="stats-card-label">Best Round</div>
+                        <div id="statsTodayBestRound" class="stats-today-secondary">—</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-divider"></div>
 
             <div class="stats-grid">
-                <div class="stats-card">
-                    <div class="stats-card-label">Game Streak</div>
-                    <div id="statsCurrentStreak" class="stats-card-value">0</div>
-                </div>
-                <div class="stats-card">
-                    <div class="stats-card-label">Average Score</div>
-                    <div id="statsAverageScore" class="stats-card-value">0</div>
-                </div>
-                <div class="stats-card">
-                    <div class="stats-card-label">Best Score</div>
-                    <div id="statsBestScore" class="stats-card-value">0</div>
-                </div>
                 <div class="stats-card">
                     <div class="stats-card-label">Games Played</div>
                     <div id="statsGamesPlayed" class="stats-card-value">0</div>
                 </div>
                 <div class="stats-card">
-                    <div class="stats-card-label">Longest Streak</div>
-                    <div id="statsLongestStreak" class="stats-card-value">0</div>
+                    <div class="stats-card-label">Game Streak</div>
+                    <div id="statsGameStreak" class="stats-card-value">0</div>
                 </div>
                 <div class="stats-card">
-                    <div class="stats-card-label">Median Score</div>
-                    <div id="statsMedianScore" class="stats-card-value">0</div>
+                    <div class="stats-card-label">Average Points</div>
+                    <div id="statsAveragePoints" class="stats-card-value">0</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-card-label">Perfect Days</div>
+                    <div id="statsPerfectDays" class="stats-card-value">0 / 0</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-card-label">Perfect Streak</div>
+                    <div id="statsPerfectStreak" class="stats-card-value">0</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-card-label">Best Points</div>
+                    <div id="statsBestPoints" class="stats-card-value">0</div>
+                    <div id="statsBestPointsDate" class="stats-card-subvalue">—</div>
                 </div>
             </div>
 
             <div class="stats-chart-wrap">
-                <div class="stats-section-title">Last 20 Games</div>
-                <svg id="statsChart" class="stats-chart" viewBox="0 0 640 220" preserveAspectRatio="none"></svg>
-            </div>
-
-            <div class="stats-bottom-grid">
-                <div class="stats-card">
-                    <div class="stats-card-label">Last Score</div>
-                    <div id="statsLastScore" class="stats-card-value">0</div>
+                <div class="stats-chart-header">
+                    <div class="stats-section-title">Recent Performance</div>
+                    <div class="stats-chart-caption"></div>
                 </div>
-                <div class="stats-card">
-                    <div class="stats-card-label">Best Guess</div>
-                    <div id="statsBestGuess" class="stats-card-value stats-best-guess">—</div>
-                </div>
+                <svg id="statsChart" class="stats-chart" viewBox="0 0 640 240" preserveAspectRatio="none"></svg>
             </div>
         </div>
     </div>
@@ -98,6 +114,6 @@
         window.CESIUM_ION_TOKEN = {{ cesium_ion_token|tojson }};
     </script>
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

@@ -1,0 +1,137 @@
+.city-row {
+    padding: 10px 0;
+    border-top: 1px solid #262b34;
+}
+
+.city-name {
+    font-weight: 700;
+}
+
+.city-detail {
+    color: #b7c4d4;
+    font-size: 14px;
+    margin-top: 4px;
+}
+
+#guessControls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#guessInput {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid #3a4658;
+    border-radius: 6px;
+    background: #111824;
+    color: #e9eef5;
+    font-size: 14px;
+    outline: none;
+}
+
+#guessInput::placeholder {
+    color: #8e9db1;
+}
+
+#guessInput:focus {
+    border-color: #51627c;
+    box-shadow: 0 0 0 2px rgba(81, 98, 124, 0.18);
+}
+
+#guessBtn,
+#passBtn,
+#nextBtn {
+    padding: 10px 16px;
+    border: 1px solid #3a4658;
+    background: #1d2633;
+    color: #e9eef5;
+    font-size: 14px;
+    font-weight: 700;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+#guessBtn:hover,
+#passBtn:hover,
+#nextBtn:hover {
+    background: #253244;
+    border-color: #51627c;
+}
+
+#guessBtn:disabled,
+#passBtn:disabled,
+#nextBtn:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+#guessFeedback {
+    margin: 0;
+    line-height: 1.35;
+    text-align: center;
+}
+
+#guessFeedback:empty {
+    display: none;
+}
+
+#nextBtn {
+    display: none;
+    margin-top: 12px;
+    align-self: flex-end;
+}
+
+#roundTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    table-layout: fixed;
+}
+
+#roundTable th,
+#roundTable td {
+    padding: 8px;
+    border: 1px solid #2a3442;
+    vertical-align: middle;
+}
+
+#roundTable th:nth-child(1),
+#roundTable td:nth-child(1) {
+    width: 10px;
+    text-align: center;
+}
+
+#roundTable th:nth-child(2),
+#roundTable td:nth-child(2) {
+    width: 100px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#roundTable th:nth-child(3),
+#roundTable td:nth-child(3) {
+    width: 75px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+#roundTable th:nth-child(4),
+#roundTable td:nth-child(4),
+#roundTable th:nth-child(5),
+#roundTable td:nth-child(5) {
+    width: 30px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.round-city {
+    display: block;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
