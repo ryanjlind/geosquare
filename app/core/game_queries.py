@@ -134,6 +134,7 @@ def get_ranked_square_cities(cur, square_id: int):
             ROW_NUMBER() OVER (ORDER BY Population DESC) AS PopRank
         FROM dbo.GameSquareCities
         WHERE SquareId = ?
+        ORDER BY Population DESC
     """, square_id)
     return cur.fetchall()
 

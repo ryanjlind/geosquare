@@ -65,6 +65,15 @@ def phonetic_key(text: str) -> str:
 
 
 def find_matching_city(rows, guess_text: str):
+    guess_text = guess_text.strip()
+
+    country_filter = None
+    if ',' in guess_text:
+        parts = [p.strip() for p in guess_text.split(',', 1)]
+        if len(parts) == 2:
+            guess_text, country_part = parts
+            country_filter = country_part.upper()
+
     guess_keys = build_match_keys(guess_text)
     normalized_guess = normalize_place_name(guess_text)
 
@@ -79,13 +88,18 @@ def find_matching_city(rows, guess_text: str):
     }
 
     print(f'\n=== GUESS: {guess_text}')
+    print(f'Country filter: {country_filter}')
     print(f'Normalized: {normalized_guess}')
     print(f'Keys: {guess_keys}')
     print(f'Phonetic Keys: {guess_phonetic_keys}')
 
-    for row in rows:
+    candidate_rows = rows
+    if country_filter:
+        candidate_rows = [r for r in rows if r.CountryCode.upper() == country_filter]
+
+    for row in candidate_rows:
         city_keys = build_match_keys(row.CityName)
-        print(f'CITY: {row.CityName} -> {city_keys}')
+        print(f'CITY: {row.CityName} ({row.CountryCode}) -> {city_keys}')
 
         if guess_keys & city_keys:
             print(f'MATCH (direct): {row.CityName}')
@@ -93,7 +107,7 @@ def find_matching_city(rows, guess_text: str):
 
     print('No direct match. Trying exact phonetic...')
 
-    for row in rows:
+    for row in candidate_rows:
         city_keys = build_match_keys(row.CityName)
         city_phonetic_keys = {
             phonetic_key(key)
