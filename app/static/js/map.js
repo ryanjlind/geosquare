@@ -23,6 +23,9 @@ export async function initCesium() {
     window.geoViewer.scene.screenSpaceCameraController.inertiaTranslate = 0;
     window.geoViewer.scene.screenSpaceCameraController.inertiaZoom = 0;
     window.geoViewer.scene.screenSpaceCameraController.minimumZoomDistance = 150000;
+    window.geoViewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(0, 20, 8000000)
+    });
 }
 
 export function clearMap() {
