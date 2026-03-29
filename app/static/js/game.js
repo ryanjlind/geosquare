@@ -142,7 +142,7 @@ export async function submitGuess() {
 }
 
 export async function initGame() {
-    initCesium();
+    await initCesium();
     wireStatsOverlay();
 
     const { response: stateResponse, data: state } = await fetchGameState();

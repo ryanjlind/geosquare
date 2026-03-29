@@ -39,3 +39,37 @@ h1 {
         rgba(157, 172, 191, 0)
     );
 }
+.sidebar-attribution {
+    margin-top: auto;
+    padding-top: 18px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    font-size: 13px;
+    line-height: 1.45;
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.sidebar-attribution-title {
+    margin-bottom: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.sidebar-attribution-item {
+    margin-bottom: 8px;
+}
+
+.sidebar-attribution a {
+    color: rgba(255, 255, 255, 0.92);
+    text-decoration: none;
+}
+
+.sidebar-attribution a:hover {
+    text-decoration: underline;
+}
+
+.sidebar-attribution-license {
+    color: rgba(255, 255, 255, 0.58);
+}

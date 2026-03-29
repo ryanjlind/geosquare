@@ -1,7 +1,7 @@
-export function initCesium() {
-    if (window.CESIUM_ION_TOKEN) {
-        Cesium.Ion.defaultAccessToken = window.CESIUM_ION_TOKEN;
-    }
+export async function initCesium() {
+    const arcGisImageryProvider = await Cesium.ArcGisMapServerImageryProvider.fromUrl(
+        'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer'
+    );
 
     window.geoViewer = new Cesium.Viewer('cesiumContainer', {
         animation: false,
@@ -15,6 +15,7 @@ export function initCesium() {
         infoBox: false,
         selectionIndicator: false,
         shouldAnimate: false,
+        baseLayer: new Cesium.ImageryLayer(arcGisImageryProvider)
     });
 
     window.geoViewer.scene.globe.enableLighting = false;
