@@ -7,12 +7,12 @@
         if (!isMobile()) return;
         if (document.body.dataset.mobileInit === 'true') return;
 
-        const sidebar = document.getElementById('sidebar');
         const guessBox = document.getElementById('guessBox');
         const guessFeedback = document.getElementById('guessFeedback');
+        const nextBtn = document.getElementById('nextBtn');
         const closeBtn = document.getElementById('mobileDrawerCloseBtn');
 
-        if (!sidebar || !guessBox || !guessFeedback || !closeBtn) return;
+        if (!sidebar || !guessBox || !guessFeedback || !nextBtn || !closeBtn) return;
 
         const scrim = document.createElement('div');
         scrim.className = 'mobile-drawer-scrim';
@@ -33,6 +33,7 @@
 
         topbar.querySelector('.mobile-feedback-host').appendChild(guessFeedback);
         bottomTray.appendChild(guessBox);
+        bottomTray.appendChild(nextBtn);
 
         function openDrawer() {
             sidebar.classList.add('mobile-open');
@@ -64,8 +65,10 @@
         }
 
         function syncGuessTrayVisibility() {
-            const visible = getComputedStyle(guessBox).display !== 'none';
-            bottomTray.style.display = visible ? 'block' : 'none';
+            const guessVisible = getComputedStyle(guessBox).display !== 'none';
+            const nextVisible = getComputedStyle(nextBtn).display !== 'none';
+
+            bottomTray.style.display = (guessVisible || nextVisible) ? 'block' : 'none';
         }
 
         document.getElementById('mobileMenuBtn').addEventListener('click', openDrawer);
@@ -73,7 +76,13 @@
         scrim.addEventListener('click', closeDrawer);
 
         const observer = new MutationObserver(syncGuessTrayVisibility);
+
         observer.observe(guessBox, {
+            attributes: true,
+            attributeFilter: ['style', 'class', 'hidden']
+        });
+
+        observer.observe(nextBtn, {
             attributes: true,
             attributeFilter: ['style', 'class', 'hidden']
         });

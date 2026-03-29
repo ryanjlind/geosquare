@@ -20,6 +20,7 @@
         display: block;
         width: 100%;
         height: 100%;
+        z-index: auto;
     }
 
     #cesiumContainer {
@@ -34,7 +35,7 @@
         position: fixed;
         top: var(--mobile-offset-top);
         left: 0;
-        width: 100vw;
+        width: min(92vw, 420px);
         height: var(--mobile-vh);
         transform: translateX(-100%);
         transition: transform 0.22s ease;
@@ -46,7 +47,7 @@
         overflow-y: auto;
         overflow-x: hidden;
         background: #151922;
-        border-right: none;
+        border-right: 1px solid #262b34;
     }
 
     .sidebar.mobile-open {
@@ -148,7 +149,6 @@
     }
 
     .mobile-bottomtray #guessBox {
-        display: block !important;
         margin: 0;
     }
 
@@ -170,5 +170,22 @@
     .mobile-bottomtray #passBtn {
         height: 40px;
         white-space: nowrap;
+    }
+
+    .mobile-bottomtray #nextBtn {
+        display: none;
+        height: 40px;
+        width: 100%;
+        margin: 0;
+    }
+
+    .mobile-bottomtray #guessBox[style*="display: none"] + #nextBtn,
+    .mobile-bottomtray #nextBtn[style*="display: inline-block"],
+    .mobile-bottomtray #nextBtn[style*="display: block"] {
+        display: block;
+    }
+
+    .mobile-bottomtray #guessBox[style*="display: none"] #guessControls {
+        display: none;
     }
 }
