@@ -102,7 +102,17 @@ def find_matching_city(rows, guess_text: str):
             ).ratio()
 
             if exact_phonetic:
-                score = 1.0
+                compact_len_gap = abs(len(guess_compact) - len(city_compact))
+                compact_prefix = 0
+                for a, b in zip(guess_compact, city_compact):
+                    if a != b:
+                        break
+                    compact_prefix += 1
+
+                if fuzzy_score >= 0.86 and compact_len_gap <= 1 and compact_prefix >= 3:
+                    score = 1.0
+                else:
+                    score = fuzzy_score
             else:
                 score = fuzzy_score
 
