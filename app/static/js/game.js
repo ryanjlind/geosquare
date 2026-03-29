@@ -1,6 +1,6 @@
 import { gameState } from './state.js';
 import { fetchGameState, fetchRound, submitGuessRequest, submitPassRequest } from './api.js';
-import { getSfxCtx, warmUpSfx, playSuccess, playFail } from './audio.js';
+import { getSfxCtx, warmUpSfx, playSuccess, playFail, playComplete, playPerfect } from './audio.js';
 import { initCesium, renderRoundMap, drawCities, showGuessedCity, showIncorrectGuessedCity } from './map.js';
 import {
     setMetaError,
@@ -18,6 +18,8 @@ import {
 } from './ui.js';
 import { wireStatsOverlay, showEndGameSummary } from './stats.js';
 import { escapeHtml, numberFmt, ordinal } from './utils.js';
+
+let isPerfect = true;
 
 function renderRound(data) {
     renderSidebar(data);
@@ -68,6 +70,8 @@ export async function handleNextRound() {
 export async function handlePass() {
     gameState.roundLocked = true;
     getSfxCtx();
+    
+    isPerfect = false 
 
     const { response, data } = await submitPassRequest(gameState.currentRound);
 
@@ -112,19 +116,25 @@ export async function submitGuess() {
 
     if (data.correct) {
         gameState.roundLocked = true;
-
+        console.log(gameState);        
         setGuessFeedback(`<b>${escapeHtml(data.city.toUpperCase())}</b> is the ${data.rank === 1 ? 'largest' : `${ordinal(data.rank)} largest`} city in the square.<br><br>
         With a population of ${numberFmt(data.population)}, you are awarded <b>${numberFmt(data.score)}</b> points.<br>`);
 
         showGuessedCity(data);
-        addRoundRow(data, gameState.currentRound);
-        playSuccess();
+        addRoundRow(data, gameState.currentRound);        
         clearGuessInput();
         setGuessBoxVisible(false);
 
         if (gameState.currentRound === 5) {
+            if (isPerfect) {
+                playPerfect();
+            }
+            else {
+                playComplete();
+            }                        
             await showEndGameSummary();
         } else {
+            playSuccess();
             showNextButton(gameState.currentRound);
         }
 
@@ -155,9 +165,9 @@ export async function initGame() {
     const data = await fetchRound(state.round_number || 1);
 
     gameState.currentRound = data.round_number;
+    gameState.isPerfect = state.isPerfect;
     console.log('[DEBUG] init:before-load', { currentRound: gameState.currentRound });
-    gameState.roundLocked = false;
-
+    gameState.roundLocked = false; 
     renderRound(data);
     const { currentRoundCompleted } = restoreSavedState(state);
     wireGuessing();

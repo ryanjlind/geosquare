@@ -115,8 +115,7 @@ def _build_completed_rounds(rows):
 
         if row.CityName is not None:
             completed_rounds_by_number[round_number]['guesses'].append({
-                'city_name': row.CityName,
-                'matched_city_id': int(row.MatchedCityId) if row.MatchedCityId is not None else None,
+                'city_name': row.CityName,                
                 'population': int(row.Population) if row.Population is not None else None,
                 'score': int(row.GuessScore),
                 'rank': int(row.PopRank) if row.PopRank is not None else None,
@@ -326,10 +325,13 @@ def get_game_state_payload(user_id: int, session_id: int | None) -> tuple[dict, 
             flush=True,
         )
 
+        print(completed_rounds)
+        is_perfect = len(completed_rounds) == all(r.get('city_name') is not None for r in completed_rounds)
+
         if session.CompletedAt is not None:
             latest_round_number = completed_rounds[-1]['round_number'] if completed_rounds else 1
             conn.commit()
-
+            
             return {
                 'state': 'completed',
                 'session_id': int(session.SessionId),
@@ -339,6 +341,7 @@ def get_game_state_payload(user_id: int, session_id: int | None) -> tuple[dict, 
                 'total_score': int(session.TotalScore),
                 'completed_at': session.CompletedAt.isoformat(),
                 'completed_rounds': completed_rounds,
+                'is_perfect': is_perfect,
             }, 200
 
         if len(completed_rounds) == 0:
@@ -353,6 +356,7 @@ def get_game_state_payload(user_id: int, session_id: int | None) -> tuple[dict, 
                 'total_score': int(session.TotalScore),
                 'completed_at': None,
                 'completed_rounds': [],
+                'is_perfect': False,
             }, 200
 
         next_round = completed_rounds[-1]['round_number'] + 1
@@ -367,6 +371,7 @@ def get_game_state_payload(user_id: int, session_id: int | None) -> tuple[dict, 
             'total_score': int(session.TotalScore),
             'completed_at': None,
             'completed_rounds': completed_rounds,
+            'is_perfect': is_perfect,
         }, 200
     
 def _compute_streaks(game_dates):

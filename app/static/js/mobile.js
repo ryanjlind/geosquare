@@ -7,6 +7,7 @@
         if (!isMobile()) return;
         if (document.body.dataset.mobileInit === 'true') return;
 
+        const sidebar = document.getElementById('sidebar');
         const guessBox = document.getElementById('guessBox');
         const guessFeedback = document.getElementById('guessFeedback');
         const nextBtn = document.getElementById('nextBtn');
@@ -64,28 +65,9 @@
             root.style.setProperty('--mobile-keyboard-inset', `${keyboardInset}px`);
         }
 
-        function syncGuessTrayVisibility() {
-            const guessVisible = getComputedStyle(guessBox).display !== 'none';
-            const nextVisible = getComputedStyle(nextBtn).display !== 'none';
-
-            bottomTray.style.display = (guessVisible || nextVisible) ? 'block' : 'none';
-        }
-
         document.getElementById('mobileMenuBtn').addEventListener('click', openDrawer);
         closeBtn.addEventListener('click', closeDrawer);
         scrim.addEventListener('click', closeDrawer);
-
-        const observer = new MutationObserver(syncGuessTrayVisibility);
-
-        observer.observe(guessBox, {
-            attributes: true,
-            attributeFilter: ['style', 'class', 'hidden']
-        });
-
-        observer.observe(nextBtn, {
-            attributes: true,
-            attributeFilter: ['style', 'class', 'hidden']
-        });
 
         if (window.visualViewport) {
             window.visualViewport.addEventListener('resize', syncViewportVars);
@@ -95,7 +77,6 @@
         window.addEventListener('resize', syncViewportVars);
 
         syncViewportVars();
-        syncGuessTrayVisibility();
 
         document.body.dataset.mobileInit = 'true';
     }

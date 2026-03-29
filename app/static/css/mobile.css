@@ -167,25 +167,13 @@
     }
 
     .mobile-bottomtray #guessBtn,
-    .mobile-bottomtray #passBtn {
+    .mobile-bottomtray #passBtn,
+    .mobile-bottomtray #nextBtn {
         height: 40px;
         white-space: nowrap;
     }
 
     .mobile-bottomtray #nextBtn {
-        display: none;
-        height: 40px;
         width: 100%;
         margin: 0;
     }
-
-    .mobile-bottomtray #guessBox[style*="display: none"] + #nextBtn,
-    .mobile-bottomtray #nextBtn[style*="display: inline-block"],
-    .mobile-bottomtray #nextBtn[style*="display: block"] {
-        display: block;
-    }
-
-    .mobile-bottomtray #guessBox[style*="display: none"] #guessControls {
-        display: none;
-    }
-}

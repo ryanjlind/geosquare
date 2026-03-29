@@ -174,9 +174,9 @@ def get_or_create_session_round(cur, session_id: int, round_number: int, square_
 def insert_correct_guess(cur, session_round_id: int, city_name: str, population: int, score: int):
     cur.execute("""
         INSERT INTO dbo.GameGuesses
-            (SessionRoundId, CityName, MatchedCityId, IsCorrect, Population, Score, GuessedAt)
+            (SessionRoundId, CityName, IsCorrect, Population, Score, GuessedAt)
         VALUES
-            (?, ?, NULL, 1, ?, ?, SYSUTCDATETIME())
+            (?, ?, 1, ?, ?, SYSUTCDATETIME())
     """, session_round_id, city_name, population, score)
 
 
@@ -235,8 +235,7 @@ def get_completed_round_rows(cur, session_id: int):
             gsr.RoundNumber,
             gsr.SquareId,
             gsr.Score,
-            gg.CityName,
-            gg.MatchedCityId,
+            gg.CityName,            
             gg.Population,
             gg.Score AS GuessScore,
             gg.GuessedAt,
