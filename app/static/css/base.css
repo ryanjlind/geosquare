@@ -73,3 +73,7 @@ h1 {
 .sidebar-attribution-license {
     color: rgba(255, 255, 255, 0.58);
 }
+
+.sidebar-mobile-header {
+    display: none;
+}

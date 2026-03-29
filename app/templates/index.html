@@ -9,22 +9,34 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/game.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/stats.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
 </head>
 <body>
     <div class="layout">
-        <div class="sidebar">
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-mobile-header">
+                <div class="sidebar-mobile-header-title">Menu</div>
+                <button id="mobileDrawerCloseBtn" class="mobile-drawer-close-btn" type="button">Close</button>
+            </div>
+
             <h1>GeoSquare</h1>
+
             <div id="meta"></div>
+
             <div class="sidebar-divider"></div>
+
             <div id="guessBox">
                 <div id="guessControls">
-                    <input id="guessInput" type="search" name="goawaybrowsers" placeholder="Enter a city..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"> 
-                    <button id="guessBtn">Submit</button>
-                    <button id="passBtn">Pass</button>
+                    <input id="guessInput" type="search" name="goawaybrowsers" placeholder="Enter a city..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                    <button id="guessBtn" type="button">Submit</button>
+                    <button id="passBtn" type="button">Pass</button>
                 </div>
             </div>
+
             <div id="guessFeedback"></div>
+
             <div class="sidebar-divider"></div>
+
             <table id="roundTable">
                 <thead>
                     <tr>
@@ -42,8 +54,10 @@
                         <td id="totalPoints">0</td>
                     </tr>
                 </tfoot>
-            </table>        
-            <button id="nextBtn" style="display:none;">Next</button>
+            </table>
+
+            <button id="nextBtn" style="display:none;" type="button">Next</button>
+
             <div class="sidebar-attribution">
                 <div class="sidebar-attribution-title">Credits</div>
 
@@ -56,6 +70,7 @@
                     Imagery:
                     <a href="https://www.esri.com/" target="_blank" rel="noopener noreferrer">Esri World Imagery</a>
                 </div>
+
                 <div class="sidebar-attribution-item">
                     City data:
                     <a href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer">GeoNames</a>
@@ -68,7 +83,6 @@
                 <div class="sidebar-attribution-item">
                     Land data:
                     <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener noreferrer">Natural Earth</a>
-                    <span class="sidebar-attribution-license"></span>
                 </div>
             </div>
         </div>
@@ -142,5 +156,6 @@
     </script>
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
     <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/mobile.js') }}"></script>
 </body>
 </html>
