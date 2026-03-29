@@ -70,6 +70,39 @@
         cursor: pointer;
     }
 
+    .sidebar h1,
+    .sidebar #guessBox,
+    .sidebar #guessFeedback,
+    .sidebar #nextBtn,
+    .sidebar #roundTable {
+        display: none;
+    }
+
+    .sidebar #meta {
+        margin-top: 0;
+    }
+
+    .sidebar .desktop-meta-only {
+        display: none;
+    }
+
+    .sidebar #meta + .sidebar-divider,
+    .sidebar #roundTable + #nextBtn + .sidebar-attribution,
+    .sidebar #roundTable + .sidebar-divider {
+        display: none;
+    }
+
+    .sidebar .sidebar-divider {
+        display: none;
+    }
+
+    .sidebar .sidebar-attribution::before {
+        content: '';
+        display: block;
+        height: 1px;
+        margin: 16px 0;
+        background: #262b34;
+    }
     .mobile-drawer-scrim {
         position: fixed;
         inset: 0;

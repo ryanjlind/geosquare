@@ -8,17 +8,19 @@ export function renderSidebar(data) {
     const meta = document.getElementById('meta');
 
     meta.innerHTML = `
-        <div class="label">Round</div>
-        <div class="value">${data.round_number} / 5</div>
-        
-        <div class="label">Population in square</div>
-        <div class="value">${numberFmt(data.total_population)}</div>
+        <div class="desktop-meta-only">
+            <div class="label">Round</div>
+            <div class="value">${data.round_number} / 5</div>
 
-        <div class="label">Cities in square</div>
-        <div class="value">${numberFmt(data.total_city_count)}</div>
+            <div class="label">Population in square</div>
+            <div class="value">${numberFmt(data.total_population)}</div>
 
-        <div class="label">Largest city population</div>
-        <div class="value">${numberFmt(data.largest_city.population)}</div>
+            <div class="label">Cities in square</div>
+            <div class="value" data-mobile-cities-value>${numberFmt(data.total_city_count)}</div>
+
+            <div class="label">Largest city population</div>
+            <div class="value">${numberFmt(data.largest_city.population)}</div>
+        </div>
 
         <div class="label">Gameplay</div>
         <div class="value">

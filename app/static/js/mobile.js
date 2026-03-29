@@ -1,3 +1,5 @@
+import { gameState } from './state.js';
+
 (function () {
     function isMobile() {
         return window.matchMedia('(max-width: 768px)').matches;
@@ -21,8 +23,9 @@
 
         const topbar = document.createElement('div');
         topbar.className = 'mobile-topbar';
-       topbar.innerHTML = `
+        topbar.innerHTML = `
             <button id="mobileMenuBtn" class="mobile-menu-btn" type="button">Menu</button>
+            <div class="mobile-title">GeoSquare</div>
             <div class="mobile-hero-stats">
                 <div class="mobile-hero-stat">
                     <div class="mobile-hero-stat-label">Round</div>
@@ -31,6 +34,10 @@
                 <div class="mobile-hero-stat">
                     <div class="mobile-hero-stat-label">Points</div>
                     <div id="mobilePointsStat" class="mobile-hero-stat-value">0</div>
+                </div>
+                <div class="mobile-hero-stat">
+                    <div class="mobile-hero-stat-label">Cities</div>
+                    <div id="mobileCitiesStat" class="mobile-hero-stat-value">0</div>
                 </div>
             </div>
         `;
@@ -49,8 +56,24 @@
         const totalPoints = document.getElementById('totalPoints');
 
         function syncMobileHeroStats() {
-            mobileRoundStat.textContent = String(gameState.currentRound);
-            mobilePointsStat.textContent = totalPoints ? totalPoints.textContent : '0';
+            const mobileRoundStat = document.getElementById('mobileRoundStat');
+            const mobilePointsStat = document.getElementById('mobilePointsStat');
+            const mobileCitiesStat = document.getElementById('mobileCitiesStat');
+            const totalPoints = document.getElementById('totalPoints');
+            const meta = document.getElementById('meta');
+
+            if (mobileRoundStat) {
+                mobileRoundStat.textContent = String(gameState.currentRound);
+            }
+
+            if (mobilePointsStat && totalPoints) {
+                mobilePointsStat.textContent = totalPoints.textContent;
+            }
+
+            if (mobileCitiesStat && meta) {
+                const cityValue = meta.querySelector('[data-mobile-cities-value]');
+                mobileCitiesStat.textContent = cityValue ? cityValue.textContent : '0';
+            }
         }
 
         function openDrawer() {
