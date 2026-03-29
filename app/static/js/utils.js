@@ -42,3 +42,20 @@ export function escapeHtml(value) {
 export function parseFormattedInt(value) {
     return parseInt(String(value).replace(/,/g, ''), 10) || 0;
 }
+
+export async function postClientLog(eventType, details) {
+    try {
+        await fetch('/api/client-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                event_type: eventType,
+                url: window.location.href,
+                user_agent: navigator.userAgent,
+                details: details
+            })
+        });
+    } catch (err) {
+        console.error('Failed to send client log', err);
+    }
+}
