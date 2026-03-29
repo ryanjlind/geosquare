@@ -1,7 +1,3 @@
-.sidebar-mobile-header {
-    display: none;
-}
-
 @media (max-width: 768px) {
     :root {
         --mobile-vh: 100dvh;
@@ -16,6 +12,10 @@
         overflow: hidden;
     }
 
+    .sidebar-mobile-header {
+        display: none;
+    }
+    
     .layout {
         display: block;
         width: 100%;
@@ -233,3 +233,30 @@
         font-weight: 700;
         color: #ffffff;
     }
+    .stats-modal {
+        width: min(92vw, 560px);
+        max-height: calc(var(--mobile-vh) - 24px);
+        overflow-y: auto;
+        box-sizing: border-box;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        align-items: stretch;
+    }
+
+    .stats-card {
+        min-width: 0;
+        height: auto;
+    }
+
+    .stats-card-value,
+    .stats-card-subvalue,
+    .stats-today-score,
+    .stats-today-secondary {
+        overflow-wrap: anywhere;
+    }
+
+}
