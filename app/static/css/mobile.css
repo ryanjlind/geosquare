@@ -86,7 +86,7 @@
     }
 
     .sidebar #meta + .sidebar-divider,
-    .sidebar #roundTable + #nextBtn + .sidebar-attribution {
+    .sidebar #roundTable + .sidebar-divider {
         display: none;
     }
 

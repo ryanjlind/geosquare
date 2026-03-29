@@ -118,8 +118,7 @@ export async function submitGuess() {
     await warmUpSfx();
     const { data } = await submitGuessRequest(guess, gameState.currentRound);
 
-    if (data.correct) {
-        gameState.roundLocked = true;
+    if (data.correct) {        
         console.log(gameState);        
         setGuessFeedback(`<b>${escapeHtml(data.city.toUpperCase())}</b> is the ${data.rank === 1 ? 'largest' : `${ordinal(data.rank)} largest`} city in the square.<br><br>
         With a population of ${numberFmt(data.population)}, you are awarded <b>${numberFmt(data.score)}</b> points.<br>`);
@@ -153,6 +152,7 @@ export async function submitGuess() {
 
     playFail();
     focusGuessInput();
+    gameState.roundLocked = false;
 }
 
 export async function initGame() {
