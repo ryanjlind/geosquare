@@ -113,8 +113,9 @@ export async function submitGuess() {
     }
 
     gameState.roundLocked = true;
-    
+
     const guess = getGuessValue();
+    await warmUpSfx();
     const { data } = await submitGuessRequest(guess, gameState.currentRound);
 
     if (data.correct) {
