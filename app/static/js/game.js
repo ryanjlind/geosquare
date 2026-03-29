@@ -108,8 +108,12 @@ export async function handlePass() {
 }
 
 export async function submitGuess() {
-    getSfxCtx();
+    if (gameState.roundLocked) {
+        return;
+    }
 
+    gameState.roundLocked = true;
+    
     const guess = getGuessValue();
     const { data } = await submitGuessRequest(guess, gameState.currentRound);
 
