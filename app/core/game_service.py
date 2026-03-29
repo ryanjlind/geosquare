@@ -326,8 +326,8 @@ def get_game_state_payload(user_id: int, session_id: int | None) -> tuple[dict, 
         )
 
         print(completed_rounds)
-        is_perfect = len(completed_rounds) == all(r.get('city_name') is not None for r in completed_rounds)
-
+        is_perfect = all(r['score'] > 0 for r in completed_rounds)
+        print(f"is_perfect: {is_perfect}")
         if session.CompletedAt is not None:
             latest_round_number = completed_rounds[-1]['round_number'] if completed_rounds else 1
             conn.commit()
@@ -356,7 +356,7 @@ def get_game_state_payload(user_id: int, session_id: int | None) -> tuple[dict, 
                 'total_score': int(session.TotalScore),
                 'completed_at': None,
                 'completed_rounds': [],
-                'is_perfect': False,
+                'is_perfect': True,
             }, 200
 
         next_round = completed_rounds[-1]['round_number'] + 1

@@ -119,28 +119,12 @@
         white-space: nowrap;
     }
 
-    .mobile-feedback-host {
-        min-width: 0;
-        overflow: hidden;
-        font-size: 12px;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-    }
-
-    .mobile-feedback-host #guessFeedback {
-        display: block !important;
-        margin: 0;
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-    }
-
     .mobile-bottomtray {
         position: fixed;
         left: 0;
         right: 0;
         bottom: var(--mobile-keyboard-inset);
-        min-height: var(--mobile-bottomtray-height);
+        min-height: calc(var(--mobile-bottomtray-height) + 44px);
         padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
         box-sizing: border-box;
         background: #151922;
@@ -173,7 +157,48 @@
         white-space: nowrap;
     }
 
+    .mobile-bottomtray #guessFeedback {
+        display: block !important;
+        margin: 8px 0 0 0;
+        font-size: 13px;
+        line-height: 1.35;
+        min-height: 18px;
+    }
+
     .mobile-bottomtray #nextBtn {
         width: 100%;
-        margin: 0;
+        margin: 8px 0 0 0;
+    }
+
+    .mobile-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .mobile-hero-stats {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-left: auto;
+    }
+
+    .mobile-hero-stat {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        line-height: 1.1;
+    }
+
+    .mobile-hero-stat-label {
+        font-size: 11px;
+        color: #9aa3b2;
+        text-transform: uppercase;
+    }
+
+    .mobile-hero-stat-value {
+        font-size: 18px;
+        font-weight: 700;
+        color: #ffffff;
     }

@@ -21,10 +21,18 @@
 
         const topbar = document.createElement('div');
         topbar.className = 'mobile-topbar';
-        topbar.innerHTML = `
+       topbar.innerHTML = `
             <button id="mobileMenuBtn" class="mobile-menu-btn" type="button">Menu</button>
-            <div class="mobile-feedback-host"></div>
-            <div class="mobile-title">GeoSquare</div>
+            <div class="mobile-hero-stats">
+                <div class="mobile-hero-stat">
+                    <div class="mobile-hero-stat-label">Round</div>
+                    <div id="mobileRoundStat" class="mobile-hero-stat-value">1</div>
+                </div>
+                <div class="mobile-hero-stat">
+                    <div class="mobile-hero-stat-label">Points</div>
+                    <div id="mobilePointsStat" class="mobile-hero-stat-value">0</div>
+                </div>
+            </div>
         `;
         document.body.appendChild(topbar);
 
@@ -32,9 +40,18 @@
         bottomTray.className = 'mobile-bottomtray';
         document.body.appendChild(bottomTray);
 
-        topbar.querySelector('.mobile-feedback-host').appendChild(guessFeedback);
         bottomTray.appendChild(guessBox);
+        bottomTray.appendChild(guessFeedback);
         bottomTray.appendChild(nextBtn);
+
+        const mobileRoundStat = document.getElementById('mobileRoundStat');
+        const mobilePointsStat = document.getElementById('mobilePointsStat');
+        const totalPoints = document.getElementById('totalPoints');
+
+        function syncMobileHeroStats() {
+            mobileRoundStat.textContent = String(gameState.currentRound);
+            mobilePointsStat.textContent = totalPoints ? totalPoints.textContent : '0';
+        }
 
         function openDrawer() {
             sidebar.classList.add('mobile-open');
@@ -77,6 +94,16 @@
         window.addEventListener('resize', syncViewportVars);
 
         syncViewportVars();
+        syncMobileHeroStats();
+
+        const observer = new MutationObserver(syncMobileHeroStats);
+        if (totalPoints) {
+            observer.observe(totalPoints, { childList: true, characterData: true, subtree: true });
+        }
+
+        document.addEventListener('click', () => {
+            syncMobileHeroStats();
+        });
 
         document.body.dataset.mobileInit = 'true';
     }

@@ -19,8 +19,6 @@ import {
 import { wireStatsOverlay, showEndGameSummary } from './stats.js';
 import { escapeHtml, numberFmt, ordinal } from './utils.js';
 
-let isPerfect = true;
-
 function renderRound(data) {
     renderSidebar(data);
     renderRoundMap(data);
@@ -55,8 +53,7 @@ export async function handleNextRound() {
 
     gameState.currentRound += 1;
 
-    if (gameState.currentRound > 5) {
-        hideNextButton();
+    if (gameState.currentRound > 5) {        
         setGuessControlsEnabled(false);
         await showEndGameSummary();
         return;
@@ -65,13 +62,15 @@ export async function handleNextRound() {
     const data = await fetchRound(gameState.currentRound);
     renderRound(data);
     gameState.roundLocked = false;
+    document.getElementById('passBtn').disabled = false;
 }
 
 export async function handlePass() {
+    document.getElementById('passBtn').disabled = true;
     gameState.roundLocked = true;
     getSfxCtx();
     
-    isPerfect = false 
+    gameState.isPerfect = false 
 
     const { response, data } = await submitPassRequest(gameState.currentRound);
 
@@ -126,7 +125,7 @@ export async function submitGuess() {
         setGuessBoxVisible(false);
 
         if (gameState.currentRound === 5) {
-            if (isPerfect) {
+            if (gameState.isPerfect) {
                 playPerfect();
             }
             else {
@@ -163,10 +162,10 @@ export async function initGame() {
     }
 
     const data = await fetchRound(state.round_number || 1);
-
+    
     gameState.currentRound = data.round_number;
-    gameState.isPerfect = state.isPerfect;
-    console.log('[DEBUG] init:before-load', { currentRound: gameState.currentRound });
+    gameState.isPerfect = state.is_perfect;
+    console.log('[DEBUG] init:before-load', { gameState: gameState });
     gameState.roundLocked = false; 
     renderRound(data);
     const { currentRoundCompleted } = restoreSavedState(state);
