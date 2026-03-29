@@ -34,4 +34,26 @@ def build_match_keys(value: str) -> set[str]:
     if base.startswith('saint '):
         keys.add(base.replace('saint ', 'st ', 1))
 
+    tokens = base.split()
+
+    if len(tokens) >= 2:
+        for i, token in enumerate(tokens[2:], start=2):
+            if token in {'de', 'del', 'da', 'do', 'di', 'du', 'of'}:
+                alias = ' '.join(tokens[:i])
+                keys.add(alias)
+                keys.add(alias.replace(' ', ''))
+                break
+
+        if tokens[0] in {'la', 'las', 'los', 'el'}:
+            alias = ' '.join(tokens[1:])
+            if alias:
+                keys.add(alias)
+                keys.add(alias.replace(' ', ''))
+
+        if tokens[0] in {'la', 'las', 'los'}:
+            for article in {'la', 'las', 'los'} - {tokens[0]}:
+                article_alias = ' '.join([article] + tokens[1:])
+                keys.add(article_alias)
+                keys.add(article_alias.replace(' ', ''))
+
     return {key for key in keys if key}
