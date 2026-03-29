@@ -5,18 +5,14 @@
 
     function initMobile() {
         if (!isMobile()) return;
-
         if (document.body.dataset.mobileInit === 'true') return;
 
         const sidebar = document.getElementById('sidebar');
-        const guessInput = document.getElementById('guessInput');
-        const guessBtn = document.getElementById('guessBtn');
-        const passBtn = document.getElementById('passBtn');
+        const guessBox = document.getElementById('guessBox');
         const guessFeedback = document.getElementById('guessFeedback');
-        const nextBtn = document.getElementById('nextBtn');
         const closeBtn = document.getElementById('mobileDrawerCloseBtn');
 
-        if (!sidebar || !guessInput || !guessBtn || !passBtn || !guessFeedback || !nextBtn || !closeBtn) return;
+        if (!sidebar || !guessBox || !guessFeedback || !closeBtn) return;
 
         const scrim = document.createElement('div');
         scrim.className = 'mobile-drawer-scrim';
@@ -35,27 +31,62 @@
         bottomTray.className = 'mobile-bottomtray';
         document.body.appendChild(bottomTray);
 
-        bottomTray.appendChild(guessInput);
-        bottomTray.appendChild(guessBtn);
-        bottomTray.appendChild(passBtn);
-
         topbar.querySelector('.mobile-feedback-host').appendChild(guessFeedback);
+        bottomTray.appendChild(guessBox);
 
         function openDrawer() {
             sidebar.classList.add('mobile-open');
             scrim.classList.add('mobile-open');
-            document.body.style.overflow = 'hidden';
         }
 
         function closeDrawer() {
             sidebar.classList.remove('mobile-open');
             scrim.classList.remove('mobile-open');
-            document.body.style.overflow = '';
+        }
+
+        function syncViewportVars() {
+            const root = document.documentElement;
+            const vv = window.visualViewport;
+
+            let vh = window.innerHeight;
+            let offsetTop = 0;
+            let keyboardInset = 0;
+
+            if (vv) {
+                vh = vv.height;
+                offsetTop = vv.offsetTop;
+                keyboardInset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+            }
+
+            root.style.setProperty('--mobile-vh', `${vh}px`);
+            root.style.setProperty('--mobile-offset-top', `${offsetTop}px`);
+            root.style.setProperty('--mobile-keyboard-inset', `${keyboardInset}px`);
+        }
+
+        function syncGuessTrayVisibility() {
+            const visible = getComputedStyle(guessBox).display !== 'none';
+            bottomTray.style.display = visible ? 'block' : 'none';
         }
 
         document.getElementById('mobileMenuBtn').addEventListener('click', openDrawer);
         closeBtn.addEventListener('click', closeDrawer);
         scrim.addEventListener('click', closeDrawer);
+
+        const observer = new MutationObserver(syncGuessTrayVisibility);
+        observer.observe(guessBox, {
+            attributes: true,
+            attributeFilter: ['style', 'class', 'hidden']
+        });
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', syncViewportVars);
+            window.visualViewport.addEventListener('scroll', syncViewportVars);
+        }
+
+        window.addEventListener('resize', syncViewportVars);
+
+        syncViewportVars();
+        syncGuessTrayVisibility();
 
         document.body.dataset.mobileInit = 'true';
     }
