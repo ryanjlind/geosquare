@@ -105,11 +105,6 @@ export async function handlePass() {
 }
 
 export async function submitGuess() {
-    if (gameState.roundLocked) {        
-        return;
-    }
-
-    gameState.roundLocked = true;
 
     const guess = getGuessValue();
     await warmUpSfx();
