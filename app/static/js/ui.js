@@ -115,10 +115,5 @@ export function restoreSavedState(state) {
         }, round.round_number);
     }
 
-    const completedRounds = state.completed_rounds || [];
-    const currentRoundCompleted = completedRounds.some(r => r.round_number === state.round_number);
-
-    setGuessBoxVisible(!currentRoundCompleted);
-
-    return { currentRoundCompleted };
+    setGuessBoxVisible(true);
 }

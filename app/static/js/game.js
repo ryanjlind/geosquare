@@ -156,10 +156,7 @@ export async function initGame() {
     wireStatsOverlay();
 
     const { response: stateResponse, data: state } = await fetchGameState();
-    alert(
-        'round_number: ' + state.round_number + '\n\ncompleted_rounds: ' +
-        JSON.stringify(state.completed_rounds)
-    );
+
     if (!stateResponse.ok) {
         setMetaError(state.error);
         return;
@@ -172,15 +169,11 @@ export async function initGame() {
     console.log('[DEBUG] init:before-load', { gameState: gameState });
     gameState.roundLocked = false; 
     renderRound(data);
-    const { currentRoundCompleted } = restoreSavedState(state);
+    restoreSavedState(state);
     wireGuessing();
     wireRoundButtons();
     initFeedback();
     
-    if (currentRoundCompleted) {
-        gameState.roundLocked = true;
-    }
-
     if (state.completed_at) {
         setGuessControlsEnabled(false);
         hideNextButton();
