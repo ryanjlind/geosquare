@@ -104,6 +104,7 @@ export async function handlePass() {
 }
 
 export async function submitGuess() {
+    alert(gameState.roundLocked)
     if (gameState.roundLocked) {
         return;
     }
