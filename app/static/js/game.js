@@ -173,7 +173,7 @@ export async function initGame() {
     wireGuessing();
     wireRoundButtons();
     initFeedback();
-    
+    alert(state)
     if (state.completed_at) {
         setGuessControlsEnabled(false);
         hideNextButton();
