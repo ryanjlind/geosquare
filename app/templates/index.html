@@ -223,7 +223,7 @@
         window.CESIUM_ION_TOKEN = {{ cesium_ion_token|tojson }};
     </script>
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
-    <script type="module" src="{{ url_for('static', filename='js/app.js') }}?v=2"></script>
+    <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/mobile.js') }}"></script>
 </body>
 </html>
