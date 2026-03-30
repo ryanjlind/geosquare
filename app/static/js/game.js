@@ -105,6 +105,7 @@ export async function handlePass() {
 
 export async function submitGuess() {
     if (gameState.roundLocked) {
+        alert('round is locked')
         return;
     }
 
@@ -172,13 +173,11 @@ export async function initGame() {
     restoreSavedState(state);
     wireGuessing();
     wireRoundButtons();
-    initFeedback();
-    alert(state)
+    initFeedback();    
     if (state.completed_at) {
         setGuessControlsEnabled(false);
         hideNextButton();
-        setGuessBoxVisible(false);
-        gameState.roundLocked = true;
+        setGuessBoxVisible(false);        
         await showEndGameSummary();
     }
 }
