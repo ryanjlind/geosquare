@@ -138,8 +138,7 @@ def get_ranked_square_cities(cur, square_id: int):
     """, square_id)
     return cur.fetchall()
 
-
-def get_or_create_session_round(cur, session_id: int, round_number: int, square_id: int):
+def get_session_round(cur, session_id: int, round_number: int):
     cur.execute("""
         SELECT TOP 1
             SessionRoundId,
@@ -152,11 +151,9 @@ def get_or_create_session_round(cur, session_id: int, round_number: int, square_
           AND RoundNumber = ?
         ORDER BY SessionRoundId DESC
     """, session_id, round_number)
-    existing = cur.fetchone()
+    return cur.fetchone()
 
-    if existing is not None:
-        return existing
-
+def create_session_round(cur, session_id: int, round_number: int, square_id: int):
     cur.execute("""
         INSERT INTO dbo.GameSessionRounds
             (SessionId, RoundNumber, SquareId, Score)
@@ -170,7 +167,6 @@ def get_or_create_session_round(cur, session_id: int, round_number: int, square_
             (?, ?, ?, 0)
     """, session_id, round_number, square_id)
     return cur.fetchone()
-
 
 def insert_correct_guess(cur, session_round_id: int, city_name: str, population: int, score: int):
     cur.execute("""
@@ -224,7 +220,7 @@ def find_city_anywhere(cur, guess_text: str):
             Population
         FROM dbo.GeoCities
         WHERE IsActive = 1
-          AND LOWER(CityName) = LOWER(?)
+          AND CityNameLower = LOWER(?)
         ORDER BY Population DESC, CityId ASC
     """, guess_text)
     return cur.fetchone()

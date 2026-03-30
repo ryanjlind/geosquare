@@ -105,46 +105,51 @@ export async function handlePass() {
 }
 
 export async function submitGuess() {
+    const guessBtn = document.getElementById('guessBtn');
+    const guessInput = document.getElementById('guessInput');
 
-    const guess = getGuessValue();
-    await warmUpSfx();
-    const { data } = await submitGuessRequest(guess, gameState.currentRound);
+    if (guessBtn.disabled) return;
 
-    if (data.correct) {        
-        console.log(gameState);        
-        setGuessFeedback(`<b>${escapeHtml(data.city.toUpperCase())}</b> is the ${data.rank === 1 ? 'largest' : `${ordinal(data.rank)} largest`} city in the square.<br><br>
-        With a population of ${numberFmt(data.population)}, you are awarded <b>${numberFmt(data.score)}</b> points.<br>`);
+    guessBtn.disabled = true;
+    guessInput.disabled = true;
 
-        showGuessedCity(data);
-        addRoundRow(data, gameState.currentRound);        
-        clearGuessInput();
-        setGuessBoxVisible(false);
+    try {
+        const guess = getGuessValue();
+        await warmUpSfx();
+        const { data } = await submitGuessRequest(guess, gameState.currentRound);
 
-        if (gameState.currentRound === 5) {
-            if (gameState.isPerfect) {
-                playPerfect();
+        if (data.correct) {
+            setGuessFeedback(`<b>${escapeHtml(data.city.toUpperCase())}</b> is the ${data.rank === 1 ? 'largest' : `${ordinal(data.rank)} largest`} city in the square.<br><br>
+            With a population of ${numberFmt(data.population)}, you are awarded <b>${numberFmt(data.score)}</b> points.<br>`);
+
+            showGuessedCity(data);
+            addRoundRow(data, gameState.currentRound);
+            clearGuessInput();
+            setGuessBoxVisible(false);
+
+            if (gameState.currentRound === 5) {
+                if (gameState.isPerfect) playPerfect();
+                else playComplete();
+            } else {
+                playSuccess();
             }
-            else {
-                playComplete();
-            }                                    
-        } else {
-            playSuccess();
-        }            
-        
-        showNextButton(gameState.currentRound);        
 
-        return;
+            showNextButton(gameState.currentRound);
+            return;
+        }
+
+        setGuessFeedback('<br>Not in the square or population < 15,000');
+
+        if (data.matched_city) {
+            showIncorrectGuessedCity(data.matched_city);
+        }
+
+        playFail();        
+    } finally {
+        guessBtn.disabled = false;
+        guessInput.disabled = false;
+        focusGuessInput();
     }
-
-    setGuessFeedback('<br>Not in the square or population < 15,000');
-
-    if (data.matched_city) {
-        showIncorrectGuessedCity(data.matched_city);
-    }
-
-    playFail();
-    focusGuessInput();
-    gameState.roundLocked = false;
 }
 
 export async function initGame() {

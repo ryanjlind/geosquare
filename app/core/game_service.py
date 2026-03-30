@@ -5,7 +5,8 @@ from app.core.game_queries import (
     complete_session,
     create_session,
     get_completed_round_rows,
-    get_or_create_session_round,
+    get_session_round,
+    create_session_round,
     get_ranked_square_cities,
     get_session_by_id,
     get_session_total_score,
@@ -190,6 +191,19 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None) -> tuple[d
         if not session:
             return {'error': 'No game found for today.'}, 404
 
+        session_id = int(session.SessionId)
+
+        # 1. Check if round already exists
+        existing_round = get_session_round(cur, session_id, round_number)
+
+        if existing_round:
+            return {
+                'ok': True,
+                'noop': True,
+                'total_score': int(session.TotalScore),
+            }, 200
+
+        # 2. Resolve square
         game_id = int(session.GameId)
         square_row = get_square_id_for_round(cur, game_id, round_number)
 
@@ -198,12 +212,13 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None) -> tuple[d
 
         square_id = int(square_row.SquareId)
 
+        # 3. Match guess
         rows = get_ranked_square_cities(cur, square_id)
-        matched_city = find_matching_city(rows, guess_text)
+        matched_city = find_matching_city(rows, guess_text)        
 
         if matched_city:
-            session_id = int(session.SessionId)
-            session_round = get_or_create_session_round(cur, session_id, round_number, square_id)
+            # 4. Create session round ONLY on a correct guess.
+            session_round = create_session_round(cur, session_id, round_number, square_id)
             session_round_id = int(session_round.SessionRoundId)
 
             city_name = matched_city.CityName
