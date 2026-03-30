@@ -104,7 +104,6 @@ export async function handlePass() {
 }
 
 export async function submitGuess() {
-    alert(gameState.roundLocked)
     if (gameState.roundLocked) {
         return;
     }
@@ -157,7 +156,10 @@ export async function initGame() {
     wireStatsOverlay();
 
     const { response: stateResponse, data: state } = await fetchGameState();
-
+    alert(
+        'round_number: ' + state.round_number + '\n\ncompleted_rounds: ' +
+        JSON.stringify(state.completed_rounds)
+    );
     if (!stateResponse.ok) {
         setMetaError(state.error);
         return;
