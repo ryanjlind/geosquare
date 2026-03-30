@@ -77,3 +77,50 @@ h1 {
 .sidebar-mobile-header {
     display: none;
 }
+
+.sidebar-support {
+    margin-top: 16px;
+}
+
+.sidebar-section-title {
+    margin: 0 0 14px 0;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #b9c7df;
+}
+
+.sidebar-support {
+    margin-top: 0;
+}
+
+.sidebar-support-links {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.sidebar-support-link-btn {
+    display: inline-block;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #c9d4e7;
+    font: inherit;
+    font-size: 15px;
+    line-height: 1.4;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.sidebar-support-link-btn:hover {
+    color: #ffffff;
+    text-decoration: underline;
+}
+
+.sidebar-support-link-btn:focus-visible {
+    outline: 2px solid #6ea8ff;
+    outline-offset: 2px;
+}

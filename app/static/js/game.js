@@ -18,6 +18,7 @@ import {
 } from './ui.js';
 import { wireStatsOverlay, showEndGameSummary } from './stats.js';
 import { escapeHtml, numberFmt, ordinal } from './utils.js';
+import { initFeedback } from './feedback.js';
 
 function renderRound(data) {
     renderSidebar(data);
@@ -48,8 +49,7 @@ function handleGuessKeyDown(e) {
     }
 }
 
-export async function handleNextRound() {
-    hideNextButton();
+export async function handleNextRound() {    
 
     gameState.currentRound += 1;
 
@@ -97,11 +97,7 @@ export async function handlePass() {
     drawCities([largestCity]);
     playFail();
 
-    if (gameState.currentRound === 5) {
-        await showEndGameSummary();
-    } else {
-        showNextButton(gameState.currentRound);
-    }
+    showNextButton(gameState.currentRound);    
 
     clearGuessInput();
     setGuessBoxVisible(false);
@@ -134,12 +130,12 @@ export async function submitGuess() {
             }
             else {
                 playComplete();
-            }                        
-            await showEndGameSummary();
+            }                                    
         } else {
             playSuccess();
-            showNextButton(gameState.currentRound);
-        }
+        }            
+        
+        showNextButton(gameState.currentRound);        
 
         return;
     }
@@ -176,7 +172,8 @@ export async function initGame() {
     const { currentRoundCompleted } = restoreSavedState(state);
     wireGuessing();
     wireRoundButtons();
-
+    initFeedback();
+    
     if (currentRoundCompleted) {
         gameState.roundLocked = true;
     }

@@ -77,7 +77,7 @@ export function hideNextButton() {
 
 export function showNextButton(currentRound) {
     const btn = document.getElementById('nextBtn');
-    btn.textContent = currentRound === 5 ? 'Finish Game' : 'Next Round';
+    btn.textContent = currentRound === 5 ? 'Show Summary' : 'Next Round';
     btn.style.display = 'inline-block';
 }
 

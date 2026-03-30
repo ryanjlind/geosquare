@@ -1,0 +1,118 @@
+/* overlay + backdrop identical */
+.feedback-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+}
+
+.feedback-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(7, 10, 16, 0.68);
+    backdrop-filter: blur(4px);
+}
+
+/* modal matches stats-modal */
+.feedback-modal {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(700px, calc(100vw - 40px));
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 28px;
+    border: 1px solid #2a3442;
+    border-radius: 16px;
+    background: #151922;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+/* title matches stats-title */
+.feedback-title {
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 18px;
+}
+
+/* close button identical */
+.feedback-close-btn {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 40px;
+    height: 40px;
+    border: 1px solid #3a4658;
+    border-radius: 10px;
+    background: #1d2633;
+    color: #e9eef5;
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.feedback-close-btn:hover {
+    background: #253244;
+    border-color: #51627c;
+}
+
+/* form spacing */
+.feedback-modal label {
+    display: block;
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: #b7c4d4;
+}
+
+/* inputs styled like stats cards */
+.feedback-modal input[type="text"],
+.feedback-modal input[type="email"],
+.feedback-modal select,
+.feedback-modal textarea {
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 6px;
+    padding: 12px 14px;
+    border: 1px solid #2a3442;
+    border-radius: 12px;
+    background: #111824;
+    color: #e9eef5;
+    font: inherit;
+}
+
+.feedback-modal textarea {
+    min-height: 140px;
+    resize: vertical;
+}
+
+/* focus matches tone */
+.feedback-modal input:focus,
+.feedback-modal select:focus,
+.feedback-modal textarea:focus {
+    border-color: #51627c;
+    outline: none;
+}
+
+/* checkbox row */
+.feedback-modal input[type="checkbox"] {
+    margin-right: 10px;
+    accent-color: #6c8fb6;
+}
+
+/* submit styled like subtle action */
+.feedback-modal button {
+    margin-top: 10px;
+    padding: 10px 18px;
+    border: 1px solid #3a4658;
+    border-radius: 10px;
+    background: #1d2633;
+    color: #e9eef5;
+    font: inherit;
+    cursor: pointer;
+}
+
+.feedback-modal button:hover {
+    background: #253244;
+    border-color: #51627c;
+}
