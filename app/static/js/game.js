@@ -168,16 +168,24 @@ export async function initGame() {
     gameState.currentRound = data.round_number;
     gameState.isPerfect = state.is_perfect;
     console.log('[DEBUG] init:before-load', { gameState: gameState });
+    alert(gameState.roundLocked)
     gameState.roundLocked = false; 
+    alert(gameState.roundLocked)
     renderRound(data);
+    alert(gameState.roundLocked)
     restoreSavedState(state);
+    alert(gameState.roundLocked)
     wireGuessing();
+    alert(gameState.roundLocked)
     wireRoundButtons();
+    alert(gameState.roundLocked)
     initFeedback();    
+    alert(gameState.roundLocked)
     if (state.completed_at) {
         setGuessControlsEnabled(false);
         hideNextButton();
         setGuessBoxVisible(false);        
         await showEndGameSummary();
     }
+    alert(gameState.roundLocked)
 }
