@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/game.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/stats.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/feedback.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
 </head>
 <body>
@@ -57,8 +58,8 @@
                 </tfoot>
             </table>
 
-            <button id="nextBtn" style="display:none;" type="button">Next</button>
-
+            <button id="nextBtn" style="display:none;" type="button">Next</button>                       
+                        
             <div class="sidebar-attribution">
                 <div class="sidebar-attribution-title">Credits</div>
 
@@ -80,11 +81,77 @@
                         <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>
                     </span>
                 </div>
-
                 <div class="sidebar-attribution-item">
                     Land data:
                     <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener noreferrer">Natural Earth</a>
                 </div>
+            </div>
+            <div class="sidebar-divider"></div>
+
+            <div class="sidebar-support">
+                <div class="sidebar-attribution-title">Support</div>
+
+                <div class="sidebar-support-links">
+                    <button id="feedbackBtn" class="sidebar-support-link-btn" type="button">Feedback</button>
+                    <a
+                        href="https://ko-fi.com/ryanlind82211"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="sidebar-support-link-btn"
+                    >Tip Jar</a>
+                </div>
+            </div>
+            <div id="feedbackOverlay" class="feedback-overlay" style="display:none;">
+            <div class="feedback-backdrop"></div>
+            <div class="feedback-modal">
+                <button id="feedbackCloseBtn" class="feedback-close-btn">×</button>
+
+                <div class="feedback-title">Feedback / Bug Report</div>
+
+                <label>
+                Type
+                <select id="fbType">
+                    <option value="bug">Bug</option>
+                    <option value="feedback">Feedback</option>
+                </select>
+                </label>
+
+                <label>
+                Description
+                <textarea id="fbDescription"></textarea>
+                </label>
+
+                <label>
+                Screenshots
+                <input type="file" id="fbScreenshots" multiple accept="image/*">
+                </label>
+
+                <label>
+                Platform
+                <select id="fbPlatform">
+                    <option value="desktop">Desktop</option>
+                    <option value="ios">Mobile - iOS</option>
+                    <option value="android">Mobile - Android</option>
+                </select>
+                </label>
+
+                <label>
+                <input type="checkbox" id="fbDiagnostics">
+                Include diagnostic info
+                </label>
+
+                <label>
+                <input type="checkbox" id="fbAllowEmail">
+                Allow email response
+                </label>
+
+                <label id="fbEmailWrap" style="display:none;">
+                Email
+                <input type="email" id="fbEmail">
+                </label>
+
+                <button id="fbSubmit">Submit</button>
+            </div>
             </div>
         </div>
         <div id="cesiumContainer"></div>
@@ -156,7 +223,7 @@
         window.CESIUM_ION_TOKEN = {{ cesium_ion_token|tojson }};
     </script>
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
-    <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/app.js') }}?v=2"></script>
     <script type="module" src="{{ url_for('static', filename='js/mobile.js') }}"></script>
 </body>
 </html>
