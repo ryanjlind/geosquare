@@ -63,6 +63,7 @@ export async function handleNextRound() {
     renderRound(data);
     gameState.roundLocked = false;
     document.getElementById('passBtn').disabled = false;
+    hideNextButton();
 }
 
 export async function handlePass() {
