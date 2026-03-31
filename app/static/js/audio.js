@@ -10,17 +10,30 @@ export function getSfxCtx() {
 }
 
 export async function warmUpSfx() {
+    alert('warmUpSfx: entered');
+
     if (!sfxWarmupPromise) {
+        alert('warmUpSfx: creating promise');
+
         sfxWarmupPromise = (async () => {
+            alert('warmUpSfx: before getSfxCtx');
             const ctx = getSfxCtx();
+            alert(`warmUpSfx: got ctx state=${ctx.state}`);
 
+            alert('warmUpSfx: before resume');
             await ctx.resume();
+            alert(`warmUpSfx: after resume state=${ctx.state}`);
 
+            alert('warmUpSfx: before oscillator promise');
             await new Promise((resolve) => {
+                alert('warmUpSfx: inside promise start');
+
                 const o = ctx.createOscillator();
                 const g = ctx.createGain();
                 const start = ctx.currentTime + 0.05;
                 const end = start + 0.25;
+
+                alert(`warmUpSfx: start=${start} end=${end}`);
 
                 o.type = 'sine';
                 o.frequency.setValueAtTime(440, start);
@@ -29,17 +42,27 @@ export async function warmUpSfx() {
                 g.gain.linearRampToValueAtTime(0.02, start + 0.02);
                 g.gain.exponentialRampToValueAtTime(0.0001, end);
 
-                o.onended = resolve;
+                o.onended = () => {
+                    alert('warmUpSfx: oscillator ended');
+                    resolve();
+                };
 
+                alert('warmUpSfx: before connect');
                 o.connect(g);
                 g.connect(ctx.destination);
 
+                alert('warmUpSfx: before start');
                 o.start(start);
+                alert('warmUpSfx: before stop');
                 o.stop(end);
+                alert('warmUpSfx: after stop');
             });
+
+            alert('warmUpSfx: after oscillator promise');
         })();
     }
 
+    alert('warmUpSfx: returning promise');
     return sfxWarmupPromise;
 }
 
