@@ -286,7 +286,7 @@ def submit_pass(payload: dict, user_id: int, session_id: int | None) -> tuple[di
         square_id = int(square_row.SquareId)
         session_id = int(session.SessionId)
 
-        get_or_create_session_round(cur, session_id, round_number, square_id)
+        create_session_round(cur, session_id, round_number, square_id)
         rows = get_ranked_square_cities(cur, square_id)
         largest_city = rows[0] if rows else None
 
