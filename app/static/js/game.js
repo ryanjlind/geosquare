@@ -108,15 +108,46 @@ export async function submitGuess() {
     const guessBtn = document.getElementById('guessBtn');
     const guessInput = document.getElementById('guessInput');
 
-    if (guessBtn.disabled) return;
+    if (guessBtn.disabled) {
+        await postClientLog('submit_guess_skipped_disabled', {});
+        return;
+    }
 
     guessBtn.disabled = true;
     guessInput.disabled = true;
 
     try {
+        await postClientLog('submit_guess_start', {
+            round: gameState.currentRound
+        });
+
         const guess = getGuessValue();
+
+        await postClientLog('submit_guess_before_warmup', {
+            round: gameState.currentRound,
+            guess: guess
+        });
+
         await warmUpSfx();
+
+        await postClientLog('submit_guess_after_warmup', {
+            round: gameState.currentRound,
+            guess: guess
+        });
+
+        await postClientLog('submit_guess_before_request', {
+            round: gameState.currentRound,
+            guess: guess
+        });
+
         const { data } = await submitGuessRequest(guess, gameState.currentRound);
+
+        await postClientLog('submit_guess_after_request', {
+            round: gameState.currentRound,
+            guess: guess,
+            correct: !!data.correct,
+            has_matched_city: !!data.matched_city
+        });
 
         if (data.correct) {
             setGuessFeedback(`<b>${escapeHtml(data.city.toUpperCase())}</b> is the ${data.rank === 1 ? 'largest' : `${ordinal(data.rank)} largest`} city in the square.<br><br>
@@ -144,8 +175,19 @@ export async function submitGuess() {
             showIncorrectGuessedCity(data.matched_city);
         }
 
-        playFail();        
+        playFail();
+    } catch (err) {
+        await postClientLog('submit_guess_error', {
+            round: gameState.currentRound,
+            message: err?.message || String(err),
+            stack: err?.stack || null
+        });
+        throw err;
     } finally {
+        await postClientLog('submit_guess_finally', {
+            round: gameState.currentRound
+        });
+
         guessBtn.disabled = false;
         guessInput.disabled = false;
         focusGuessInput();
