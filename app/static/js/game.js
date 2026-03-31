@@ -105,15 +105,13 @@ export async function handlePass() {
     setGuessBoxVisible(false);
 }
 
-export async function submitGuess() {
-
-    document.title = 'submitGuess entered';
-    alert('submitGuess entered');
+export async function submitGuess() {    
+    
     const guessBtn = document.getElementById('guessBtn');
     const guessInput = document.getElementById('guessInput');
 
     if (guessBtn.disabled) {
-        await postClientLog('submit_guess_skipped_disabled', {});
+        alert('submit_guess_skipped_disabled');
         return;
     }
 
@@ -121,6 +119,7 @@ export async function submitGuess() {
     guessInput.disabled = true;
 
     try {
+        alert('submit_guess_start')
         await postClientLog('submit_guess_start', {
             round: gameState.currentRound
         });
