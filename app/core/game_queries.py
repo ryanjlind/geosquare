@@ -1,8 +1,7 @@
 from app.helpers.date import get_effective_game_date
 
 def get_today_game(cur):
-    game_date = get_effective_game_date()
-    print(game_date)
+    game_date = get_effective_game_date()    
     cur.execute("""
         SELECT TOP 1 GameId
         FROM dbo.Games

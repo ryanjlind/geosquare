@@ -213,6 +213,7 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None) -> tuple[d
         square_id = int(square_row.SquareId)
 
         # 3. Match guess
+        print(f"Square={square_id}")
         rows = get_ranked_square_cities(cur, square_id)
         matched_city = find_matching_city(rows, guess_text)        
 
