@@ -17,6 +17,13 @@ export async function warmUpSfx() {
             await ctx.resume();
 
             await new Promise((resolve) => {
+                let done = false;
+                const finish = () => {
+                    if (done) return;
+                    done = true;
+                    resolve();
+                };
+
                 const o = ctx.createOscillator();
                 const g = ctx.createGain();
                 const start = ctx.currentTime;
@@ -29,20 +36,24 @@ export async function warmUpSfx() {
                 g.gain.linearRampToValueAtTime(0.02, start + 0.02);
                 g.gain.exponentialRampToValueAtTime(0.0001, end);
 
-                o.onended = resolve;
+                o.onended = finish;
 
                 o.connect(g);
                 g.connect(ctx.destination);
 
                 o.start(start);
                 o.stop(end);
+
+                setTimeout(finish, 500);
             });
-        })();
+        })().catch((err) => {
+            sfxWarmupPromise = null;
+            throw err;
+        });
     }
 
     return sfxWarmupPromise;
 }
-
 function playTone({ type, frequency, duration, volume = 0.03, startTime = 0.00 }) {
     const ctx = getSfxCtx();
     const start = ctx.currentTime + 0.10 + startTime;
