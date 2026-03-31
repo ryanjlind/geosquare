@@ -119,13 +119,13 @@ export async function submitGuess() {
     guessInput.disabled = true;
 
     try {
-        alert('submit_guess_start')
+        alert('submit_guess_start');
         await postClientLog('submit_guess_start', {
             round: gameState.currentRound
         });
 
         const guess = getGuessValue();
-
+        alert('submit_guess_before_warmup');
         await postClientLog('submit_guess_before_warmup', {
             round: gameState.currentRound,
             guess: guess
@@ -133,11 +133,12 @@ export async function submitGuess() {
 
         await warmUpSfx();
 
+        alert('submit_guess_after_warmup');
         await postClientLog('submit_guess_after_warmup', {
             round: gameState.currentRound,
             guess: guess
         });
-
+        alert('submit_guess_before_request');
         await postClientLog('submit_guess_before_request', {
             round: gameState.currentRound,
             guess: guess
