@@ -108,6 +108,10 @@ def find_matching_city(rows, guess_text: str):
 
     for row in candidate_rows:
         city_keys = build_match_keys(row.CityName)
+
+        if getattr(row, 'AlternateNames', None):
+            for alt_name in row.AlternateNames.split('|||'):
+                city_keys |= build_match_keys(alt_name)
         city_phonetic_keys = {
             phonetic_key(key)
             for key in city_keys

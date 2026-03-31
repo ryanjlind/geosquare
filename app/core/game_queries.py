@@ -125,16 +125,40 @@ def get_square_id_for_round(cur, game_id: int, round_number: int):
 
 def get_ranked_square_cities(cur, square_id: int):
     cur.execute("""
+        WITH RankedCities AS (
+            SELECT
+                gsc.CityId,
+                gsc.CityName,
+                gsc.CountryCode,
+                gsc.Latitude,
+                gsc.Longitude,
+                gsc.Population,
+                ROW_NUMBER() OVER (ORDER BY gsc.Population DESC) AS PopRank
+            FROM dbo.GameSquareCities gsc
+            WHERE gsc.SquareId = ?
+        ),
+        AltNames AS (
+            SELECT
+                gca.GeoNameId,
+                STRING_AGG(gca.AlternateName, '|||') AS AlternateNames
+            FROM dbo.GeoCityAlternateNames gca
+            GROUP BY gca.GeoNameId
+        )
         SELECT
-            CityName,
-            CountryCode,
-            Latitude,
-            Longitude,
-            Population,
-            ROW_NUMBER() OVER (ORDER BY Population DESC) AS PopRank
-        FROM dbo.GameSquareCities
-        WHERE SquareId = ?
-        ORDER BY Population DESC
+            rc.CityId,
+            rc.CityName,
+            rc.CountryCode,
+            rc.Latitude,
+            rc.Longitude,
+            rc.Population,
+            rc.PopRank,
+            an.AlternateNames
+        FROM RankedCities rc
+        LEFT JOIN dbo.GeoCities gc
+            ON gc.CityId = rc.CityId
+        LEFT JOIN AltNames an
+            ON an.GeoNameId = gc.GeoNameId
+        ORDER BY rc.PopRank
     """, square_id)
     return cur.fetchall()
 
