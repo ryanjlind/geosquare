@@ -1,7 +1,7 @@
 import { gameState } from './state.js';
 import { postClientLog } from './utils.js';
 import { fetchGameState, fetchRound, submitGuessRequest, submitPassRequest } from './api.js';
-import { getSfxCtx, warmUpSfx, playSuccess, playFail, playComplete, playPerfect } from './audio.js';
+import { getSfxCtx, playSuccess, playFail, playComplete, playPerfect } from './audio.js';
 import { initCesium, renderRoundMap, drawCities, showGuessedCity, showIncorrectGuessedCity } from './map.js';
 import {
     setMetaError,
@@ -30,10 +30,6 @@ function wireGuessing() {
     const input = document.getElementById('guessInput');
     const btn = document.getElementById('guessBtn');
     const passBtn = document.getElementById('passBtn');
-
-    btn.onpointerdown = warmUpSfx;
-    input.onpointerdown = warmUpSfx;
-    passBtn.onpointerdown = warmUpSfx;
 
     btn.onclick = submitGuess;
     input.onkeydown = handleGuessKeyDown;
@@ -126,9 +122,7 @@ export async function submitGuess() {
         await postClientLog('submit_guess_before_warmup', {
             round: gameState.currentRound,
             guess: guess
-        });
-
-        await warmUpSfx();
+        });        
         
         await postClientLog('submit_guess_after_warmup', {
             round: gameState.currentRound,

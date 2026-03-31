@@ -9,51 +9,6 @@ export function getSfxCtx() {
     return sfxCtx;
 }
 
-export async function warmUpSfx() {
-    if (!sfxWarmupPromise) {
-        sfxWarmupPromise = (async () => {
-            const ctx = getSfxCtx();
-
-            await ctx.resume();
-
-            await new Promise((resolve) => {
-                let done = false;
-                const finish = () => {
-                    if (done) return;
-                    done = true;
-                    resolve();
-                };
-
-                const o = ctx.createOscillator();
-                const g = ctx.createGain();
-                const start = ctx.currentTime;
-                const end = start + 0.25;
-
-                o.type = 'sine';
-                o.frequency.setValueAtTime(440, start);
-
-                g.gain.setValueAtTime(0.0001, start);
-                g.gain.linearRampToValueAtTime(0.02, start + 0.02);
-                g.gain.exponentialRampToValueAtTime(0.0001, end);
-
-                o.onended = finish;
-
-                o.connect(g);
-                g.connect(ctx.destination);
-
-                o.start(start);
-                o.stop(end);
-
-                setTimeout(finish, 500);
-            });
-        })().catch((err) => {
-            sfxWarmupPromise = null;
-            throw err;
-        });
-    }
-
-    return sfxWarmupPromise;
-}
 function playTone({ type, frequency, duration, volume = 0.03, startTime = 0.00 }) {
     const ctx = getSfxCtx();
     const start = ctx.currentTime + 0.10 + startTime;
