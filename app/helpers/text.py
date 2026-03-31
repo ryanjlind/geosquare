@@ -10,6 +10,7 @@ def strip_accents(value: str) -> str:
 
 
 def normalize_place_name(value: str) -> str:
+    value = value.replace('ß', 'ss')
     value = strip_accents(value).lower().strip()
     value = value.replace('&', ' and ')
     value = re.sub(r"[’'`]", '', value)
