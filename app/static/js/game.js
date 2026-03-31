@@ -106,6 +106,9 @@ export async function handlePass() {
 }
 
 export async function submitGuess() {
+
+    document.title = 'submitGuess entered';
+    alert('submitGuess entered');
     const guessBtn = document.getElementById('guessBtn');
     const guessInput = document.getElementById('guessInput');
 
