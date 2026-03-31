@@ -98,8 +98,7 @@ def find_matching_city(rows, guess_text: str):
         candidate_rows = [r for r in rows if r.CountryCode.upper() == country_filter]
 
     for row in candidate_rows:
-        city_keys = build_match_keys(row.CityName)
-        print(f'CITY: {row.CityName} ({row.CountryCode}) -> {city_keys}')
+        city_keys = build_match_keys(row.CityName)        
 
         if guess_keys & city_keys:
             print(f'MATCH (direct): {row.CityName}')
