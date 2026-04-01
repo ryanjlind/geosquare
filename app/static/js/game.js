@@ -112,7 +112,7 @@ export async function submitGuess() {
 
     guessBtn.disabled = true;
     guessInput.disabled = true;
-
+    const guess = getGuessValue();
     try {        
         const { data } = await submitGuessRequest(guess, gameState.currentRound);
 
