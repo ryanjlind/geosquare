@@ -37,10 +37,9 @@ export function initFeedback() {
 
         formData.append('diagnostics', JSON.stringify({
             userAgent: navigator.userAgent,
-            url: window.location.href,
-            gameState: gameState
+            url: window.location.href
         }));
-        
+
         await fetch('/api/feedback', {
             method: 'POST',
             body: formData
