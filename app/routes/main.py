@@ -94,6 +94,8 @@ def feedback():
     msg['From'] = os.environ['SMTP_FROM']
     msg['To'] = os.environ['FEEDBACK_EMAIL']
 
+    diagnostics = data.get('diagnostics')
+
     body = f"""
         Type: {data.get('type')}
         Platform: {data.get('platform')}
@@ -103,8 +105,15 @@ def feedback():
 
         Description:
         {data.get('description')}
+    """
+
+    if data.get('includeDiagnostics') == 'true' and diagnostics:
+        body += f"""
+
+        Diagnostics:
+        {diagnostics}
         """
-    
+
     msg.set_content(body)
 
     for file in request.files.getlist('screenshots'):

@@ -35,6 +35,12 @@ export function initFeedback() {
             formData.append('screenshots', files[i]);
         }
 
+        formData.append('diagnostics', JSON.stringify({
+            userAgent: navigator.userAgent,
+            url: window.location.href,
+            gameState: gameState
+        }));
+        
         await fetch('/api/feedback', {
             method: 'POST',
             body: formData
