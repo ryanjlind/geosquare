@@ -1,4 +1,5 @@
 from datetime import date
+from time import perf_counter
 
 from app.core.db import get_conn
 from app.core.game_queries import (
@@ -178,65 +179,94 @@ def get_daily_square_data(round_number: int) -> dict:
 
 
 def submit_guess(payload: dict, user_id: int, session_id: int | None) -> tuple[dict, int]:
+    t0 = perf_counter()
+
+    def log_stage(stage: str, started_at: float) -> float:
+        now = perf_counter()
+        print(f"[submit_guess] {stage}: {(now - started_at) * 1000:.1f} ms")
+        return now
+
     guess_text = (payload.get('guess') or '').strip()
     round_number = int(payload.get('round_number', 1))
+    t = log_stage("parse_input", t0)
 
     if not guess_text:
+        print(f"[submit_guess] total: {(perf_counter() - t0) * 1000:.1f} ms")
         return {'error': 'Guess is required.'}, 400
 
     with get_conn() as conn:
+        t = log_stage("get_conn", t)
         cur = conn.cursor()
+        t = log_stage("create_cursor", t)
 
         session = _get_current_session(cur, user_id, session_id)
+        t = log_stage("_get_current_session", t)
+
         if not session:
+            print(f"[submit_guess] total: {(perf_counter() - t0) * 1000:.1f} ms")
             return {'error': 'No game found for today.'}, 404
 
         session_id = int(session.SessionId)
 
-        # 1. Check if round already exists
         existing_round = get_session_round(cur, session_id, round_number)
+        t = log_stage("get_session_round", t)
 
         if existing_round:
+            print(f"[submit_guess] total: {(perf_counter() - t0) * 1000:.1f} ms")
             return {
                 'ok': True,
                 'noop': True,
                 'total_score': int(session.TotalScore),
             }, 200
 
-        # 2. Resolve square
         game_id = int(session.GameId)
         square_row = get_square_id_for_round(cur, game_id, round_number)
+        t = log_stage("get_square_id_for_round", t)
 
         if not square_row:
+            print(f"[submit_guess] total: {(perf_counter() - t0) * 1000:.1f} ms")
             return {'error': 'No square found for that round.'}, 404
 
         square_id = int(square_row.SquareId)
 
-        # 3. Match guess
         print(f"Square={square_id}")
         rows = get_ranked_square_cities(cur, square_id)
-        matched_city = find_matching_city(rows, guess_text)        
+        t = log_stage("get_ranked_square_cities", t)
+
+        matched_city = find_matching_city(rows, guess_text)
+        t = log_stage("find_matching_city", t)
 
         if matched_city:
-            # 4. Create session round ONLY on a correct guess.
             session_round = create_session_round(cur, session_id, round_number, square_id)
+            t = log_stage("create_session_round", t)
+
             session_round_id = int(session_round.SessionRoundId)
 
             city_name = matched_city.CityName
             population = int(matched_city.Population)
             score = compute_score(rows, population)
+            t = log_stage("compute_score", t)
 
             insert_correct_guess(cur, session_round_id, city_name, population, score)
+            t = log_stage("insert_correct_guess", t)
+
             increment_session_round_score(cur, session_round_id, score)
+            t = log_stage("increment_session_round_score", t)
+
             increment_session_total_score(cur, session_id, score)
+            t = log_stage("increment_session_total_score", t)
 
             updated_session = get_session_total_score(cur, session_id)
+            t = log_stage("get_session_total_score", t)
 
             if round_number == 5:
                 complete_session(cur, session_id)
+                t = log_stage("complete_session", t)
 
             conn.commit()
+            t = log_stage("commit", t)
 
+            print(f"[submit_guess] total: {(perf_counter() - t0) * 1000:.1f} ms")
             return {
                 'ok': True,
                 'correct': True,
@@ -251,8 +281,12 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None) -> tuple[d
             }, 200
 
         nearby_city = find_city_anywhere(cur, guess_text)
-        conn.commit()
+        t = log_stage("find_city_anywhere", t)
 
+        conn.commit()
+        t = log_stage("commit", t)
+
+        print(f"[submit_guess] total: {(perf_counter() - t0) * 1000:.1f} ms")
         return {
             'ok': True,
             'correct': False,
