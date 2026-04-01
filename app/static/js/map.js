@@ -190,7 +190,7 @@ export function showIncorrectGuessedCity(city) {
 
     let alpha = 0.95;
     const intervalId = window.setInterval(() => {
-        alpha -= 0.06;
+        alpha -= 0.03;
 
         if (alpha <= 0) {
             window.clearInterval(intervalId);
