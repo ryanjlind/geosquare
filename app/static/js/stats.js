@@ -180,8 +180,8 @@ export async function showEndGameSummary() {
 
     const feedback = document.getElementById('guessFeedback');
     feedback.innerHTML = isPerfect
-        ? `<div><b>Perfect Game!</b></div><div style="margin-top:8px;">You solved all ${totalRounds} squares and scored <b>${escapeHtml(totalText)}</b> points.</div>`
-        : `<div><b>Game Complete</b></div><div style="margin-top:8px;">You solved <b>${solved} / ${totalRounds}</b> squares and scored <b>${escapeHtml(totalText)}</b> points.</div>`;
+        ? `<div><b>Perfect Game!</b></div><div style="margin-top:8px;">You completed all ${totalRounds} squares and scored <b>${escapeHtml(totalText)}</b> points.</div>`
+        : `<div><b>Game Complete</b></div><div style="margin-top:8px;">You completed <b>${solved} / ${totalRounds}</b> squares and scored <b>${escapeHtml(totalText)}</b> points.</div>`;
 
     const stats = await fetchPlayerStats();
     const lastGraphPoint = stats.graph_points && stats.graph_points.length
