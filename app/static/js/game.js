@@ -48,13 +48,14 @@ function handleGuessKeyDown(e) {
 
 export async function handleNextRound() {    
 
-    gameState.currentRound += 1;
-
-    if (gameState.currentRound > 5) {        
+    if (gameState.currentRound >= 5) {
+        gameState.currentRound = 5;
         setGuessControlsEnabled(false);
         await showEndGameSummary();
         return;
     }
+
+    gameState.currentRound += 1;
 
     const data = await fetchRound(gameState.currentRound);
     renderRound(data);
