@@ -110,11 +110,7 @@ export function wireStatsOverlay() {
                 message.textContent = saveData?.error || 'Unable to save username';
                 return;
             }
-
-            if (latestGameState) {
-                latestGameState.username = username;
-            }
-
+                    
             text.textContent = username;
             message.textContent = 'Saved';
             edit.classList.add('hidden');
