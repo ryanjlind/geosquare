@@ -20,7 +20,7 @@ import {
 import { wireStatsOverlay, showEndGameSummary } from './stats.js';
 import { escapeHtml, numberFmt, ordinal } from './utils.js';
 import { initFeedback } from './feedback.js';
-import { login, setAuthUi, logout, showAuthConflictModal } from './auth.js';
+import { login, setAuthUi, logout } from './auth.js';
 
 function renderRound(data) {
     renderSidebar(data);
@@ -218,6 +218,7 @@ export async function initGame() {
     wireRoundButtons();
     initFeedback();
     wireAuth(state);
+    wireAuthConflictModal();
 
     if (state.completed_at) {
         setGuessControlsEnabled(false);
@@ -226,3 +227,64 @@ export async function initGame() {
         await showEndGameSummary();
     }
 }
+
+function showAuthConflictModal() {
+    document.getElementById('authConflictModal').classList.remove('hidden');
+}
+
+function hideAuthConflictModal() {
+    document.getElementById('authConflictModal').classList.add('hidden');
+}
+
+function wireAuthConflictModal() {
+    document.getElementById('conflictDiscardBtn').onclick = () => resolveConflict('discard_this_device_conflicts');
+    document.getElementById('conflictOverwriteBtn').onclick = () => resolveConflict('overwrite_profile');
+    document.getElementById('conflictAbortBtn').onclick = () => resolveConflict('abort');
+}
+
+export async function resolveConflict(action) {
+    const { response, data } = await fetchJson('/auth/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+    });
+
+    if (!response.ok) {
+        console.log(data.error || 'Unable to resolve login conflict.');
+        return;
+    }
+    
+    await refreshAfterAuth();
+}
+
+async function refreshAfterAuth() {
+    const { response: stateResponse, data: state } = await fetchGameState();
+
+    if (!stateResponse.ok) {
+        setMetaError(state.error);
+        return;
+    }
+
+    setAuthUi(state.is_authenticated);
+
+    const data = await fetchRound(state.round_number || 1);
+
+    gameState.currentRound = data.round_number;
+    gameState.isPerfect = state.is_perfect;
+    gameState.roundLocked = false;
+
+    renderRound(data);
+    restoreSavedState(state);
+
+    if (state.completed_at) {
+        setGuessControlsEnabled(false);
+        hideNextButton();
+        setGuessBoxVisible(false);
+        await showEndGameSummary();
+        return;
+    }
+
+    setGuessControlsEnabled(true);
+    setGuessBoxVisible(true);
+}
+

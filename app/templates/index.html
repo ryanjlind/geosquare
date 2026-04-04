@@ -222,6 +222,27 @@
             </div>
         </div>
     </div>
+    <div id="authConflictModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-title">Resolve conflict</div>
+
+            <div class="modal-body">
+                You have gameplay on this device that conflicts with days already registered to your profile.
+            </div>
+
+            <div class="modal-actions">
+                <button id="conflictDiscardBtn" class="modal-btn">
+                    Discard gameplay from this device
+                </button>
+                <button id="conflictOverwriteBtn" class="modal-btn primary">
+                    Overwrite profile with gameplay from this device
+                </button>
+                <button id="conflictAbortBtn" class="modal-btn secondary">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
     <script>
         window.CESIUM_ION_TOKEN = {{ cesium_ion_token|tojson }};
     </script>

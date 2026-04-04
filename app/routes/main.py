@@ -208,7 +208,7 @@ def auth_callback():
         return build_popup_response(
             {
                 'type': 'auth_conflict',
-                'message': 'You have gameplay on this device that conflicts with days already registered to your profile. Do you want to:\\n\\nDiscard the conflicting gameplay from this device\\nOverwrite the gameplay in my profile with gameplay from this device\\nAbort linking this device to my profile'
+                'message': 'You have gameplay on this device that conflicts with days already registered to your profile.'
             },
             identity['user_id'],
             identity['session_id']

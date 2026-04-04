@@ -173,3 +173,39 @@ h1 {
 .modal-title {
     margin-bottom: 10px;
 }
+
+.modal-body {
+    margin-bottom: 16px;
+    color: #c9d4e7;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.modal-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.modal-btn {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.modal-btn.primary {
+    background: #3b82f6;
+    color: white;
+}
+
+.modal-btn.secondary {
+    background: #374151;
+    color: white;
+}
+
+.modal-btn:hover {
+    opacity: 0.9;
+}

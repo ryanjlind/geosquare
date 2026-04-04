@@ -1,4 +1,5 @@
 import { numberFmt, escapeHtml, parseFormattedInt } from './utils.js';
+import { resolveConflict } from './auth.js'
 
 export function setMetaError(message) {
     document.getElementById('meta').innerHTML = `<div class="value">${escapeHtml(message)}</div>`;
