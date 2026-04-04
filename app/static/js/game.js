@@ -24,8 +24,6 @@ import { wireStatsOverlay, showEndGameSummary } from './stats.js';
 import { initFeedback } from './feedback.js';
 import { initAuth, resolveAuthConflict } from './auth.js';
 
-let latestGameState = null;
-
 function renderRound(data) {
     renderSidebar(data);
     renderRoundMap(data);
@@ -56,7 +54,7 @@ export async function handleNextRound() {
     if (gameState.currentRound >= 5) {
         gameState.currentRound = 5;
         setGuessControlsEnabled(false);
-        await showEndGameSummary(latestGameState);
+        await showEndGameSummary();
         return;
     }
 
@@ -164,6 +162,9 @@ export async function submitGuess() {
 }
 
 export async function initGame() {
+    
+    Object.assign(gameState, state);
+
     await initCesium();
     wireStatsOverlay();
 
@@ -173,8 +174,6 @@ export async function initGame() {
         setMetaError(state.error);
         return;
     }
-
-    latestGameState = state;
 
     const data = await fetchRound(state.round_number || 1);
 

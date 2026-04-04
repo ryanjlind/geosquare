@@ -1,7 +1,7 @@
 import { fetchPlayerStats } from './api.js';
 import { escapeHtml, numberFmt, parseFormattedInt } from './utils.js';
 
-export async function syncStatsUsernameUi(state) {
+export function syncStatsUsernameUi(state) {
     const row = document.getElementById('statsUserRow');
     const view = document.getElementById('statsUserView');
     const edit = document.getElementById('statsUserEdit');
@@ -10,8 +10,6 @@ export async function syncStatsUsernameUi(state) {
     const message = document.getElementById('statsUsernameMessage');
 
     message.textContent = '';
-    edit.classList.add('hidden');
-    view.classList.remove('hidden');
 
     if (!state || !state.is_authenticated) {
         row.classList.add('hidden');
@@ -19,6 +17,7 @@ export async function syncStatsUsernameUi(state) {
     }
 
     row.classList.remove('hidden');
+
     text.textContent = state.username || '';
     input.value = state.username || '';
 }
@@ -277,7 +276,7 @@ export function renderStatsOverlay(stats, todaySummary) {
     renderStatsChart(stats);
 }
 
-export async function showEndGameSummary(state) {
+export async function showEndGameSummary() {
     const totalText = document.getElementById('totalPoints').textContent;
     const total = parseFormattedInt(totalText);
     const rows = Array.from(document.querySelectorAll('#roundTable tbody tr'));
@@ -323,6 +322,6 @@ export async function showEndGameSummary(state) {
         bestRound: bestRound && bestRound.points > 0 ? bestRound : null
     });
 
-    await syncStatsUsernameUi(state);
+    await syncStatsUsernameUi(gameState);
     showStatsOverlay();
 }
