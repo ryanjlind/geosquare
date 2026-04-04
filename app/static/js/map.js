@@ -6,16 +6,11 @@ export async function initCesium() {
         userAgent: navigator.userAgent
     });
 
-    try {
-        await postClientLog('arcgis_provider_create_started', {
-            url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer'
-        });
+    try {        
 
         const arcGisImageryProvider = await Cesium.ArcGisMapServerImageryProvider.fromUrl(
             'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer'
-        );
-
-        await postClientLog('arcgis_provider_create_succeeded', {});
+        );        
 
         if (arcGisImageryProvider.errorEvent) {
             arcGisImageryProvider.errorEvent.addEventListener(function (error) {
@@ -34,11 +29,6 @@ export async function initCesium() {
 
         const baseLayer = new Cesium.ImageryLayer(arcGisImageryProvider);
 
-        await postClientLog('imagery_layer_constructed', {
-            show: baseLayer.show,
-            alpha: baseLayer.alpha
-        });
-
         window.geoViewer = new Cesium.Viewer('cesiumContainer', {
             animation: false,
             timeline: false,
@@ -54,23 +44,11 @@ export async function initCesium() {
             baseLayer: baseLayer
         });
 
-        await postClientLog('viewer_constructed', {
-            imageryLayerCount: window.geoViewer.imageryLayers.length,
-            canvasWidth: window.geoViewer.canvas?.width ?? null,
-            canvasHeight: window.geoViewer.canvas?.height ?? null,
-            clientWidth: window.geoViewer.canvas?.clientWidth ?? null,
-            clientHeight: window.geoViewer.canvas?.clientHeight ?? null
-        });
-
         window.geoViewer.scene.globe.enableLighting = false;
         window.geoViewer.scene.screenSpaceCameraController.inertiaSpin = 0;
         window.geoViewer.scene.screenSpaceCameraController.inertiaTranslate = 0;
         window.geoViewer.scene.screenSpaceCameraController.inertiaZoom = 0;
         window.geoViewer.scene.screenSpaceCameraController.minimumZoomDistance = 150000;
-
-        await postClientLog('viewer_config_applied', {
-            minimumZoomDistance: window.geoViewer.scene.screenSpaceCameraController.minimumZoomDistance
-        });
 
         window.geoViewer.scene.renderError.addEventListener(function (scene, error) {
             postClientLog('cesium_render_error', {
@@ -78,12 +56,7 @@ export async function initCesium() {
                 stack: error?.stack || null
             });
         });
-
-        await postClientLog('init_cesium_completed', {
-            imageryLayerCount: window.geoViewer.imageryLayers.length,
-            baseLayerShow: window.geoViewer.imageryLayers.get(0)?.show ?? null,
-            baseLayerAlpha: window.geoViewer.imageryLayers.get(0)?.alpha ?? null
-        });
+        
     } catch (error) {
         await postClientLog('init_cesium_failed', {
             message: error?.message || String(error),

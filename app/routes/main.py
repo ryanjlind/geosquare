@@ -57,10 +57,13 @@ def daily_square():
     print(square_data)
     return square_data
 
-
 @main_bp.route('/api/game-state')
 def game_state():
-    identity = resolve_request_identity()
+    try:
+        identity = resolve_request_identity()
+    except Exception as e:
+        print('[ERROR] resolve_request_identity failed:', repr(e), flush=True)
+        raise
 
     try:
         response_body, status_code = get_game_state_payload(
@@ -74,7 +77,6 @@ def game_state():
     response = jsonify(response_body)
     response.status_code = status_code
     return attach_session_cookie(response, identity['user_id'], identity['session_id'])
-
 
 @main_bp.route('/api/guess', methods=['POST'])
 def guess():
