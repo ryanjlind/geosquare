@@ -189,12 +189,25 @@
     background: #111824;
 }
 
-.stats-user-view,
-.stats-user-edit {
-    display: flex;
+#statsUserView,
+#statsUserEdit {
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
+}
+
+#statsUserView {
+    display: flex;
+}
+
+#statsUserEdit {
+    display: flex;
+}
+
+#statsUserRow.hidden,
+#statsUserView.hidden,
+#statsUserEdit.hidden {
+    display: none;
 }
 
 .stats-user-label {
