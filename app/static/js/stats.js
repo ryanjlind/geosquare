@@ -1,4 +1,4 @@
-import { fetchPlayerStats } from './api.js';
+import { fetchPlayerStats, fetchJson } from './api.js';
 import { gameState } from './state.js';
 import { escapeHtml, numberFmt, parseFormattedInt } from './utils.js';
 
