@@ -1,7 +1,7 @@
 import { fetchPlayerStats } from './api.js';
 import { escapeHtml, numberFmt, parseFormattedInt } from './utils.js';
 
-export async function syncStatsUsernameUi() {
+export async function syncStatsUsernameUi(state) {
     const row = document.getElementById('statsUserRow');
     const view = document.getElementById('statsUserView');
     const edit = document.getElementById('statsUserEdit');
@@ -9,22 +9,18 @@ export async function syncStatsUsernameUi() {
     const input = document.getElementById('statsUsernameInput');
     const message = document.getElementById('statsUsernameMessage');
 
-    if (!row || !view || !edit || !text || !input || !message) {
-        return;
-    }
-
     message.textContent = '';
     edit.classList.add('hidden');
     view.classList.remove('hidden');
 
-    if (!latestGameState || !latestGameState.is_authenticated) {
+    if (!state || !state.is_authenticated) {
         row.classList.add('hidden');
         return;
     }
 
     row.classList.remove('hidden');
-    text.textContent = latestGameState.username || '';
-    input.value = latestGameState.username || '';
+    text.textContent = state.username || '';
+    input.value = state.username || '';
 }
 
 export function wireStatsOverlay() {
@@ -281,7 +277,7 @@ export function renderStatsOverlay(stats, todaySummary) {
     renderStatsChart(stats);
 }
 
-export async function showEndGameSummary() {
+export async function showEndGameSummary(state) {
     const totalText = document.getElementById('totalPoints').textContent;
     const total = parseFormattedInt(totalText);
     const rows = Array.from(document.querySelectorAll('#roundTable tbody tr'));
@@ -327,6 +323,6 @@ export async function showEndGameSummary() {
         bestRound: bestRound && bestRound.points > 0 ? bestRound : null
     });
 
-    await syncStatsUsernameUi();
+    await syncStatsUsernameUi(state);
     showStatsOverlay();
 }

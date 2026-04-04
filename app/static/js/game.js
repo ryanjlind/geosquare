@@ -56,7 +56,7 @@ export async function handleNextRound() {
     if (gameState.currentRound >= 5) {
         gameState.currentRound = 5;
         setGuessControlsEnabled(false);
-        await showEndGameSummary();
+        await showEndGameSummary(latestGameState);
         return;
     }
 
@@ -209,6 +209,6 @@ export async function initGame() {
         setGuessControlsEnabled(false);
         setGuessBoxVisible(false);
         showNextButton(5);
-        await showEndGameSummary();
+        await showEndGameSummary(state);
     }
 }
