@@ -1,13 +1,13 @@
+import os
+
 from flask import current_app, request
 from itsdangerous import URLSafeSerializer
 
 COOKIE_NAME = 'geosquare_session'
 COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365 * 5
 
-
 def get_session_signer():
     return URLSafeSerializer(current_app.config['SECRET_KEY'], salt='geosquare-session')
-
 
 def get_identity_from_cookie() -> dict:
     raw = request.cookies.get(COOKIE_NAME)
@@ -31,25 +31,24 @@ def get_identity_from_cookie() -> dict:
 
     return identity
 
-
 def get_user_id_from_cookie():
     return get_identity_from_cookie().get('user_id')
-
 
 def get_session_id_from_cookie():
     return get_identity_from_cookie().get('session_id')
 
+def attach_session_cookie(response, user_id: int, session_id: int | None):
+    is_local = os.getenv('LOCAL_AUTH_BYPASS', '').lower() in ('1', 'true', 'yes')
 
-def attach_session_cookie(response, user_id: int, session_id: int):
     response.set_cookie(
         COOKIE_NAME,
         get_session_signer().dumps({
             'user_id': int(user_id),
-            'session_id': int(session_id),
+            'session_id': int(session_id) if session_id is not None else None,
         }),
         max_age=COOKIE_MAX_AGE_SECONDS,
         httponly=True,
-        secure=True,
+        secure=not is_local,
         samesite='Lax',
     )
     return response

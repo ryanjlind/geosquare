@@ -1,9 +1,6 @@
 import os
-
 from flask import Flask
-
 from app.routes.main import main_bp
-
 
 def create_app() -> Flask:
     app = Flask(
@@ -11,6 +8,7 @@ def create_app() -> Flask:
         template_folder='templates',
         static_folder='static',
     )
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-change-me')
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+
     app.register_blueprint(main_bp)
     return app

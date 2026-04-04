@@ -1,11 +1,16 @@
-from flask import Blueprint, jsonify, render_template, request, current_app
+from flask import Blueprint, jsonify, render_template, request, current_app, url_for, redirect, session, make_response
 from email.message import EmailMessage
 import os
 import smtplib
 import json
 import logging
 from datetime import datetime, timezone
-
+from app.core.auth import (
+    begin_lastlogin_link,
+    resolve_lastlogin_conflict,
+    get_lastlogin_client,
+    is_local_auth_bypass_enabled,
+)
 from app.core.game_service import (
     get_daily_square_data,
     get_game_state_payload,
@@ -14,7 +19,9 @@ from app.core.game_service import (
     submit_guess,
     submit_pass,
 )
-from app.helpers.session import attach_session_cookie
+from app.core.user import is_username_available, set_username
+
+from app.helpers.session import attach_session_cookie, COOKIE_NAME
 
 main_bp = Blueprint('main', __name__)
 
@@ -46,7 +53,9 @@ def client_log():
 @main_bp.route('/api/daily-square')
 def daily_square():
     round_number = int(request.args['round'])
-    return jsonify(get_daily_square_data(round_number))
+    square_data = jsonify(get_daily_square_data(round_number))
+    print(square_data)
+    return square_data
 
 
 @main_bp.route('/api/game-state')
@@ -123,5 +132,126 @@ def feedback():
         s.starttls()
         s.login(os.environ['SMTP_USER'], os.environ['SMTP_PASS'])
         s.send_message(msg)
+
+    return jsonify({'ok': True})
+
+@main_bp.route('/login')
+def login():
+    if is_local_auth_bypass_enabled():
+        popup_url = url_for('main.auth_callback', dev_sub='local-test-user')
+        return redirect(popup_url)
+
+    client = get_lastlogin_client()
+    redirect_uri = url_for('main.auth_callback', _external=True)
+    return client.authorize_redirect(redirect_uri)
+
+@main_bp.route('/auth/callback')
+def auth_callback():
+    if is_local_auth_bypass_enabled():
+        user_info = {'sub': request.args.get('dev_sub', 'local-test-user')}
+    else:
+        client = get_lastlogin_client()
+        token = client.authorize_access_token()
+        user_info = token.get('userinfo') or {}
+
+    identity = resolve_request_identity()
+
+    result = begin_lastlogin_link(
+        current_user_id=identity['user_id'],
+        subject=user_info.get('sub'),
+    )
+    
+    print(
+        f"[AUTH] subject={user_info.get('sub')} "
+        f"current_user_id={identity['user_id']} "
+        f"result={result}",
+        flush=True
+    )
+
+    def build_popup_response(payload, user_id, session_id):
+        message_json = json.dumps(payload)
+
+        response = make_response(
+            f"""
+            <!doctype html>
+            <html>
+            <body>
+            <script>
+            window.opener.postMessage({message_json}, window.location.origin);
+            window.close();
+            </script>
+            </body>
+            </html>
+            """
+        )
+        return attach_session_cookie(response, user_id, session_id)
+
+    status = result.get('status')
+
+    if status in ('linked_current_user', 'already_linked', 'switched_to_linked_user'):
+        print(f"[AUTH] success -> user_id={result['user_id']} status={status}", flush=True)
+        return build_popup_response(
+            {'type': 'auth_success'},
+            result['user_id'],
+            None
+        )
+
+    if status == 'conflict':
+        print(f"[AUTH] conflict -> current_user_id={identity['user_id']}", flush=True)
+        return build_popup_response(
+            {
+                'type': 'auth_conflict',
+                'message': 'You have gameplay on this device that conflicts with days already registered to your profile. Do you want to:\\n\\nDiscard the conflicting gameplay from this device\\nOverwrite the gameplay in my profile with gameplay from this device\\nAbort linking this device to my profile'
+            },
+            identity['user_id'],
+            identity['session_id']
+        )
+    print(f"[AUTH] error -> result={result}", flush=True)
+    return build_popup_response(
+        {
+            'type': 'auth_error',
+            'message': result.get('message', 'Login failed.')
+        },
+        identity['user_id'],
+        identity['session_id']
+    )
+
+@main_bp.route('/auth/resolve', methods=['POST'])
+def auth_resolve():
+    payload = request.get_json(silent=True) or {}
+    result = resolve_lastlogin_conflict(payload.get('action'))
+
+    if result['status'] == 'resolved':
+        response = jsonify({'ok': True})
+        return attach_session_cookie(response, result['user_id'], None)
+
+    if result['status'] == 'aborted':
+        response = jsonify({'ok': True, 'aborted': True})
+        return attach_session_cookie(response, result['user_id'], None)
+
+    return jsonify({'ok': False, 'error': result['message']}), 400
+
+@main_bp.route('/logout', methods=['POST'])
+def logout():
+    response = jsonify({'ok': True})
+    response.delete_cookie(COOKIE_NAME)
+    return response
+
+@main_bp.route('/api/username-check')
+def username_check():
+    username = (request.args.get('username') or '').strip()
+    return jsonify({
+        'available': is_username_available(username)
+    })
+
+@main_bp.route('/api/set-username', methods=['POST'])
+def set_username_route():
+    identity = resolve_request_identity()
+    payload = request.get_json(silent=True) or {}
+
+    ok, error = set_username(identity['user_id'], payload.get('username', ''))
+
+    if not ok:
+        return jsonify({'ok': False, 'error': error}), 400
 
     return jsonify({'ok': True})

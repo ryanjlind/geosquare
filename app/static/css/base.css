@@ -124,3 +124,52 @@ h1 {
     outline: 2px solid #6ea8ff;
     outline-offset: 2px;
 }
+
+#loginBtn,
+#logoutBtn {
+    align-self: flex-start;
+    background: none;
+    border: none;
+    color: #8b97a8;
+    font-size: 13px;
+    padding: 0;
+    margin-top: 6px;
+    cursor: pointer;
+    text-align: left;
+}
+
+#loginBtn:hover,
+#logoutBtn:hover {
+    color: #c9d1d9;
+    text-decoration: underline;
+}
+
+#loginBtn.hidden,
+#logoutBtn.hidden {
+    display: none;
+}
+
+.modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.6);
+    z-index: 10000;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: #1f2937;
+    padding: 20px;
+    border-radius: 8px;
+    width: 320px;
+}
+
+.modal-title {
+    margin-bottom: 10px;
+}

@@ -350,6 +350,17 @@ def get_game_state_payload(user_id: int, session_id: int | None) -> tuple[dict, 
     with get_conn() as conn:
         cur = conn.cursor()
 
+        cur.execute(
+            """
+            SELECT AuthProviderSubject
+            FROM Users
+            WHERE UserId = ?
+            """,
+            (user_id,),
+        )
+        user_row = cur.fetchone()
+        is_authenticated = bool(user_row and user_row.AuthProviderSubject)
+
         game_id = _require_today_game(cur)
         if game_id is None:
             return {'error': 'No game found for today.'}, 404
@@ -378,20 +389,26 @@ def get_game_state_payload(user_id: int, session_id: int | None) -> tuple[dict, 
         print(completed_rounds)
         is_perfect = all(r['score'] > 0 for r in completed_rounds)
         print(f"is_perfect: {is_perfect}")
+
+        base_payload = {
+            'session_id': int(session.SessionId),
+            'user_id': int(session.UserId),
+            'game_id': int(session.GameId),
+            'total_score': int(session.TotalScore),
+            'is_authenticated': is_authenticated,
+        }
+
         if session.CompletedAt is not None:
             latest_round_number = completed_rounds[-1]['round_number'] if completed_rounds else 1
             conn.commit()
-            
+
             return {
                 'state': 'completed',
-                'session_id': int(session.SessionId),
-                'user_id': int(session.UserId),
-                'game_id': int(session.GameId),
                 'round_number': latest_round_number,
-                'total_score': int(session.TotalScore),
                 'completed_at': session.CompletedAt.isoformat(),
                 'completed_rounds': completed_rounds,
                 'is_perfect': is_perfect,
+                **base_payload,
             }, 200
 
         if len(completed_rounds) == 0:
@@ -399,14 +416,11 @@ def get_game_state_payload(user_id: int, session_id: int | None) -> tuple[dict, 
 
             return {
                 'state': 'not_started',
-                'session_id': int(session.SessionId),
-                'user_id': int(session.UserId),
-                'game_id': int(session.GameId),
                 'round_number': 1,
-                'total_score': int(session.TotalScore),
                 'completed_at': None,
                 'completed_rounds': [],
                 'is_perfect': True,
+                **base_payload,
             }, 200
 
         next_round = completed_rounds[-1]['round_number'] + 1
@@ -414,14 +428,11 @@ def get_game_state_payload(user_id: int, session_id: int | None) -> tuple[dict, 
 
         return {
             'state': 'in_progress',
-            'session_id': int(session.SessionId),
-            'user_id': int(session.UserId),
-            'game_id': int(session.GameId),
             'round_number': next_round,
-            'total_score': int(session.TotalScore),
             'completed_at': None,
             'completed_rounds': completed_rounds,
             'is_perfect': is_perfect,
+            **base_payload,
         }, 200
     
 def _compute_streaks(game_dates):

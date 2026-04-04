@@ -20,6 +20,7 @@ import {
 import { wireStatsOverlay, showEndGameSummary } from './stats.js';
 import { escapeHtml, numberFmt, ordinal } from './utils.js';
 import { initFeedback } from './feedback.js';
+import { login, setAuthUi, logout } from './auth.js';
 
 function renderRound(data) {
     renderSidebar(data);
@@ -158,6 +159,42 @@ export async function submitGuess() {
     }
 }
 
+function wireAuthMessageListener() {
+    if (window.__authMessageListenerWired) return;
+    window.__authMessageListenerWired = true;
+
+    window.addEventListener('message', (event) => {        
+
+        if (event.origin !== window.location.origin) return;
+        if (!event.data || typeof event.data !== 'object') return;        
+
+        if (event.data.type === 'auth_success') {            
+            window.location.reload();
+            return;
+        }
+
+        if (event.data.type === 'auth_conflict') {
+            showAuthConflictModal(event.data.message);
+            return;
+        }
+
+        if (event.data.type === 'auth_error') {
+            console.log(event.data.message || 'Login failed.');
+        }
+    });
+}
+
+function wireAuth(state) {
+    setAuthUi(state.is_authenticated);
+    wireAuthMessageListener();
+
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    if (loginBtn) loginBtn.onclick = login;
+    if (logoutBtn) logoutBtn.onclick = logout;
+}
+
 export async function initGame() {
     await initCesium();
     wireStatsOverlay();
@@ -170,20 +207,22 @@ export async function initGame() {
     }
 
     const data = await fetchRound(state.round_number || 1);
-    
+
     gameState.currentRound = data.round_number;
     gameState.isPerfect = state.is_perfect;
     console.log('[DEBUG] init:before-load', { gameState: gameState });
-    gameState.roundLocked = false; 
+    gameState.roundLocked = false;
     renderRound(data);
     restoreSavedState(state);
     wireGuessing();
     wireRoundButtons();
-    initFeedback();    
+    initFeedback();
+    wireAuth(state);
+
     if (state.completed_at) {
         setGuessControlsEnabled(false);
         hideNextButton();
-        setGuessBoxVisible(false);        
+        setGuessBoxVisible(false);
         await showEndGameSummary();
     }
 }
