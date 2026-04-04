@@ -61,7 +61,16 @@ def daily_square():
 @main_bp.route('/api/game-state')
 def game_state():
     identity = resolve_request_identity()
-    response_body, status_code = get_game_state_payload(identity['user_id'], identity['session_id'])
+
+    try:
+        response_body, status_code = get_game_state_payload(
+            identity['user_id'],
+            identity['session_id']
+        )
+    except Exception as e:
+        print('[ERROR] get_game_state_payload failed:', repr(e), flush=True)
+        raise
+
     response = jsonify(response_body)
     response.status_code = status_code
     return attach_session_cookie(response, identity['user_id'], identity['session_id'])
