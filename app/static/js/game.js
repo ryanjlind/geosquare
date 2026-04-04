@@ -1,5 +1,5 @@
 import { gameState } from './state.js';
-import { postClientLog } from './utils.js';
+import { postClientLog, fetchJson } from './utils.js';
 import { fetchGameState, fetchRound, submitGuessRequest, submitPassRequest } from './api.js';
 import { getSfxCtx, playSuccess, playFail, playComplete, playPerfect } from './audio.js';
 import { initCesium, renderRoundMap, drawCities, showGuessedCity, showIncorrectGuessedCity } from './map.js';
