@@ -61,8 +61,8 @@ def daily_square():
 def game_state():
     try:
         identity = resolve_request_identity()
-    except Exception as e:
-        print('[ERROR] resolve_request_identity failed:', repr(e), flush=True)
+    except Exception:
+        current_app.logger.exception('resolve_request_identity failed')
         raise
 
     try:
@@ -70,8 +70,8 @@ def game_state():
             identity['user_id'],
             identity['session_id']
         )
-    except Exception as e:
-        print('[ERROR] get_game_state_payload failed:', repr(e), flush=True)
+    except Exception:
+        current_app.logger.exception('get_game_state_payload failed')
         raise
 
     response = jsonify(response_body)
