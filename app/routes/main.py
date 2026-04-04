@@ -5,7 +5,6 @@ import smtplib
 import json
 import logging
 from datetime import datetime, timezone
-from app.core.db import get_conn
 from app.core.auth import (
     begin_lastlogin_link,
     resolve_lastlogin_conflict,
@@ -192,16 +191,7 @@ def auth_callback():
             </html>
             """
         )
-        # resolve correct session AFTER switch
-        with get_conn() as conn:
-            cur = conn.cursor()
-            session = _get_current_session(cur, result['user_id'], None)
-
-        return attach_session_cookie(
-            response,
-            result['user_id'],
-            int(session.SessionId) if session else None
-        )
+        return attach_session_cookie(response, user_id, session_id)
 
     status = result.get('status')
 

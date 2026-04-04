@@ -43,26 +43,53 @@ def _get_current_session(cur, user_id: int, session_id: int | None):
     if game_id is None:
         return None
 
-    if session_id is None:
-        return None
+    # 1. If cookie session_id exists and is valid, use it
+    if session_id is not None:
+        cur.execute(
+            """
+            SELECT SessionId, GameId, UserId, CompletedAt, TotalScore
+            FROM GameSessions
+            WHERE SessionId = ?
+            """,
+            (session_id,),
+        )
+        row = cur.fetchone()
+        if row and int(row.UserId) == user_id and int(row.GameId) == game_id:
+            return row
 
-    session = get_session_by_id(cur, session_id)
-    if session is None:
-        return None
+    # 2. Otherwise: find the single best existing session for this user/game
+    cur.execute(
+        """
+        SELECT SessionId, GameId, UserId, CompletedAt, TotalScore
+        FROM GameSessions
+        WHERE UserId = ? AND GameId = ?
+        ORDER BY
+            CASE WHEN CompletedAt IS NOT NULL THEN 0 ELSE 1 END,
+            StartedAt DESC
+        """,
+        (user_id, game_id),
+    )
+    rows = cur.fetchall()
 
-    if int(session.UserId) != user_id:
-        return None
+    if rows:
+        # pick the best one (completed first, else latest in-progress)
+        return rows[0]
 
-    if int(session.GameId) != game_id:
-        return None
-
-    return session
-
+    # 3. Only create if NONE exist
+    cur.execute(
+        """
+        INSERT INTO GameSessions (UserId, GameId)
+        OUTPUT INSERTED.SessionId, INSERTED.GameId, INSERTED.UserId, INSERTED.CompletedAt, INSERTED.TotalScore
+        VALUES (?, ?)
+        """,
+        (user_id, game_id),
+    )
+    return cur.fetchone()
 
 def resolve_request_identity() -> dict:
     with get_conn() as conn:
         cur = conn.cursor()
-        print("getting cookie...")
+        
         cookie_user_id = get_user_id_from_cookie()
         cookie_session_id = get_session_id_from_cookie()
 
@@ -81,8 +108,25 @@ def resolve_request_identity() -> dict:
         print(f"user_id={user_id}, game_id={game_id}")
         session = None
 
-        if game_id is not None and cookie_session_id is not None:
-            session = get_session_by_id(cur, cookie_session_id)
+        if game_id is not None and session is None:
+            # NEW: if authenticated, try to recover existing session
+            cur.execute(
+                """
+                SELECT TOP 1 SessionId, GameId, UserId, CompletedAt, TotalScore
+                FROM GameSessions
+                WHERE UserId = ? AND GameId = ?
+                ORDER BY
+                    CASE WHEN CompletedAt IS NOT NULL THEN 0 ELSE 1 END,
+                    StartedAt DESC
+                """,
+                (user_id, game_id),
+            )
+            existing = cur.fetchone()
+
+            if existing:
+                session = existing
+            else:
+                session = create_session(cur, user_id, game_id)
 
             if session is not None:
                 if int(session.UserId) != user_id:
