@@ -60,6 +60,7 @@ def daily_square():
 @main_bp.route('/api/game-state')
 def game_state():
     try:
+        print("getting request_identiy..")
         identity = resolve_request_identity()
     except Exception:
         current_app.logger.exception('resolve_request_identity failed')

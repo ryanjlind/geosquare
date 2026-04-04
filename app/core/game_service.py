@@ -62,21 +62,23 @@ def _get_current_session(cur, user_id: int, session_id: int | None):
 def resolve_request_identity() -> dict:
     with get_conn() as conn:
         cur = conn.cursor()
-
+        print("getting cookie...")
         cookie_user_id = get_user_id_from_cookie()
         cookie_session_id = get_session_id_from_cookie()
 
         user = None
+        print(f"user={user}")        
         if cookie_user_id is not None:
             user = get_user_by_id(cur, cookie_user_id)
 
+        print(f"user={user}")
         if user is None:
             user = create_user(cur)
             print(f'[DEBUG] identity created_user_id={int(user.UserId)}', flush=True)
 
         user_id = int(user.UserId)
         game_id = _require_today_game(cur)
-
+        print(f"user_id={user_id}, game_id={game_id}")
         session = None
 
         if game_id is not None and cookie_session_id is not None:
