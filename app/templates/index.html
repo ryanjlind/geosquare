@@ -20,11 +20,10 @@
                 <div class="sidebar-mobile-header-title">Menu</div>
                 <button id="mobileDrawerCloseBtn" class="mobile-drawer-close-btn" type="button">Close</button>
             </div>
-
+            <div class="sidebar-divider"></div>
             <h1>GeoSquare</h1>
             <button id="loginBtn">Login to play across devices</button>
             <button id="logoutBtn" class="hidden">Logout</button>
-
             <div class="sidebar-divider"></div>
             <div id="meta"></div>
 
@@ -164,7 +163,29 @@
         <div class="stats-modal">
             <button id="statsCloseBtn" class="stats-close-btn" type="button">×</button>
             <div id="statsTitle" class="stats-title">Game Complete!</div>
+            <div id="statsUserRow" class="stats-user-row hidden">
+                <div id="statsUserView">
+                    <span class="stats-user-label">Logged in as</span>
+                    <span id="statsUsernameText"></span>
+                    <button id="statsUsernameEditBtn" type="button">Edit</button>
+                </div>
 
+                <div id="statsUserEdit" class="hidden">
+                    <input
+                        id="statsUsernameInput"
+                        type="text"
+                        maxlength="15"
+                        autocomplete="off"
+                        autocorrect="off"
+                        autocapitalize="off"
+                        spellcheck="false"
+                    >
+                    <button id="statsUsernameSaveBtn" type="button">Save</button>
+                    <button id="statsUsernameCancelBtn" type="button">Cancel</button>
+                </div>
+
+                <div id="statsUsernameMessage"></div>
+            </div>
             <div id="statsTodayCard" class="stats-today-card">
                 <div id="statsGameDate" class="stats-game-date">—</div>
                 <div class="stats-today-grid">
@@ -227,7 +248,7 @@
             <div class="modal-title">Resolve conflict</div>
 
             <div class="modal-body">
-                You have gameplay on this device that conflicts with days already registered to your profile.
+                You have gameplay on this device that conflicts with days already recorded to your profile.
             </div>
             <div id="authConflictMessage" class="modal-body"></div>
             <div class="modal-actions">

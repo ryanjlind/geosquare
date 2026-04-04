@@ -398,7 +398,7 @@ def get_game_state_payload(user_id: int, session_id: int | None) -> tuple[dict, 
 
         cur.execute(
             """
-            SELECT AuthProviderSubject
+            SELECT AuthProviderSubject, Username
             FROM Users
             WHERE UserId = ?
             """,
@@ -406,6 +406,7 @@ def get_game_state_payload(user_id: int, session_id: int | None) -> tuple[dict, 
         )
         user_row = cur.fetchone()
         is_authenticated = bool(user_row and user_row.AuthProviderSubject)
+        username = user_row.Username if user_row else None
 
         game_id = _require_today_game(cur)
         if game_id is None:
@@ -442,6 +443,7 @@ def get_game_state_payload(user_id: int, session_id: int | None) -> tuple[dict, 
             'game_id': int(session.GameId),
             'total_score': int(session.TotalScore),
             'is_authenticated': is_authenticated,
+            'username': username,
         }
 
         if session.CompletedAt is not None:

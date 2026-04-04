@@ -115,9 +115,14 @@ export function restoreSavedState(state) {
         }, round.round_number);
     }
 
+    if (state.completed_at) {
+        setGuessBoxVisible(false);
+        showNextButton(5);
+        return;
+    }
+
     setGuessBoxVisible(true);
 }
-
 export function showAuthConflictModal(message) {
     const modal = document.getElementById('authConflictModal');
     const body = document.getElementById('authConflictMessage');

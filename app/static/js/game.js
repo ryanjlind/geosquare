@@ -24,6 +24,8 @@ import { wireStatsOverlay, showEndGameSummary } from './stats.js';
 import { initFeedback } from './feedback.js';
 import { initAuth, resolveAuthConflict } from './auth.js';
 
+let latestGameState = null;
+
 function renderRound(data) {
     renderSidebar(data);
     renderRoundMap(data);
@@ -172,6 +174,8 @@ export async function initGame() {
         return;
     }
 
+    latestGameState = state;
+
     const data = await fetchRound(state.round_number || 1);
 
     gameState.currentRound = data.round_number;
@@ -203,8 +207,8 @@ export async function initGame() {
 
     if (state.completed_at) {
         setGuessControlsEnabled(false);
-        hideNextButton();
         setGuessBoxVisible(false);
+        showNextButton(5);
         await showEndGameSummary();
     }
 }

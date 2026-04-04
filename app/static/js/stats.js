@@ -1,13 +1,144 @@
 import { fetchPlayerStats } from './api.js';
 import { escapeHtml, numberFmt, parseFormattedInt } from './utils.js';
 
+export async function syncStatsUsernameUi() {
+    const row = document.getElementById('statsUserRow');
+    const view = document.getElementById('statsUserView');
+    const edit = document.getElementById('statsUserEdit');
+    const text = document.getElementById('statsUsernameText');
+    const input = document.getElementById('statsUsernameInput');
+    const message = document.getElementById('statsUsernameMessage');
+
+    if (!row || !view || !edit || !text || !input || !message) {
+        return;
+    }
+
+    message.textContent = '';
+    edit.classList.add('hidden');
+    view.classList.remove('hidden');
+
+    if (!latestGameState || !latestGameState.is_authenticated) {
+        row.classList.add('hidden');
+        return;
+    }
+
+    row.classList.remove('hidden');
+    text.textContent = latestGameState.username || '';
+    input.value = latestGameState.username || '';
+}
+
 export function wireStatsOverlay() {
     const overlay = document.getElementById('statsOverlay');
     const closeBtn = document.getElementById('statsCloseBtn');
     const backdrop = overlay.querySelector('.stats-backdrop');
+    const editBtn = document.getElementById('statsUsernameEditBtn');
+    const saveBtn = document.getElementById('statsUsernameSaveBtn');
+    const cancelBtn = document.getElementById('statsUsernameCancelBtn');
+    const input = document.getElementById('statsUsernameInput');
 
     closeBtn.onclick = hideStatsOverlay;
     backdrop.onclick = hideStatsOverlay;
+
+    if (editBtn) {
+        editBtn.onclick = () => {
+            const row = document.getElementById('statsUserRow');
+            const view = document.getElementById('statsUserView');
+            const edit = document.getElementById('statsUserEdit');
+            const text = document.getElementById('statsUsernameText');
+            const message = document.getElementById('statsUsernameMessage');
+
+            if (row.classList.contains('hidden')) {
+                return;
+            }
+
+            input.value = text.textContent.trim();
+            message.textContent = '';
+            view.classList.add('hidden');
+            edit.classList.remove('hidden');
+            input.focus();
+            input.select();
+        };
+    }
+
+    if (cancelBtn) {
+        cancelBtn.onclick = () => {
+            const view = document.getElementById('statsUserView');
+            const edit = document.getElementById('statsUserEdit');
+            const message = document.getElementById('statsUsernameMessage');
+
+            message.textContent = '';
+            edit.classList.add('hidden');
+            view.classList.remove('hidden');
+        };
+    }
+
+    if (saveBtn) {
+        saveBtn.onclick = async () => {
+            const view = document.getElementById('statsUserView');
+            const edit = document.getElementById('statsUserEdit');
+            const text = document.getElementById('statsUsernameText');
+            const message = document.getElementById('statsUsernameMessage');
+            const username = input.value.trim();
+
+            message.textContent = '';
+
+            if (!username) {
+                message.textContent = 'Username is required';
+                return;
+            }
+
+            if (!/^[a-zA-Z0-9]{3,15}$/.test(username)) {
+                message.textContent = 'Username must be 3-15 letters or numbers';
+                return;
+            }
+
+            const { response: checkResponse, data: checkData } = await fetchJson(`/api/username-check?username=${encodeURIComponent(username)}`);
+            if (!checkResponse.ok) {
+                message.textContent = 'Unable to validate username';
+                return;
+            }
+
+            const currentUsername = text.textContent.trim();
+            if (username !== currentUsername && !checkData.available) {
+                message.textContent = 'Username taken';
+                return;
+            }
+
+            const { response: saveResponse, data: saveData } = await fetchJson('/api/set-username', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username })
+            });
+
+            if (!saveResponse.ok) {
+                message.textContent = saveData?.error || 'Unable to save username';
+                return;
+            }
+
+            if (latestGameState) {
+                latestGameState.username = username;
+            }
+
+            text.textContent = username;
+            message.textContent = 'Saved';
+            edit.classList.add('hidden');
+            view.classList.remove('hidden');
+        };
+    }
+
+    if (input) {
+        input.onkeydown = async (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                await saveBtn.onclick();
+            }
+
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelBtn.onclick();
+            }
+        };
+    }
 
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && overlay.style.display !== 'none') {
@@ -196,5 +327,6 @@ export async function showEndGameSummary() {
         bestRound: bestRound && bestRound.points > 0 ? bestRound : null
     });
 
+    await syncStatsUsernameUi();
     showStatsOverlay();
 }

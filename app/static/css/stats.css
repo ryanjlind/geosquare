@@ -180,3 +180,68 @@
         font-size: 24px;
     }
 }
+
+.stats-user-row {
+    margin-bottom: 18px;
+    padding: 14px 16px;
+    border: 1px solid #2a3442;
+    border-radius: 12px;
+    background: #111824;
+}
+
+.stats-user-view,
+.stats-user-edit {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.stats-user-label {
+    font-size: 14px;
+    color: #b7c4d4;
+}
+
+#statsUsernameText {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+#statsUsernameInput {
+    min-width: 220px;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid #3a4658;
+    border-radius: 10px;
+    background: #1d2633;
+    color: #e9eef5;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+#statsUsernameEditBtn,
+#statsUsernameSaveBtn,
+#statsUsernameCancelBtn {
+    height: 40px;
+    padding: 0 14px;
+    border: 1px solid #3a4658;
+    border-radius: 10px;
+    background: #1d2633;
+    color: #e9eef5;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+#statsUsernameEditBtn:hover,
+#statsUsernameSaveBtn:hover,
+#statsUsernameCancelBtn:hover {
+    background: #253244;
+    border-color: #51627c;
+}
+
+#statsUsernameMessage {
+    margin-top: 10px;
+    min-height: 18px;
+    font-size: 14px;
+    color: #b7c4d4;
+}

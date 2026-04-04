@@ -208,7 +208,7 @@ def auth_callback():
         return build_popup_response(
             {
                 'type': 'auth_conflict',
-                'message': 'You have gameplay on this device that conflicts with days already registered to your profile.'
+                'message': 'How should GeoSquare handle the conflict?'
             },
             identity['user_id'],
             identity['session_id']
