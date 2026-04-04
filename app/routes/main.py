@@ -5,6 +5,7 @@ import smtplib
 import json
 import logging
 from datetime import datetime, timezone
+from app.core.db import get_conn
 from app.core.auth import (
     begin_lastlogin_link,
     resolve_lastlogin_conflict,
@@ -68,14 +69,11 @@ def game_state():
         response = jsonify(response_body)
         response.status_code = status_code
         return attach_session_cookie(response, identity['user_id'], identity['session_id'])
-    except Exception as e:
+    except Exception:
         import traceback
         print('[ERROR] /api/game-state failed', flush=True)
         traceback.print_exc()
-        return jsonify({
-            'ok': False,
-            'error': repr(e),
-        }), 500
+        raise
     
 @main_bp.route('/api/guess', methods=['POST'])
 def guess():
@@ -194,7 +192,16 @@ def auth_callback():
             </html>
             """
         )
-        return attach_session_cookie(response, user_id, session_id)
+        # resolve correct session AFTER switch
+        with get_conn() as conn:
+            cur = conn.cursor()
+            session = _get_current_session(cur, result['user_id'], None)
+
+        return attach_session_cookie(
+            response,
+            result['user_id'],
+            int(session.SessionId) if session else None
+        )
 
     status = result.get('status')
 
