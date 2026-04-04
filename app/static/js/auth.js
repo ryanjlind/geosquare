@@ -106,7 +106,7 @@ async function resolveAuthConflict(action) {
     await refreshAfterAuth();
 }
 
-function showAuthConflictModal(message) {
+export function showAuthConflictModal(message) {
     const modal = ensureAuthConflictModal();
     document.getElementById('authConflictMessage').textContent = message;
     document.getElementById('authConflictDiscardBtn').onclick = () => resolveAuthConflict('discard_this_device_conflicts');

@@ -20,7 +20,7 @@ import {
 import { wireStatsOverlay, showEndGameSummary } from './stats.js';
 import { escapeHtml, numberFmt, ordinal } from './utils.js';
 import { initFeedback } from './feedback.js';
-import { login, setAuthUi, logout } from './auth.js';
+import { login, setAuthUi, logout, showAuthConflictModal } from './auth.js';
 
 function renderRound(data) {
     renderSidebar(data);
