@@ -1,4 +1,5 @@
 import { fetchPlayerStats } from './api.js';
+import { gameState } from './state.js';
 import { escapeHtml, numberFmt, parseFormattedInt } from './utils.js';
 
 export function syncStatsUsernameUi(state) {
