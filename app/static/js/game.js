@@ -1,5 +1,5 @@
 import { gameState } from './state.js';
-import { postClientLog, fetchJson } from './utils.js';
+import { postClientLog, escapeHtml, numberFmt, ordinal } from './utils.js';
 import { fetchGameState, fetchRound, submitGuessRequest, submitPassRequest } from './api.js';
 import { getSfxCtx, playSuccess, playFail, playComplete, playPerfect } from './audio.js';
 import { initCesium, renderRoundMap, drawCities, showGuessedCity, showIncorrectGuessedCity } from './map.js';
@@ -16,11 +16,13 @@ import {
     getGuessValue,
     focusGuessInput,
     addRoundRow,
+    showAuthConflictModal,
+    hideAuthConflictModal,
+    wireAuthConflictModal,
 } from './ui.js';
 import { wireStatsOverlay, showEndGameSummary } from './stats.js';
-import { escapeHtml, numberFmt, ordinal } from './utils.js';
 import { initFeedback } from './feedback.js';
-import { login, setAuthUi, logout } from './auth.js';
+import { initAuth, resolveAuthConflict } from './auth.js';
 
 function renderRound(data) {
     renderSidebar(data);
@@ -159,42 +161,6 @@ export async function submitGuess() {
     }
 }
 
-function wireAuthMessageListener() {
-    if (window.__authMessageListenerWired) return;
-    window.__authMessageListenerWired = true;
-
-    window.addEventListener('message', (event) => {        
-
-        if (event.origin !== window.location.origin) return;
-        if (!event.data || typeof event.data !== 'object') return;        
-
-        if (event.data.type === 'auth_success') {            
-            window.location.reload();
-            return;
-        }
-
-        if (event.data.type === 'auth_conflict') {
-            showAuthConflictModal(event.data.message);
-            return;
-        }
-
-        if (event.data.type === 'auth_error') {
-            console.log(event.data.message || 'Login failed.');
-        }
-    });
-}
-
-function wireAuth(state) {
-    setAuthUi(state.is_authenticated);
-    wireAuthMessageListener();
-
-    const loginBtn = document.getElementById('loginBtn');
-    const logoutBtn = document.getElementById('logoutBtn');
-
-    if (loginBtn) loginBtn.onclick = login;
-    if (logoutBtn) logoutBtn.onclick = logout;
-}
-
 export async function initGame() {
     await initCesium();
     wireStatsOverlay();
@@ -217,74 +183,28 @@ export async function initGame() {
     wireGuessing();
     wireRoundButtons();
     initFeedback();
-    wireAuth(state);
-    wireAuthConflictModal();
-
-    if (state.completed_at) {
-        setGuessControlsEnabled(false);
-        hideNextButton();
-        setGuessBoxVisible(false);
-        await showEndGameSummary();
-    }
-}
-
-function showAuthConflictModal() {
-    document.getElementById('authConflictModal').classList.remove('hidden');
-}
-
-function hideAuthConflictModal() {
-    document.getElementById('authConflictModal').classList.add('hidden');
-}
-
-function wireAuthConflictModal() {
-    document.getElementById('conflictDiscardBtn').onclick = () => resolveConflict('discard_this_device_conflicts');
-    document.getElementById('conflictOverwriteBtn').onclick = () => resolveConflict('overwrite_profile');
-    document.getElementById('conflictAbortBtn').onclick = () => resolveConflict('abort');
-}
-
-export async function resolveConflict(action) {
-    const { response, data } = await fetchJson('/auth/resolve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
+    initAuth(state, {
+        onAuthSuccess: async () => {
+            window.location.reload();
+        },
+        onAuthConflict: (message) => {
+            showAuthConflictModal(message);
+        },
+        onAuthError: (message) => {
+            console.log(message || 'Login failed.');
+        },
     });
 
-    if (!response.ok) {
-        console.log(data.error || 'Unable to resolve login conflict.');
-        return;
-    }
-    
-    await refreshAfterAuth();
-}
-
-async function refreshAfterAuth() {
-    const { response: stateResponse, data: state } = await fetchGameState();
-
-    if (!stateResponse.ok) {
-        setMetaError(state.error);
-        return;
-    }
-
-    setAuthUi(state.is_authenticated);
-
-    const data = await fetchRound(state.round_number || 1);
-
-    gameState.currentRound = data.round_number;
-    gameState.isPerfect = state.is_perfect;
-    gameState.roundLocked = false;
-
-    renderRound(data);
-    restoreSavedState(state);
+    wireAuthConflictModal({
+        onDiscard: () => resolveAuthConflict('discard_this_device_conflicts').then(hideAuthConflictModal),
+        onOverwrite: () => resolveAuthConflict('overwrite_profile').then(hideAuthConflictModal),
+        onAbort: () => resolveAuthConflict('abort').then(hideAuthConflictModal),
+    });
 
     if (state.completed_at) {
         setGuessControlsEnabled(false);
         hideNextButton();
         setGuessBoxVisible(false);
         await showEndGameSummary();
-        return;
     }
-
-    setGuessControlsEnabled(true);
-    setGuessBoxVisible(true);
 }
-

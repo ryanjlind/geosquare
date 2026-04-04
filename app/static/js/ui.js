@@ -117,3 +117,34 @@ export function restoreSavedState(state) {
 
     setGuessBoxVisible(true);
 }
+
+export function showAuthConflictModal(message) {
+    const modal = document.getElementById('authConflictModal');
+    const body = document.getElementById('authConflictMessage');
+
+    if (body) {
+        body.textContent = message;
+    }
+
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+}
+
+export function hideAuthConflictModal() {
+    const modal = document.getElementById('authConflictModal');
+
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+export function wireAuthConflictModal({ onDiscard, onOverwrite, onAbort }) {
+    const discardBtn = document.getElementById('conflictDiscardBtn');
+    const overwriteBtn = document.getElementById('conflictOverwriteBtn');
+    const abortBtn = document.getElementById('conflictAbortBtn');
+
+    if (discardBtn) discardBtn.onclick = onDiscard;
+    if (overwriteBtn) overwriteBtn.onclick = onOverwrite;
+    if (abortBtn) abortBtn.onclick = onAbort;
+}
