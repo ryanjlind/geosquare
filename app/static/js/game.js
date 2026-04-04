@@ -161,14 +161,14 @@ export async function submitGuess() {
     }
 }
 
-export async function initGame() {
-    
-    Object.assign(gameState, state);
+export async function initGame() {    
 
     await initCesium();
     wireStatsOverlay();
 
     const { response: stateResponse, data: state } = await fetchGameState();
+
+    Object.assign(gameState, state);
 
     if (!stateResponse.ok) {
         setMetaError(state.error);
