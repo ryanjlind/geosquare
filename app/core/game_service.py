@@ -633,6 +633,8 @@ def get_reveal_cities_for_square(square_id: int, excluded_city_name: str | None 
             sql += " AND CityName <> ?"
             params.append(excluded_city_name)
 
+        sql += " ORDER BY NEWID() "
+        
         cur.execute(sql, params)
         rows = cur.fetchall()
 
