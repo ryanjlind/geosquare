@@ -49,22 +49,33 @@ function handleGuessKeyDown(e) {
     }
 }
 
-export async function handleNextRound() {    
+export async function handleNextRound() {
+    const nextBtn = document.getElementById('nextBtn');
 
-    if (gameState.currentRound >= 5) {
-        gameState.currentRound = 5;
-        setGuessControlsEnabled(false);
-        await showEndGameSummary();
+    if (nextBtn.disabled) {
         return;
     }
 
-    gameState.currentRound += 1;
+    nextBtn.disabled = true;
 
-    const data = await fetchRound(gameState.currentRound);
-    renderRound(data);
-    gameState.roundLocked = false;
-    document.getElementById('passBtn').disabled = false;
-    hideNextButton();
+    try {
+        if (gameState.currentRound >= 5) {
+            gameState.currentRound = 5;
+            setGuessControlsEnabled(false);
+            await showEndGameSummary();
+            return;
+        }
+
+        gameState.currentRound += 1;
+
+        const data = await fetchRound(gameState.currentRound);
+        renderRound(data);
+        gameState.roundLocked = false;
+        document.getElementById('passBtn').disabled = false;
+        hideNextButton();
+    } finally {
+        nextBtn.disabled = false;
+    }
 }
 
 export async function handlePass() {

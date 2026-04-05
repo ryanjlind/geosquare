@@ -110,7 +110,7 @@ export function wireStatsOverlay() {
                 message.textContent = saveData?.error || 'Unable to save username';
                 return;
             }
-                    
+
             text.textContent = username;
             message.textContent = 'Saved';
             edit.classList.add('hidden');
@@ -129,6 +129,36 @@ export function wireStatsOverlay() {
                 e.preventDefault();
                 cancelBtn.onclick();
             }
+        };
+
+        input.oninput = async () => {
+            const message = document.getElementById('statsUsernameMessage');
+            const username = input.value.trim();
+
+            message.textContent = '';
+
+            if (!username) {
+                return;
+            }
+
+            if (!/^[a-zA-Z0-9]{3,15}$/.test(username)) {
+                message.textContent = 'Username must be 3-15 letters or numbers';
+                return;
+            }
+
+            const { response, data } = await fetchJson(`/api/username-check?username=${encodeURIComponent(username)}`);
+
+            if (!response.ok) {
+                message.textContent = 'Unable to validate username';
+                return;
+            }
+
+            if (!data.available) {
+                message.textContent = 'Username taken';
+                return;
+            }
+
+            message.textContent = 'Available';
         };
     }
 
