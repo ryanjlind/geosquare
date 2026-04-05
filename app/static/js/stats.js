@@ -349,6 +349,6 @@ export async function showEndGameSummary() {
         bestRound: bestRound && bestRound.points > 0 ? bestRound : null
     });
 
-    await syncStatsUsernameUi(gameState);
+    await syncStatsUsernameUi(gameState);    
     showStatsOverlay();
 }

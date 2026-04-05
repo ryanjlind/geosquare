@@ -1,4 +1,4 @@
-import { postClientLog } from './utils.js';
+import { postClientLog, numberFmt } from './utils.js';
 
 export async function initCesium() {
     await postClientLog('init_cesium_started', {
@@ -6,11 +6,10 @@ export async function initCesium() {
         userAgent: navigator.userAgent
     });
 
-    try {        
-
+    try {
         const arcGisImageryProvider = await Cesium.ArcGisMapServerImageryProvider.fromUrl(
             'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer'
-        );        
+        );
 
         if (arcGisImageryProvider.errorEvent) {
             arcGisImageryProvider.errorEvent.addEventListener(function (error) {
@@ -56,7 +55,6 @@ export async function initCesium() {
                 stack: error?.stack || null
             });
         });
-        
     } catch (error) {
         await postClientLog('init_cesium_failed', {
             message: error?.message || String(error),
@@ -74,7 +72,7 @@ export function drawSquare(data) {
     const b = data.bounds;
 
     window.geoViewer.entities.add({
-        name: 'Daily square',
+        name: `Round ${data.round_number || ''}`.trim(),
         rectangle: {
             coordinates: Cesium.Rectangle.fromDegrees(b.min_lon, b.min_lat, b.max_lon, b.max_lat),
             material: Cesium.Color.YELLOW.withAlpha(0.2),
@@ -90,11 +88,13 @@ export function drawCities(cities) {
         window.geoViewer.entities.add({
             position: Cesium.Cartesian3.fromDegrees(city.longitude, city.latitude),
             point: {
-                pixelSize: 6,
-                color: Cesium.Color.CYAN,
+                pixelSize: city.pixel_size || 6,
+                color: city.color || Cesium.Color.CYAN,
+                outlineColor: city.outline_color || Cesium.Color.BLACK,
+                outlineWidth: city.outline_width ?? 1,
             },
             label: {
-                text: city.city_name,
+                text: city.label || city.city_name,
                 font: '14px sans-serif',
                 showBackground: true,
                 horizontalOrigin: Cesium.HorizontalOrigin.LEFT,
@@ -109,17 +109,104 @@ export function zoomToSquare(bounds) {
     const centerLat = (bounds.min_lat + bounds.max_lat) / 2;
     const centerLon = (bounds.min_lon + bounds.max_lon) / 2;
 
-    window.geoViewer.camera.setView({
-        destination: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, 10000000)
+    const rectangle = Cesium.Cartesian3.fromDegrees(centerLon, centerLat, 10000000)    
+    
+    window.geoViewer.camera.flyTo({
+        destination: rectangle,
+        duration: 1.8
     });
 
     window.geoViewer.clock.shouldAnimate = false;
+}
+
+function spinGlobeOnce(durationMs = 1500) {
+    return new Promise((resolve) => {
+        const camera = window.geoViewer.camera;        
+        const startHeading = camera.heading;        
+        const startTime = performance.now();
+
+        function step(now) {
+            const elapsed = now - startTime;
+            const t = Math.min(elapsed / durationMs, 1);
+            const heading = startHeading - (Cesium.Math.TWO_PI * t);
+
+            const delta = -Cesium.Math.TWO_PI / 60;
+            camera.rotate(Cesium.Cartesian3.UNIT_Z, delta);
+
+            if (t < 1) {
+                window.requestAnimationFrame(step);
+                return;
+            }
+
+            resolve();
+        }
+
+        window.requestAnimationFrame(step);
+    });
+}
+
+export async function zoomToAllSquares(rounds) {
+    const roundFive = rounds.find(round => round.round_number === 5);
+
+    if (!roundFive) {
+        throw new Error('Round 1 not found for end-game animation.');
+    }
+
+    await spinGlobeOnce();
+
+    zoomToSquare(roundFive.bounds);        
 }
 
 export function renderRoundMap(data) {
     clearMap();
     drawSquare(data);
     zoomToSquare(data.bounds);
+}
+
+export async function renderAllSquares(rounds) {
+    clearMap();
+
+    for (const round of rounds) {
+        drawSquare(round);
+
+        if (round.player_guess && round.player_guess.latitude != null && round.player_guess.longitude != null) {
+            drawCities([{
+                city_name: round.player_guess.city_name,
+                label: `${round.player_guess.city_name} (${numberFmt(round.player_guess.population || 0)})`,
+                latitude: round.player_guess.latitude,
+                longitude: round.player_guess.longitude,
+                pixel_size: 8,
+                color: Cesium.Color.LIME,
+                outline_color: Cesium.Color.BLACK,
+                outline_width: 2,
+            }]);
+        }
+
+        if (round.reveal_cities && round.reveal_cities.length) {
+            drawCities(
+                round.reveal_cities.map(city => ({
+                    ...city,
+                    label: `${city.city_name} (${numberFmt(city.population)})`,
+                    pixel_size: 6,
+                    color: Cesium.Color.CYAN,
+                    outline_color: Cesium.Color.BLACK,
+                    outline_width: 1,
+                }))
+            );
+        }
+    }
+
+    await zoomToAllSquares(rounds);
+}
+
+export function renderEndGameRound(rounds, roundNumber) {
+    const round = rounds.find(r => r.round_number === roundNumber);
+
+    if (!round) {
+        throw new Error(`Round ${roundNumber} not found in end-game data.`);
+    }
+
+    zoomToSquare(round.bounds);
 }
 
 export function showGuessedCity(result) {

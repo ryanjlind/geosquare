@@ -1,8 +1,16 @@
 import { gameState } from './state.js';
 import { postClientLog, escapeHtml, numberFmt, ordinal } from './utils.js';
-import { fetchGameState, fetchRound, submitGuessRequest, submitPassRequest } from './api.js';
+import { fetchGameState, fetchRound, fetchAllDailySquares, submitGuessRequest, submitPassRequest } from './api.js';
 import { getSfxCtx, playSuccess, playFail, playComplete, playPerfect } from './audio.js';
-import { initCesium, renderRoundMap, drawCities, showGuessedCity, showIncorrectGuessedCity } from './map.js';
+import {
+    initCesium,
+    renderRoundMap,
+    renderAllSquares,
+    renderEndGameRound,
+    drawCities,
+    showGuessedCity,
+    showIncorrectGuessedCity
+} from './map.js';
 import {
     setMetaError,
     renderSidebar,
@@ -16,6 +24,8 @@ import {
     getGuessValue,
     focusGuessInput,
     addRoundRow,
+    wireRoundTable,
+    setSelectedRoundRow,
     showAuthConflictModal,
     hideAuthConflictModal,
     wireAuthConflictModal,
@@ -24,15 +34,38 @@ import { wireStatsOverlay, showEndGameSummary } from './stats.js';
 import { initFeedback } from './feedback.js';
 import { initAuth, resolveAuthConflict } from './auth.js';
 
+let endGameRounds = [];
+
 function renderRound(data) {
     renderSidebar(data);
     renderRoundMap(data);
 }
 
+async function loadEndGameRounds() {
+    endGameRounds = await fetchAllDailySquares();
+    await renderAllSquares(endGameRounds);
+}
+
+function handleEndGameRoundSelect(roundNumber) {
+    if (!endGameRounds.length) {
+        return;
+    }
+
+    setSelectedRoundRow(roundNumber);
+    renderEndGameRound(endGameRounds, roundNumber);
+}
+
+async function enterEndGameGlobe() {
+    setGuessControlsEnabled(false);
+    setGuessBoxVisible(false);
+    showNextButton(5);
+    await loadEndGameRounds();
+    setSelectedRoundRow(5);
+}
+
 function wireGuessing() {
     const input = document.getElementById('guessInput');
     const btn = document.getElementById('guessBtn');
-    const passBtn = document.getElementById('passBtn');
 
     btn.onclick = submitGuess;
     input.onkeydown = handleGuessKeyDown;
@@ -61,7 +94,6 @@ export async function handleNextRound() {
     try {
         if (gameState.currentRound >= 5) {
             gameState.currentRound = 5;
-            setGuessControlsEnabled(false);
             await showEndGameSummary();
             return;
         }
@@ -82,8 +114,8 @@ export async function handlePass() {
     document.getElementById('passBtn').disabled = true;
     gameState.roundLocked = true;
     getSfxCtx();
-    
-    gameState.isPerfect = false 
+
+    gameState.isPerfect = false;
 
     const { response, data } = await submitPassRequest(gameState.currentRound);
 
@@ -110,25 +142,30 @@ export async function handlePass() {
     drawCities([largestCity]);
     playFail();
 
-    showNextButton(gameState.currentRound);    
-
     clearGuessInput();
     setGuessBoxVisible(false);
+
+    if (gameState.currentRound === 5) {
+        await enterEndGameGlobe();
+        return;
+    }
+
+    showNextButton(gameState.currentRound);
 }
 
-export async function submitGuess() {    
-    
+export async function submitGuess() {
     const guessBtn = document.getElementById('guessBtn');
     const guessInput = document.getElementById('guessInput');
 
-    if (guessBtn.disabled) {        
+    if (guessBtn.disabled) {
         return;
     }
 
     guessBtn.disabled = true;
     guessInput.disabled = true;
     const guess = getGuessValue();
-    try {        
+
+    try {
         const { data } = await submitGuessRequest(guess, gameState.currentRound);
 
         if (data.correct) {
@@ -143,10 +180,12 @@ export async function submitGuess() {
             if (gameState.currentRound === 5) {
                 if (gameState.isPerfect) playPerfect();
                 else playComplete();
-            } else {
-                playSuccess();
+
+                await enterEndGameGlobe();
+                return;
             }
 
+            playSuccess();
             showNextButton(gameState.currentRound);
             return;
         }
@@ -172,8 +211,7 @@ export async function submitGuess() {
     }
 }
 
-export async function initGame() {    
-
+export async function initGame() {
     await initCesium();
     wireStatsOverlay();
 
@@ -190,13 +228,15 @@ export async function initGame() {
 
     gameState.currentRound = data.round_number;
     gameState.isPerfect = state.is_perfect;
-    console.log('[DEBUG] init:before-load', { gameState: gameState });
     gameState.roundLocked = false;
+
     renderRound(data);
     restoreSavedState(state);
     wireGuessing();
     wireRoundButtons();
+    wireRoundTable(handleEndGameRoundSelect);
     initFeedback();
+
     initAuth(state, {
         onAuthSuccess: async () => {
             window.location.reload();
@@ -216,9 +256,6 @@ export async function initGame() {
     });
 
     if (state.completed_at) {
-        setGuessControlsEnabled(false);
-        setGuessBoxVisible(false);
-        showNextButton(5);
-        await showEndGameSummary(state);
+        await enterEndGameGlobe();
     }
 }

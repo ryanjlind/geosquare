@@ -86,6 +86,8 @@ export function addRoundRow(result, roundNumber) {
     const totalEl = document.getElementById('totalPoints');
     const tr = document.createElement('tr');
 
+    tr.dataset.roundNumber = String(roundNumber);
+
     tr.innerHTML = `
         <td>${roundNumber}</td>
         <td><span class="round-city">${escapeHtml(result.city)}</span></td>
@@ -98,6 +100,27 @@ export function addRoundRow(result, roundNumber) {
 
     const currentTotal = parseFormattedInt(totalEl.textContent);
     totalEl.textContent = numberFmt(currentTotal + result.score);
+}
+
+export function wireRoundTable(onRoundSelect) {
+    const tbody = document.querySelector('#roundTable tbody');
+
+    tbody.onclick = (e) => {
+        const row = e.target.closest('tr[data-round-number]');
+        if (!row) {
+            return;
+        }
+
+        onRoundSelect(Number(row.dataset.roundNumber));
+    };
+}
+
+export function setSelectedRoundRow(roundNumber) {
+    const rows = document.querySelectorAll('#roundTable tbody tr');
+
+    rows.forEach((row) => {
+        row.classList.toggle('selected', Number(row.dataset.roundNumber) === roundNumber);
+    });
 }
 
 export function restoreSavedState(state) {

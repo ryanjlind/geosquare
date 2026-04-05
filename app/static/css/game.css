@@ -135,3 +135,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+#roundTable tbody tr {
+    cursor: pointer;
+}
+
+#roundTable tbody tr.selected {
+    background: rgba(143, 211, 255, 0.14);
+}

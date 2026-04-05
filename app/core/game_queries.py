@@ -233,11 +233,13 @@ def get_completed_round_rows(cur, session_id: int):
             gsr.RoundNumber,
             gsr.SquareId,
             gsr.Score,
-            gg.CityName,            
+            gg.CityName,
             gg.Population,
             gg.Score AS GuessScore,
             gg.GuessedAt,
-            ranked.PopRank
+            ranked.PopRank,
+            ranked.Latitude,
+            ranked.Longitude
         FROM dbo.GameSessionRounds gsr
         LEFT JOIN dbo.GameGuesses gg
             ON gg.SessionRoundId = gsr.SessionRoundId
@@ -247,6 +249,8 @@ def get_completed_round_rows(cur, session_id: int):
                 SquareId,
                 CityName,
                 Population,
+                Latitude,
+                Longitude,
                 ROW_NUMBER() OVER (
                     PARTITION BY SquareId
                     ORDER BY Population DESC, CityName ASC

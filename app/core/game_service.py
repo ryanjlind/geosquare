@@ -8,8 +8,7 @@ from app.core.game_queries import (
     get_completed_round_rows,
     get_session_round,
     create_session_round,
-    get_ranked_square_cities,
-    get_session_by_id,
+    get_ranked_square_cities,    
     get_session_total_score,
     get_square_cities,
     get_square_city_count,
@@ -36,7 +35,6 @@ def _require_today_game(cur):
     if today_game is None:
         return None
     return int(today_game.GameId)
-
 
 def _get_current_session(cur, user_id: int, session_id: int | None):
     game_id = _require_today_game(cur)
@@ -145,7 +143,6 @@ def resolve_request_identity() -> dict:
             'session_id': int(session.SessionId) if session is not None else None,
         }
 
-
 def _build_completed_rounds(rows):
     completed_rounds_by_number = {}
 
@@ -163,7 +160,9 @@ def _build_completed_rounds(rows):
 
         if row.CityName is not None:
             completed_rounds_by_number[round_number]['guesses'].append({
-                'city_name': row.CityName,                
+                'city_name': row.CityName,
+                'latitude': float(row.Latitude),
+                'longitude': float(row.Longitude),
                 'population': int(row.Population) if row.Population is not None else None,
                 'score': int(row.GuessScore),
                 'rank': int(row.PopRank) if row.PopRank is not None else None,
@@ -171,7 +170,6 @@ def _build_completed_rounds(rows):
             })
 
     return list(completed_rounds_by_number.values())
-
 
 def get_daily_square_data(round_number: int) -> dict:
     with get_conn() as conn:
@@ -222,7 +220,6 @@ def get_daily_square_data(round_number: int) -> dict:
             'round_number': int(row.RoundNumber),
             'game_id': int(row.GameId),
         }
-
 
 def submit_guess(payload: dict, user_id: int, session_id: int | None) -> tuple[dict, int]:
     t0 = perf_counter()
@@ -391,7 +388,6 @@ def submit_pass(payload: dict, user_id: int, session_id: int | None) -> tuple[di
             } if largest_city else None,
         }, 200
 
-
 def get_game_state_payload(user_id: int, session_id: int | None) -> tuple[dict, int]:
     with get_conn() as conn:
         cur = conn.cursor()
@@ -512,8 +508,8 @@ def _compute_streaks(game_dates):
 
     return current_streak, longest_streak
 
-
 def get_player_stats_payload(user_id: int) -> tuple[dict, int]:
+
     through_game_date = get_effective_game_date()
 
     with get_conn() as conn:
@@ -616,3 +612,80 @@ def get_player_stats_payload(user_id: int) -> tuple[dict, int]:
                 'round_number': int(best_guess.RoundNumber),
             } if best_guess else None,
         }, 200
+    
+def get_reveal_cities_for_square(square_id: int, excluded_city_name: str | None = None) -> list[dict]:
+    with get_conn() as conn:
+        cur = conn.cursor()
+
+        params = [square_id]
+        sql = """
+            SELECT TOP 5
+                CityName,
+                CountryCode,
+                Latitude,
+                Longitude,
+                Population
+            FROM dbo.GameSquareCities
+            WHERE SquareId = ?
+        """
+
+        if excluded_city_name:
+            sql += " AND CityName <> ?"
+            params.append(excluded_city_name)
+
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+
+        return [
+            {
+                'city_name': row.CityName,
+                'country_code': row.CountryCode,
+                'latitude': float(row.Latitude),
+                'longitude': float(row.Longitude),
+                'population': int(row.Population),
+            }
+            for row in rows
+        ]
+
+
+def get_all_daily_square_data(user_id: int, session_id: int | None) -> tuple[dict, int]:
+    with get_conn() as conn:
+        cur = conn.cursor()
+
+        session = _get_current_session(cur, user_id, session_id)
+        if session is None:
+            return {'error': 'No game found for today.'}, 404
+
+        completed_rounds = _build_completed_rounds(
+            get_completed_round_rows(cur, int(session.SessionId))
+        )
+
+        completed_by_round = {
+            int(r['round_number']): r for r in completed_rounds
+        }
+
+    rounds = []
+
+    for round_number in range(1, 6):
+        base = get_daily_square_data(round_number)
+
+        completed = completed_by_round.get(round_number)
+        guess = None
+
+        if completed and completed.get('guesses'):
+            guess = completed['guesses'][0]
+
+        excluded_city_name = guess['city_name'] if guess else None
+
+        reveal_cities = get_reveal_cities_for_square(
+            base['square_id'],
+            excluded_city_name=excluded_city_name
+        )
+
+        rounds.append({
+            **base,
+            'player_guess': guess,              # <-- includes lat/lon now
+            'reveal_cities': reveal_cities
+        })
+
+    return {'rounds': rounds}, 200

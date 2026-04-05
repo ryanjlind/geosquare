@@ -18,6 +18,7 @@ from app.core.game_service import (
     resolve_request_identity,
     submit_guess,
     submit_pass,
+    get_all_daily_square_data,    
 )
 from app.core.user import is_username_available, set_username
 
@@ -56,6 +57,17 @@ def daily_square():
     square_data = jsonify(get_daily_square_data(round_number))
     print(square_data)
     return square_data
+
+@main_bp.route('/api/all-daily-squares')
+def all_daily_squares():
+    identity = resolve_request_identity()
+    response_body, status_code = get_all_daily_square_data(
+        identity['user_id'],
+        identity['session_id']
+    )
+    response = jsonify(response_body)
+    response.status_code = status_code
+    return attach_session_cookie(response, identity['user_id'], identity['session_id'])
 
 @main_bp.route('/api/game-state')
 def game_state():

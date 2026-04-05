@@ -14,6 +14,16 @@ export async function fetchRound(roundNumber) {
     return data;
 }
 
+export async function fetchAllDailySquares() {
+    const { response, data } = await fetchJson('/api/all-daily-squares');
+
+    if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch all daily squares.');
+    }
+
+    return data.rounds;
+}
+
 export async function submitGuessRequest(guess, roundNumber) {
     const { response, data } = await fetchJson('/api/guess', {
         method: 'POST',
