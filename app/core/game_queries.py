@@ -237,6 +237,7 @@ def get_completed_round_rows(cur, session_id: int):
             gg.Population,
             gg.Score AS GuessScore,
             gg.GuessedAt,
+            ranked.CityId,
             ranked.PopRank,
             ranked.Latitude,
             ranked.Longitude
@@ -247,6 +248,7 @@ def get_completed_round_rows(cur, session_id: int):
         LEFT JOIN (
             SELECT
                 SquareId,
+                CityId,
                 CityName,
                 Population,
                 Latitude,

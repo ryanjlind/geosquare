@@ -160,6 +160,7 @@ def _build_completed_rounds(rows):
 
         if row.CityName is not None:
             completed_rounds_by_number[round_number]['guesses'].append({
+                'city_id': int(row.CityId) if row.CityId is not None else None,
                 'city_name': row.CityName,
                 'latitude': float(row.Latitude),
                 'longitude': float(row.Longitude),
@@ -613,28 +614,31 @@ def get_player_stats_payload(user_id: int) -> tuple[dict, int]:
             } if best_guess else None,
         }, 200
     
-def get_reveal_cities_for_square(square_id: int, excluded_city_name: str | None = None) -> list[dict]:
+def get_reveal_cities_for_square(square_id: int, excluded_city: dict | None = None) -> list[dict]:
     with get_conn() as conn:
         cur = conn.cursor()
 
         params = [square_id]
         sql = """
             SELECT TOP 5
-                CityName,
-                CountryCode,
-                Latitude,
-                Longitude,
-                Population
-            FROM dbo.GameSquareCities
-            WHERE SquareId = ?
+                gsc.CityName,
+                gsc.CountryCode,
+                gsc.Latitude,
+                gsc.Longitude,
+                gsc.Population
+            FROM dbo.GameSquareCities gsc
+            JOIN dbo.GeoCities gc
+                ON gc.CityId = gsc.CityId
+            WHERE gsc.SquareId = ?
         """
 
-        if excluded_city_name:
-            sql += " AND CityName <> ?"
-            params.append(excluded_city_name)
+        if excluded_city:
+            sql += " AND gsc.CityId <> ? AND gsc.Population < ?"
+            params.append(excluded_city['city_id'])
+            params.append(excluded_city['population'])
 
-        sql += " ORDER BY NEWID() "
-        
+        sql += " ORDER BY gc.NotorietyScore DESC, gsc.Population DESC"
+
         cur.execute(sql, params)
         rows = cur.fetchall()
 
@@ -677,11 +681,16 @@ def get_all_daily_square_data(user_id: int, session_id: int | None) -> tuple[dic
         if completed and completed.get('guesses'):
             guess = completed['guesses'][0]
 
-        excluded_city_name = guess['city_name'] if guess else None
+        excluded_city = None
+        if guess:
+            excluded_city = {
+                'city_id': guess['city_id'],
+                'population': guess['population'],
+            }
 
         reveal_cities = get_reveal_cities_for_square(
             base['square_id'],
-            excluded_city_name=excluded_city_name
+            excluded_city=excluded_city
         )
 
         rounds.append({
