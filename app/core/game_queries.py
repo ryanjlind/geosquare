@@ -130,7 +130,8 @@ def get_ranked_square_cities(cur, square_id: int):
             c.Longitude,
             c.Population,
             ROW_NUMBER() OVER (ORDER BY c.Population DESC) AS PopRank,
-            gc.AltNames AS AlternateNames
+            gc.AltNames AS AlternateNames,
+            gc.ProvinceCodes
         FROM dbo.GameSquareCities c
         LEFT JOIN dbo.GeoCities gc
             ON gc.CityId = c.CityId   
