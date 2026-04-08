@@ -93,7 +93,7 @@ export async function handleNextRound() {
 
     try {
         if (gameState.currentRound >= 5) {
-            gameState.currentRound = 5;
+            gameState.currentRound = 5;            
             await showEndGameSummary();
             return;
         }

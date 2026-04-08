@@ -258,3 +258,73 @@
     font-size: 14px;
     color: #b7c4d4;
 }
+
+.stats-section-title {
+    margin-bottom: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #e9eef5;
+}
+
+.stats-rounds-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.stats-rounds-table th,
+.stats-rounds-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #2a3442;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.stats-rounds-table thead th {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #b7c4d4;
+}
+
+.stats-rounds-table tbody tr:last-child td {
+    border-bottom: 1px solid #2a3442;
+}
+
+.stats-rounds-table tfoot td {
+    padding: 12px;
+    border-top: 1px solid #3a4658;
+    border-bottom: 0;
+    font-weight: 700;
+}
+
+.stats-rounds-table th:nth-child(1),
+.stats-rounds-table td:nth-child(1),
+.stats-rounds-table th:nth-child(4),
+.stats-rounds-table td:nth-child(4),
+.stats-rounds-table th:nth-child(5),
+.stats-rounds-table td:nth-child(5) {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.stats-rounds-table th:nth-child(3),
+.stats-rounds-table td:nth-child(3) {
+    text-align: right;
+    white-space: nowrap;
+}
+
+#statsTodayRoundsCard {
+    margin-bottom: 12px;
+}
+
+@media (max-width: 760px) {
+    .stats-rounds-table {
+        font-size: 13px;
+    }
+
+    .stats-rounds-table th,
+    .stats-rounds-table td {
+        padding: 8px 8px;
+    }
+}

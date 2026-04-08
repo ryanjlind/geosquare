@@ -1,6 +1,20 @@
-import { fetchPlayerStats, fetchJson } from './api.js';
+import { fetchGameState, fetchPlayerStats, fetchJson } from './api.js';
 import { gameState } from './state.js';
 import { escapeHtml, numberFmt, parseFormattedInt } from './utils.js';
+
+export function buildRoundsFromState(state) {
+    return (state.completed_rounds || []).map((round) => {
+        const guess = round.guesses && round.guesses.length ? round.guesses[0] : null;
+
+        return {
+            round: round.round_number ?? 0,
+            city: guess ? guess.city_name : '—',
+            population: guess ? (guess.population ?? 0) : 0,
+            rank: guess ? (guess.rank ?? '—') : '—',
+            points: round.score ?? 0
+        };
+    });
+}
 
 export function syncStatsUsernameUi(state) {
     const row = document.getElementById('statsUserRow');
@@ -277,6 +291,37 @@ export function renderStatsChart(stats) {
     `;
 }
 
+function buildTodayRoundsFromCompletedRounds(completedRounds) {
+        return (completedRounds || []).map((round) => {
+            const guess = round.guesses && round.guesses.length ? round.guesses[0] : null;
+
+            return {
+                round: round.round_number ?? 0,
+                city: guess ? guess.city_name : '—',
+                population: guess ? (guess.population ?? 0) : 0,
+                rank: guess ? (guess.rank ?? '—') : '—',
+                points: round.score ?? 0
+            };
+        });
+    }
+
+function renderTodayRoundsTable(rounds, total) {
+    const tbody = document.querySelector('#statsTodayRoundsTable tbody');
+    const totalEl = document.getElementById('statsTodayRoundsTotal');
+
+    tbody.innerHTML = rounds.map((round) => `
+        <tr>
+            <td>${round.round}</td>
+            <td><span class="round-city">${escapeHtml(round.city)}</span></td>
+            <td>${numberFmt(round.population)}</td>
+            <td>${round.rank}</td>
+            <td>${numberFmt(round.points)}</td>
+        </tr>
+    `).join('');
+
+    totalEl.textContent = numberFmt(total || 0);
+}
+
 export function renderStatsOverlay(stats, todaySummary) {
     const solved = todaySummary.solved;
     const totalRounds = todaySummary.totalRounds;
@@ -292,6 +337,8 @@ export function renderStatsOverlay(stats, todaySummary) {
         ? `${todaySummary.bestRound.city} · R${todaySummary.bestRound.round} · ${numberFmt(todaySummary.bestRound.points)}`
         : '—';
 
+    renderTodayRoundsTable(todaySummary.rounds || [], todaySummary.total || 0);
+
     document.getElementById('statsGamesPlayed').textContent = numberFmt(stats.games_played || 0);
     document.getElementById('statsGameStreak').textContent = numberFmt(stats.current_streak || 0);
     document.getElementById('statsAveragePoints').textContent = numberFmt(stats.average_score || 0);
@@ -304,40 +351,43 @@ export function renderStatsOverlay(stats, todaySummary) {
 }
 
 export async function showEndGameSummary() {
-    const totalText = document.getElementById('totalPoints').textContent;
-    const total = parseFormattedInt(totalText);
-    const rows = Array.from(document.querySelectorAll('#roundTable tbody tr'));
+    const { response, data: state } = await fetchGameState();
+    if (!response.ok) {
+        throw new Error(state?.error || 'Failed to fetch game state.');
+    }
+
+    const rounds = buildRoundsFromState(state);
 
     let bestRound = null;
     let bestPoints = -1;
     let solved = 0;
 
-    for (const row of rows) {
-        const cells = row.querySelectorAll('td');
-        const round = parseInt(cells[0].textContent.trim(), 10) || 0;
-        const city = cells[1].textContent.trim();
-        const points = parseFormattedInt(cells[4].textContent);
-
-        if (points > 0) {
+    for (const round of rounds) {
+        if (round.points > 0) {
             solved += 1;
         }
 
-        if (points > bestPoints) {
-            bestPoints = points;
-            bestRound = { round, city, points };
+        if (round.points > bestPoints) {
+            bestPoints = round.points;
+            bestRound = {
+                round: round.round,
+                city: round.city,
+                points: round.points
+            };
         }
     }
 
-    const totalRounds = rows.length;
+    const total = rounds.reduce((sum, r) => sum + (r.points || 0), 0);
+    const totalRounds = rounds.length;
     const isPerfect = totalRounds > 0 && solved === totalRounds;
 
     const feedback = document.getElementById('guessFeedback');
     feedback.innerHTML = isPerfect
-        ? `<div><b>Perfect Game!</b></div><div style="margin-top:8px;">You completed all ${totalRounds} squares and scored <b>${escapeHtml(totalText)}</b> points.</div>`
-        : `<div><b>Game Complete</b></div><div style="margin-top:8px;">You completed <b>${solved} / ${totalRounds}</b> squares and scored <b>${escapeHtml(totalText)}</b> points.</div>`;
+        ? `<div><b>Perfect Game!</b></div><div style="margin-top:8px;">You completed all ${totalRounds} squares and scored <b>${numberFmt(total)}</b> points.</div>`
+        : `<div><b>Game Complete</b></div><div style="margin-top:8px;">You completed <b>${solved} / ${totalRounds}</b> squares and scored <b>${numberFmt(total)}</b> points.</div>`;
 
     const stats = await fetchPlayerStats();
-    const lastGraphPoint = stats.graph_points && stats.graph_points.length
+    const lastGraphPoint = stats.graph_points?.length
         ? stats.graph_points[stats.graph_points.length - 1]
         : null;
 
@@ -345,10 +395,11 @@ export async function showEndGameSummary() {
         total,
         solved,
         totalRounds,
+        rounds,
         gameDate: lastGraphPoint ? lastGraphPoint.game_date : '—',
         bestRound: bestRound && bestRound.points > 0 ? bestRound : null
     });
 
-    await syncStatsUsernameUi(gameState);    
+    await syncStatsUsernameUi(gameState);
     showStatsOverlay();
 }
