@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GeoSquare Profile</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/stats.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body>
+    <div class="profile-layout">
+        <aside class="profile-sidebar">
+            <div class="sidebar-mobile-header">
+                <div class="sidebar-mobile-header-title">Menu</div>
+            </div>
+
+            <div class="sidebar-divider"></div>
+            <h1>GeoSquare</h1>
+            <a href="/" class="sidebar-support-link-btn">Back to Game</a>
+            <button id="loginBtn">Login to play across devices</button>
+            <button id="logoutBtn" class="hidden">Logout</button>
+            <div class="sidebar-divider"></div>
+
+            <div id="profileUserBlock" class="profile-user-block hidden">
+                <div class="label">Player</div>
+                <div id="profileUsername" class="profile-username">—</div>
+
+                <div class="label">Account</div>
+                <div id="profileAccountType" class="value">—</div>
+            </div>
+
+            <div id="profileEmptyState" class="profile-empty-state hidden">
+                <div class="label">Profile</div>
+                <div class="value">No profile found.</div>
+            </div>
+
+            <div class="sidebar-divider"></div>
+
+            <div class="sidebar-attribution">
+                <div class="sidebar-attribution-title">Credits</div>
+
+                <div class="sidebar-attribution-item">
+                    Globe:
+                    <a href="https://cesium.com/" target="_blank" rel="noopener noreferrer">CesiumJS</a>
+                </div>
+
+                <div class="sidebar-attribution-item">
+                    Imagery:
+                    <a href="https://www.esri.com/" target="_blank" rel="noopener noreferrer">Esri World Imagery</a>
+                </div>
+
+                <div class="sidebar-attribution-item">
+                    City data:
+                    <a href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer">GeoNames</a>
+                    <span class="sidebar-attribution-license">
+                        © GeoNames —
+                        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>
+                    </span>
+                </div>
+
+                <div class="sidebar-attribution-item">
+                    Land data:
+                    <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener noreferrer">Natural Earth</a>
+                </div>
+            </div>
+        </aside>
+
+        <main class="profile-main">
+            <div id="profileContent" class="profile-content hidden">
+                <section class="profile-hero-card">
+                    <div class="profile-hero-text">
+                        <div class="stats-section-title">Player Summary</div>
+                        <div id="profileHeroName" class="profile-hero-name">—</div>
+                    </div>
+                </section>
+
+                <section class="profile-stats-grid">
+                    <div class="stats-card">
+                        <div class="stats-card-label">Games Played</div>
+                        <div id="statsGamesPlayed" class="stats-card-value">0</div>
+                    </div>
+
+                    <div class="stats-card">
+                        <div class="stats-card-label">Perfect Games</div>
+                        <div id="statsPerfectGamesPlayed" class="stats-card-value">0</div>
+                    </div>
+
+                    <div class="stats-card">
+                        <div class="stats-card-label">Best Score</div>
+                        <div id="statsBestScore" class="stats-card-value">0</div>
+                        <div id="statsBestScoreDate" class="stats-card-subvalue">—</div>
+                    </div>
+
+                    <div class="stats-card">
+                        <div class="stats-card-label">Average Points</div>
+                        <div id="statsAveragePoints" class="stats-card-value">0</div>
+                    </div>
+
+                    <div class="stats-card">
+                        <div class="stats-card-label">Total Points</div>
+                        <div id="statsTotalPoints" class="stats-card-value">0</div>
+                    </div>
+
+                    <div class="stats-card">
+                        <div class="stats-card-label">Total Squares Solved</div>
+                        <div id="statsTotalSquaresSolved" class="stats-card-value">0</div>
+                    </div>
+
+                    <div class="stats-card">
+                        <div class="stats-card-label">Average Squares Solved</div>
+                        <div id="statsAverageSquaresSolved" class="stats-card-value">0</div>
+                    </div>
+
+                    <div class="stats-card">
+                        <div class="stats-card-label">Game Streak</div>
+                        <div id="statsGameStreak" class="stats-card-value">0</div>
+                    </div>
+
+                    <div class="stats-card">
+                        <div class="stats-card-label">Perfect Streak</div>
+                        <div id="statsPerfectStreak" class="stats-card-value">0</div>
+                    </div>
+
+                    <div class="stats-card profile-stat-wide">
+                        <div class="stats-card-label">Most Obscure City</div>
+                        <div id="statsMostObscureCity" class="stats-card-value">—</div>
+                        <div id="statsMostObscureCityMeta" class="stats-card-subvalue">—</div>
+                    </div>
+
+                    <div class="stats-card profile-stat-wide">
+                        <div class="stats-card-label">City Used Most Times</div>
+                        <div id="statsMostUsedCity" class="stats-card-value">—</div>
+                        <div id="statsMostUsedCityMeta" class="stats-card-subvalue">—</div>
+                    </div>
+                </section>
+
+                <div class="stats-divider"></div>
+
+                <section class="profile-history-section">
+                    <div class="profile-history-header">
+                        <div class="stats-section-title">Full History</div>
+                    </div>
+
+                    <div id="profileHistoryList" class="profile-history-list"></div>
+                </section>
+            </div>
+
+            <div id="profileLoadingState" class="profile-message">Loading profile...</div>
+        </main>
+    </div>
+
+    <script type="module" src="{{ url_for('static', filename='js/profile.js') }}"></script>
+</body>
+</html>
