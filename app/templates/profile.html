@@ -8,11 +8,16 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/stats.css') }}">    
     <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
 </head>
-<body>
-    <div class="profile-layout">
-        <aside class="profile-sidebar">
+<body class="profile-page">
+    <div class="layout profile-layout">
+        <aside class="sidebar profile-sidebar" id="sidebar">
+            <div class="sidebar-mobile-header">
+                <div class="sidebar-mobile-header-title">Menu</div>
+                <button id="mobileDrawerCloseBtn" class="mobile-drawer-close-btn" type="button">Close</button>
+            </div>
             
             <div class="sidebar-divider"></div>
             
@@ -158,5 +163,6 @@
     </div>
 
     <script type="module" src="{{ url_for('static', filename='js/profile.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/mobile.js') }}"></script>
 </body>
 </html>

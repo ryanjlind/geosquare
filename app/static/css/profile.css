@@ -305,59 +305,94 @@
     }
 }
 
-@media (max-width: 900px) {
-    html,
-    body {
+@media (max-width: 768px) {
+    html.profile-page,
+    body.profile-page {
         height: auto;
         overflow-x: hidden;
         overflow-y: auto;
     }
 
-    .profile-layout {
+    .profile-page .layout.profile-layout {
         display: block;
+        width: 100%;
         min-height: 100dvh;
+        height: auto;
+        padding-top: calc(var(--mobile-topbar-height) + var(--mobile-offset-top));
     }
 
-    .profile-sidebar {
-        border-right: 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        padding: 20px 16px;
+    .profile-page .sidebar.profile-sidebar {
+        position: fixed;
+        top: var(--mobile-offset-top);
+        left: 0;
+        width: min(92vw, 420px);
+        height: var(--mobile-vh);
+        transform: translateX(-100%);
+        transition: transform 0.22s ease;
+        z-index: 200;
+        display: flex;
+        flex-direction: column;
+        padding: 20px;
+        box-sizing: border-box;
+        overflow-y: auto;
+        overflow-x: hidden;
+        background: #151922;
+        border-right: 1px solid #262b34;
+        border-bottom: 0;
     }
 
-    .profile-main {
+    .profile-page .sidebar.profile-sidebar.mobile-open {
+        transform: translateX(0);
+    }
+
+    .profile-page .profile-main {
         min-width: 0;
-        padding: 20px 16px 32px;
+        padding: 20px 12px 32px;
     }
 
-    .profile-history-summary {
+    .profile-page .profile-stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .profile-page .profile-stat-wide {
+        grid-column: span 1;
+    }
+
+    .profile-page .profile-hero-name {
+        font-size: 26px;
+    }
+
+    .profile-page .profile-history-summary {
         grid-template-columns: 1fr;
         gap: 8px;
     }
 
-    .profile-history-toggle {
+    .profile-page .profile-history-toggle {
         justify-self: start;
     }
 
-    .profile-stat-wide {
-        grid-column: span 1;
-    }
-}
-
-@media (max-width: 640px) {
-    .profile-stats-grid {
-        grid-template-columns: 1fr;
+    .profile-page .profile-analysis-section .stats-card {
+        overflow-x: auto;
     }
 
-    .profile-hero-name {
-        font-size: 26px;
+    .profile-page .profile-analysis-section .stats-rounds-table {
+        min-width: 720px;
     }
 
-    .profile-rounds-table {
+    .profile-page .region-detail-container > td {
+        overflow-x: auto;
+    }
+
+    .profile-page .region-detail-container .stats-rounds-table {
+        min-width: 760px;
+    }
+
+    .profile-page .profile-rounds-table {
         font-size: 13px;
     }
 
-    .profile-rounds-table th,
-    .profile-rounds-table td {
+    .profile-page .profile-rounds-table th,
+    .profile-page .profile-rounds-table td {
         padding: 8px 6px;
     }
 }
