@@ -19,18 +19,7 @@
             <h1>GeoSquare</h1>
             <a href="/" class="sidebar-support-link-btn">Back to Game</a>
             <button id="loginBtn">Login to play across devices</button>
-            <button id="logoutBtn" class="hidden">Logout</button>
-            
-            <div class="sidebar-divider"></div>
-
-            <div id="profileUserBlock" class="profile-user-block hidden">
-                <div class="label">Player</div>
-                <div id="profileUsername" class="profile-username">—</div>
-            </div>
-                        <div id="profileEmptyState" class="profile-empty-state hidden">
-                <div class="label">Profile</div>
-                <div class="value">No profile found.</div>
-            </div>
+            <button id="logoutBtn" class="hidden">Logout</button>                       
 
             <div class="sidebar-divider"></div>
 
@@ -95,17 +84,7 @@
                     </div>
 
                     <div class="stats-card">
-                        <div class="stats-card-label">Total Points</div>
-                        <div id="statsTotalPoints" class="stats-card-value">0</div>
-                    </div>
-
-                    <div class="stats-card">
-                        <div class="stats-card-label">Total Squares Solved</div>
-                        <div id="statsTotalSquaresSolved" class="stats-card-value">0</div>
-                    </div>
-
-                    <div class="stats-card">
-                        <div class="stats-card-label">Average Squares Solved</div>
+                        <div class="stats-card-label">Average Squares Completed</div>
                         <div id="statsAverageSquaresSolved" class="stats-card-value">0</div>
                     </div>
 
@@ -117,8 +96,12 @@
                     <div class="stats-card">
                         <div class="stats-card-label">Perfect Streak</div>
                         <div id="statsPerfectStreak" class="stats-card-value">0</div>
-                    </div>
+                    </div>                    
+                </section>
+                
+                <div class="stats-divider"></div>
 
+                <section class="profile-stats-grid">
                     <div class="stats-card profile-stat-wide">
                         <div class="stats-card-label">Most Obscure City</div>
                         <div id="statsMostObscureCity" class="stats-card-value">—</div>
@@ -136,19 +119,34 @@
                         <div id="statsStrongestCountry" class="stats-card-value">—</div>
                         <div id="statsStrongestCountryMeta" class="stats-card-subvalue">—</div>
                     </div>
+                    
+                </section>
+
+                <section class="profile-analysis-section">
+                    <div class="profile-history-header">
+                        <div class="stats-section-title">Regional Performance</div>
+                    </div>
 
                     <div class="stats-card">
-                        <div class="stats-card-label">Best Region</div>
-                        <div id="statsBestRegion" class="stats-card-value">—</div>
-                        <div id="statsBestRegionMeta" class="stats-card-subvalue">—</div>
+                        <table class="stats-rounds-table">
+                            <thead>
+                                <tr>
+                                    <th>Region</th>
+                                    <th>Squares</th>
+                                    <th>Completion Rate</th>
+                                    <th>Average Points</th>
+                                </tr>
+                            </thead>
+                            <tbody id="profileRegionTableBody"></tbody>
+                        </table>
                     </div>
-                </section>
+                </section>                
 
                 <div class="stats-divider"></div>
 
                 <section class="profile-history-section">
                     <div class="profile-history-header">
-                        <div class="stats-section-title">Full History</div>
+                        <div class="stats-section-title">Game History</div>
                     </div>
 
                     <div id="profileHistoryList" class="profile-history-list"></div>

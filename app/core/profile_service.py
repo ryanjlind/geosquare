@@ -3,6 +3,26 @@ from datetime import date, timedelta
 
 from app.core.db import get_conn
 
+REGION_ORDER = [
+    'Nordic Europe',
+    'Mainland Europe',
+    'European Russia',
+    'Asian Steppe',
+    'China',
+    'Japan / Korea',
+    'South Asia',
+    'Southeast Asia',
+    'West Asia',
+    'North Africa',
+    'West Africa',
+    'Sub-Saharan Africa',
+    'Caribbean / Central America',
+    'US / Canada',
+    'Mexico',
+    'South America',
+    'Oceania',
+    'Other',
+]
 
 def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
     print(f"fetching profile for user_id={user_id}")
@@ -67,14 +87,13 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
 
         most_obscure_city = _get_most_obscure_city(cur, user_id)
         most_used_city = _get_most_used_city(cur, user_id)
-        region_performance = _get_region_performance(cur, user_id)
         strongest_country = _get_strongest_country(cur, user_id)
+        region_performance, region_classification_details = _get_region_performance(cur, user_id)
 
         summary = _build_summary(
             history,
             most_obscure_city,
             most_used_city,
-            region_performance,
             strongest_country,
         )
 
@@ -83,11 +102,13 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
     return {
         'profile_found': True,
         'user': {
-            'user_id': int(user_id),
-            'username': user_row.Username if user_row else None,
-            'is_authenticated': bool(user_row and user_row.AuthProviderSubject),
+            'user_id': int(user_row.UserId),
+            'username': user_row.Username,
+            'is_authenticated': bool(user_row.AuthProviderSubject),
         },
         'summary': summary,
+        'region_performance': region_performance,
+        'region_classification_details': region_classification_details,
         'history': history,
     }, 200
 
@@ -431,20 +452,23 @@ def _classify_region(min_lat: float, min_lon: float, max_lat: float, max_lon: fl
     if 20 <= center_lat <= 45 and 30 <= center_lon < 60:
         return 'West Asia'
 
-    if 10 <= center_lat <= 37 and -20 <= center_lon <= 35:
+    if 20 <= center_lat <= 37 and -17 <= center_lon <= 35:
         return 'North Africa'
 
-    if -35 <= center_lat < 10 and -20 <= center_lon <= 52:
+    if 4 <= center_lat < 20 and -20 <= center_lon <= 15:
+        return 'West Africa'
+
+    if -35 <= center_lat < 20 and -20 <= center_lon <= 52:
         return 'Sub-Saharan Africa'
 
     if 5 <= center_lat <= 28 and -92 <= center_lon <= -58:
         return 'Caribbean / Central America'
 
-    if 25 <= center_lat <= 72 and -170 <= center_lon < -105:
-        return 'North America West'
+    if 14 <= center_lat <= 33 and -118 <= center_lon < -86:
+        return 'Mexico'
 
-    if 25 <= center_lat <= 72 and -105 <= center_lon <= -52:
-        return 'North America East'
+    if 25 <= center_lat <= 72 and -170 <= center_lon <= -52:
+        return 'US / Canada'
 
     if -56 <= center_lat <= 13 and -82 <= center_lon <= -34:
         return 'South America'
@@ -454,68 +478,113 @@ def _classify_region(min_lat: float, min_lon: float, max_lat: float, max_lon: fl
 
     return 'Other'
 
-def _get_region_performance(cur, user_id: int) -> list[dict]:
+def _get_region_performance(cur, user_id: int) -> tuple[list[dict], list[dict]]:
     cur.execute(
-        """
-        SELECT
-            gsq.MinLat,
-            gsq.MinLon,
-            gsq.MaxLat,
-            gsq.MaxLon,
-            gsr.Score
-        FROM dbo.GameSessions gs
-        INNER JOIN dbo.GameSessionRounds gsr
-            ON gsr.SessionId = gs.SessionId
-        INNER JOIN dbo.GameSquares gsq
-            ON gsq.SquareId = gsr.SquareId
-        WHERE gs.UserId = ?
-          AND gs.CompletedAt IS NOT NULL
-        ORDER BY gs.SessionId ASC, gsr.RoundNumber ASC
-        """,
-        (user_id,),
-    )
+    """
+    SELECT
+        g.GameDate,
+        gsr.RoundNumber,
+        gsr.Score,
+        gg.CityName AS GuessedCity,
+        gg.Population AS GuessedPopulation,
+        topcity.CityName AS TopCityName,
+        topcity.Population AS TopCityPopulation,
+        gsq.MinLat,
+        gsq.MinLon,
+        gsq.MaxLat,
+        gsq.MaxLon
+    FROM dbo.GameSessions gs
+    INNER JOIN dbo.Games g
+        ON g.GameId = gs.GameId
+    INNER JOIN dbo.GameSessionRounds gsr
+        ON gsr.SessionId = gs.SessionId
+    LEFT JOIN dbo.GameGuesses gg
+        ON gg.SessionRoundId = gsr.SessionRoundId
+    INNER JOIN dbo.GameSquares gsq
+        ON gsq.SquareId = gsr.SquareId
+    OUTER APPLY (
+        SELECT TOP 1
+            gsc.CityName,
+            gsc.Population
+        FROM dbo.GameSquareCities gsc
+        WHERE gsc.SquareId = gsr.SquareId
+        ORDER BY gsc.Population DESC, gsc.CityName ASC
+    ) topcity
+    WHERE gs.UserId = ?
+        AND gs.CompletedAt IS NOT NULL
+    ORDER BY g.GameDate DESC, gsr.RoundNumber ASC
+    """,
+    (user_id,),)
     rows = cur.fetchall()
 
-    buckets: dict[str, dict] = {}
+    buckets = {
+        region: {
+            'region': region,
+            'square_count': 0,
+            'solved_count': 0,
+            'total_points': 0,
+        }
+        for region in REGION_ORDER
+    }
+
+    details = []
 
     for row in rows:
-        region = _classify_region(
-            float(row.MinLat),
-            float(row.MinLon),
-            float(row.MaxLat),
-            float(row.MaxLon),
-        )
+        min_lat = float(row.MinLat)
+        min_lon = float(row.MinLon)
+        max_lat = float(row.MaxLat)
+        max_lon = float(row.MaxLon)
+        score = int(row.Score)
+        
+        region = _classify_region(min_lat, min_lon, max_lat, max_lon)
 
         if region not in buckets:
             buckets[region] = {
                 'region': region,
-                'round_count': 0,
-                'total_score': 0,
+                'square_count': 0,
+                'solved_count': 0,
+                'total_points': 0,
             }
 
-        buckets[region]['round_count'] += 1
-        buckets[region]['total_score'] += int(row.Score)
+        buckets[region]['square_count'] += 1
+        buckets[region]['total_points'] += score
 
-    results = []
-    for region_data in buckets.values():
-        results.append({
-            'region': region_data['region'],
-            'round_count': int(region_data['round_count']),
-            'total_score': int(region_data['total_score']),
-            'average_score': round(
-                region_data['total_score'] / region_data['round_count'],
-                2,
-            ) if region_data['round_count'] else 0.0,
+        if score > 0:
+            buckets[region]['solved_count'] += 1
+
+        details.append({
+            'game_date': row.GameDate.isoformat(),
+            'round_number': int(row.RoundNumber),
+            'region': region,
+            'score': score,
+            'solved': score > 0,
+            'guessed_city': row.GuessedCity,
+            'guessed_population': int(row.GuessedPopulation) if row.GuessedPopulation is not None else None,
+            'top_city_name': row.TopCityName,
+            'top_city_population': int(row.TopCityPopulation) if row.TopCityPopulation is not None else None,
         })
 
-    results.sort(key=lambda row: (-row['average_score'], -row['round_count'], row['region']))
-    return results
+    summary = []
+    for region in REGION_ORDER:
+        region_data = buckets[region]
+        square_count = int(region_data['square_count'])
+        solved_count = int(region_data['solved_count'])
+        total_points = int(region_data['total_points'])
+
+        summary.append({
+            'region': region,
+            'square_count': square_count,
+            'solved_count': solved_count,
+            'completion_rate': round((solved_count / square_count) * 100, 2) if square_count else 0.0,
+            'average_points': round(total_points / square_count, 2) if square_count else 0.0,
+        })
+
+    return summary, details
 
 def _build_summary(
     history: list[dict],
     most_obscure_city: dict | None,
     most_used_city: dict | None,
-    region_performance: list[dict],
     strongest_country: dict | None,
 ) -> dict:
     games_played = len(history)
@@ -535,7 +604,6 @@ def _build_summary(
 
     current_game_streak = _calculate_game_streak(history)
     current_perfect_streak = _calculate_perfect_streak(history)
-    best_region = region_performance[0] if region_performance else None
 
     return {
         'games_played': int(games_played),
@@ -550,7 +618,6 @@ def _build_summary(
         'current_perfect_streak': int(current_perfect_streak),
         'most_obscure_city': most_obscure_city,
         'most_used_city': most_used_city,
-        'best_region': best_region,
         'strongest_country': strongest_country,
     }
 

@@ -124,17 +124,71 @@ function renderSummary(summary) {
         setText('statsMostUsedCity', '—');
         setText('statsMostUsedCityMeta', '—');
     }
+    
+}
 
-    if (summary.best_region) {
-        setText('statsBestRegion', summary.best_region.region);
-        setText(
-            'statsBestRegionMeta',
-            `${numberFmt(summary.best_region.average_score)} avg pts · ${numberFmt(summary.best_region.round_count)} rounds`
-        );
-    } else {
-        setText('statsBestRegion', '—');
-        setText('statsBestRegionMeta', '—');
-    }
+function renderRegionPerformance(summaryRows, detailRows) {
+    const tbody = document.getElementById('profileRegionTableBody');
+
+    if (!tbody) return;
+
+    const grouped = {};
+    (detailRows || []).forEach((row) => {
+        if (!grouped[row.region]) {
+            grouped[row.region] = [];
+        }
+        grouped[row.region].push(row);
+    });
+
+    tbody.innerHTML = (summaryRows || []).map((row, idx) => {
+        const regionKey = row.region;
+        const regionDetails = grouped[regionKey] || [];
+        const detailId = `region-detail-${idx}`;
+
+        const detailRowsHtml = regionDetails.map((d) => `
+            <tr class="region-detail-row">
+                <td>${escapeHtml(d.game_date)}</td>
+                <td>${numberFmt(d.round_number)}</td>
+                <td>${d.guessed_city ? escapeHtml(d.guessed_city) : '—'}</td>
+                <td>${d.guessed_population != null ? numberFmt(d.guessed_population) : '—'}</td>
+                <td>${d.top_city_name ? escapeHtml(d.top_city_name) : '—'}</td>
+                <td>${d.top_city_population != null ? numberFmt(d.top_city_population) : '—'}</td>
+                <td>${numberFmt(d.score)}</td>
+            </tr>
+        `).join('');
+
+        return `
+            <tr class="region-summary-row" data-target="${detailId}">
+                <td>${escapeHtml(row.region)}</td>
+                <td>${numberFmt(row.square_count)}</td>
+                <td>${numberFmt(row.completion_rate)}%</td>
+                <td>${numberFmt(row.average_points)}</td>
+            </tr>
+
+            <tr id="${detailId}" class="region-detail-container hidden">
+                <td colspan="4">
+                    <table class="stats-rounds-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Round</th>
+                                <th>Your Guess</th>
+                                <th>Pop.</th>
+                                <th>Largest City</th>
+                                <th>Pop.</th>
+                                <th>Pts</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${detailRowsHtml || '<tr><td colspan="10">No data</td></tr>'}
+                        </tbody>
+                    </table>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    wireRegionRowToggle();
 }
 
 function buildHistoryRoundsTable(completedRounds) {
@@ -237,18 +291,14 @@ function wireHistoryCards() {
 }
 
 function renderNoProfile() {
-    hideElement('profileContent');
-    hideElement('profileUserBlock');
-    hideElement('profileLoadingState');
-    showElement('profileEmptyState');
+    hideElement('profileContent');    
+    hideElement('profileLoadingState');    
     wireAuthButtons(null);
 }
 
 function renderProfile(payload) {
-    hideElement('profileLoadingState');
-    hideElement('profileEmptyState');
+    hideElement('profileLoadingState');    
     showElement('profileContent');
-    showElement('profileUserBlock');
 
     const username = payload.user?.username || `User ${payload.user?.user_id ?? ''}`.trim();
 
@@ -256,6 +306,11 @@ function renderProfile(payload) {
     setText('profileHeroName', username);    
 
     renderSummary(payload.summary);
+    renderRegionPerformance(
+        payload.region_performance || [],
+        payload.region_classification_details || []
+    );
+    wireRegionDetailsToggle();
     renderHistory(payload.history || []);
     wireAuthButtons(payload.user);
 }
@@ -294,4 +349,41 @@ function wireAuthButtons(user) {
     logoutBtn.onclick = () => {
         window.location.href = '/logout';
     };
+}
+
+function wireRegionDetailsToggle() {
+    const button = document.getElementById('profileRegionDetailsToggle');
+    const wrap = document.getElementById('profileRegionDetailsWrap');
+
+    if (!button || !wrap) {
+        return;
+    }
+
+    button.onclick = () => {
+        const isHidden = wrap.classList.contains('hidden');
+
+        if (isHidden) {
+            wrap.classList.remove('hidden');
+            button.textContent = 'Hide square classification detail';
+            return;
+        }
+
+        wrap.classList.add('hidden');
+        button.textContent = 'Show square classification detail';
+    };
+}
+
+function wireRegionRowToggle() {
+    const rows = document.querySelectorAll('.region-summary-row');
+
+    rows.forEach((row) => {
+        row.onclick = () => {
+            const targetId = row.getAttribute('data-target');
+            const detail = document.getElementById(targetId);
+
+            if (!detail) return;
+
+            detail.classList.toggle('hidden');
+        };
+    });
 }

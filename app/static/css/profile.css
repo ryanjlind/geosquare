@@ -230,6 +230,71 @@
     color: #bfe7c1;
 }
 
+.profile-analysis-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.region-summary-row {
+    cursor: pointer;
+}
+
+.region-summary-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.region-detail-container.hidden {
+    display: none;
+}
+
+.region-detail-container > td {
+    padding: 0;
+    border-bottom: 0;
+    background: rgba(255, 255, 255, 0.015);
+}
+
+.region-detail-container .stats-rounds-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+}
+
+.region-detail-container .stats-rounds-table thead th {
+    padding: 14px 16px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #9dacbf;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.region-detail-container .stats-rounds-table tbody td {
+    padding: 14px 16px;
+    font-size: 15px;
+    line-height: 1.35;
+    color: #e9eef5;
+    white-space: nowrap;
+}
+
+.region-detail-container .stats-rounds-table th:first-child,
+.region-detail-container .stats-rounds-table td:first-child {
+    padding-left: 20px;
+}
+
+.region-detail-container .stats-rounds-table th:last-child,
+.region-detail-container .stats-rounds-table td:last-child {
+    padding-right: 20px;
+}
+
+.region-detail-row td {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.region-detail-row:last-child td {
+    border-bottom: 0;
+}
+
 @media (max-width: 1200px) {
     .profile-stats-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
