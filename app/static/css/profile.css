@@ -25,8 +25,12 @@
 
 .profile-user-block,
 .profile-empty-state {
-    display: flex;
     flex-direction: column;
+}
+
+.profile-user-block:not(.hidden),
+.profile-empty-state:not(.hidden) {
+    display: flex;
 }
 
 .profile-username {
@@ -237,16 +241,26 @@
 }
 
 @media (max-width: 900px) {
+    html,
+    body {
+        height: auto;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
     .profile-layout {
-        grid-template-columns: 1fr;
+        display: block;
+        min-height: 100dvh;
     }
 
     .profile-sidebar {
         border-right: 0;
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 20px 16px;
     }
 
     .profile-main {
+        min-width: 0;
         padding: 20px 16px 32px;
     }
 

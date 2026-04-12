@@ -67,8 +67,16 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
 
         most_obscure_city = _get_most_obscure_city(cur, user_id)
         most_used_city = _get_most_used_city(cur, user_id)
+        region_performance = _get_region_performance(cur, user_id)
+        strongest_country = _get_strongest_country(cur, user_id)
 
-        summary = _build_summary(history, most_obscure_city, most_used_city)
+        summary = _build_summary(
+            history,
+            most_obscure_city,
+            most_used_city,
+            region_performance,
+            strongest_country,
+        )
 
         conn.commit()
 
@@ -83,7 +91,6 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
         'history': history,
     }, 200
 
-
 def _get_user_row(cur, user_id: int):
     cur.execute(
         """
@@ -94,7 +101,6 @@ def _get_user_row(cur, user_id: int):
         (user_id,),
     )
     return cur.fetchone()
-
 
 def _get_completed_sessions(cur, user_id: int) -> list[dict]:
     cur.execute(
@@ -125,7 +131,6 @@ def _get_completed_sessions(cur, user_id: int) -> list[dict]:
         }
         for row in cur.fetchall()
     ]
-
 
 def _get_completed_round_rows_for_sessions(cur, session_ids: list[int]):
     if not session_ids:
@@ -177,7 +182,6 @@ def _get_completed_round_rows_for_sessions(cur, session_ids: list[int]):
 
     return cur.fetchall()
 
-
 def _build_completed_rounds_by_session(rows) -> dict[int, list[dict]]:
     rounds_by_session = defaultdict(dict)
 
@@ -213,7 +217,6 @@ def _build_completed_rounds_by_session(rows) -> dict[int, list[dict]]:
 
     return result
 
-
 def _get_best_round(completed_rounds: list[dict]) -> dict | None:
     scored_rounds = [round_data for round_data in completed_rounds if int(round_data['score']) > 0]
     if not scored_rounds:
@@ -237,6 +240,56 @@ def _get_best_round(completed_rounds: list[dict]) -> dict | None:
         'rank': int(best_guess['rank']) if best_guess and best_guess['rank'] is not None else None,
     }
 
+def _get_strongest_country(cur, user_id: int) -> dict | None:
+    cur.execute(
+        """
+        WITH RankedGuesses AS (
+            SELECT
+                gsr.SessionId,
+                gsr.SquareId,
+                gg.CityName,
+                gg.Population,
+                gg.Score AS GuessScore,
+                gsc.CountryCode,
+                ROW_NUMBER() OVER (
+                    PARTITION BY gsr.SessionId, gsr.SquareId, gg.CityName, gg.Population
+                    ORDER BY gsc.CityId ASC
+                ) AS rn
+            FROM dbo.GameSessions gs
+            INNER JOIN dbo.GameSessionRounds gsr
+                ON gsr.SessionId = gs.SessionId
+            INNER JOIN dbo.GameGuesses gg
+                ON gg.SessionRoundId = gsr.SessionRoundId
+            INNER JOIN dbo.GameSquareCities gsc
+                ON gsc.SquareId = gsr.SquareId
+                AND gsc.CityName = gg.CityName
+                AND gsc.Population = gg.Population
+            WHERE gs.UserId = ?
+              AND gs.CompletedAt IS NOT NULL
+        )
+        SELECT TOP 1
+            CountryCode,
+            COUNT(*) AS GuessCount,
+            AVG(CAST(GuessScore AS float)) AS AverageScore,
+            SUM(GuessScore) AS TotalScore
+        FROM RankedGuesses
+        WHERE rn = 1
+        GROUP BY CountryCode
+        ORDER BY AVG(CAST(GuessScore AS float)) DESC, COUNT(*) DESC, CountryCode ASC
+        """,
+        (user_id,),
+    )
+    row = cur.fetchone()
+
+    if not row:
+        return None
+
+    return {
+        'country_code': row.CountryCode,
+        'guess_count': int(row.GuessCount),
+        'average_score': round(float(row.AverageScore), 2),
+        'total_score': int(row.TotalScore),
+    }
 
 def _get_most_obscure_city(cur, user_id: int) -> dict | None:
     cur.execute(
@@ -248,6 +301,7 @@ def _get_most_obscure_city(cur, user_id: int) -> dict | None:
                 gg.CityName,
                 gg.Population,
                 gsc.CityId,
+                gsc.CountryCode,
                 gc.NotorietyScore,
                 ROW_NUMBER() OVER (
                     PARTITION BY gsr.SessionId, gsr.SquareId, gg.CityName, gg.Population
@@ -271,6 +325,7 @@ def _get_most_obscure_city(cur, user_id: int) -> dict | None:
         SELECT TOP 1
             CityId,
             CityName,
+            CountryCode,
             Population,
             NotorietyScore
         FROM RankedGuesses
@@ -287,10 +342,10 @@ def _get_most_obscure_city(cur, user_id: int) -> dict | None:
     return {
         'city_id': int(row.CityId),
         'city_name': row.CityName,
+        'country_code': row.CountryCode,
         'population': int(row.Population),
         'notoriety_score': float(row.NotorietyScore),
     }
-
 
 def _get_most_used_city(cur, user_id: int) -> dict | None:
     cur.execute(
@@ -302,6 +357,7 @@ def _get_most_used_city(cur, user_id: int) -> dict | None:
                 gg.CityName,
                 gg.Population,
                 gsc.CityId,
+                gsc.CountryCode,
                 ROW_NUMBER() OVER (
                     PARTITION BY gsr.SessionId, gsr.SquareId, gg.CityName, gg.Population
                     ORDER BY gsc.CityId ASC
@@ -321,11 +377,12 @@ def _get_most_used_city(cur, user_id: int) -> dict | None:
         SELECT TOP 1
             CityId,
             CityName,
+            CountryCode,
             Population,
             COUNT(*) AS TimesUsed
         FROM RankedGuesses
         WHERE rn = 1
-        GROUP BY CityId, CityName, Population
+        GROUP BY CityId, CityName, CountryCode, Population
         ORDER BY COUNT(*) DESC, Population ASC, CityName ASC
         """,
         (user_id,),
@@ -338,17 +395,134 @@ def _get_most_used_city(cur, user_id: int) -> dict | None:
     return {
         'city_id': int(row.CityId),
         'city_name': row.CityName,
+        'country_code': row.CountryCode,
         'population': int(row.Population),
         'times_used': int(row.TimesUsed),
     }
 
+def _classify_region(min_lat: float, min_lon: float, max_lat: float, max_lon: float) -> str:
+    center_lat = (min_lat + max_lat) / 2.0
+    center_lon = (min_lon + max_lon) / 2.0
 
-def _build_summary(history: list[dict], most_obscure_city: dict | None, most_used_city: dict | None) -> dict:
+    if 54 <= center_lat <= 72 and -25 <= center_lon <= 40:
+        return 'Nordic Europe'
+
+    if 43 <= center_lat < 54 and -11 <= center_lon <= 30:
+        return 'Mainland Europe'
+
+    if 50 <= center_lat <= 72 and 30 < center_lon <= 60:
+        return 'European Russia'
+
+    if 35 <= center_lat <= 55 and 60 <= center_lon <= 95:
+        return 'Asian Steppe'
+
+    if 18 <= center_lat <= 50 and 95 < center_lon <= 125:
+        return 'China'
+
+    if 30 <= center_lat <= 46 and 125 < center_lon <= 146:
+        return 'Japan / Korea'
+
+    if 5 <= center_lat <= 35 and 60 <= center_lon < 95:
+        return 'South Asia'
+
+    if -10 <= center_lat <= 25 and 95 <= center_lon <= 135:
+        return 'Southeast Asia'
+
+    if 20 <= center_lat <= 45 and 30 <= center_lon < 60:
+        return 'West Asia'
+
+    if 10 <= center_lat <= 37 and -20 <= center_lon <= 35:
+        return 'North Africa'
+
+    if -35 <= center_lat < 10 and -20 <= center_lon <= 52:
+        return 'Sub-Saharan Africa'
+
+    if 5 <= center_lat <= 28 and -92 <= center_lon <= -58:
+        return 'Caribbean / Central America'
+
+    if 25 <= center_lat <= 72 and -170 <= center_lon < -105:
+        return 'North America West'
+
+    if 25 <= center_lat <= 72 and -105 <= center_lon <= -52:
+        return 'North America East'
+
+    if -56 <= center_lat <= 13 and -82 <= center_lon <= -34:
+        return 'South America'
+
+    if -47 <= center_lat <= 0 and 110 <= center_lon <= 179:
+        return 'Oceania'
+
+    return 'Other'
+
+def _get_region_performance(cur, user_id: int) -> list[dict]:
+    cur.execute(
+        """
+        SELECT
+            gsq.MinLat,
+            gsq.MinLon,
+            gsq.MaxLat,
+            gsq.MaxLon,
+            gsr.Score
+        FROM dbo.GameSessions gs
+        INNER JOIN dbo.GameSessionRounds gsr
+            ON gsr.SessionId = gs.SessionId
+        INNER JOIN dbo.GameSquares gsq
+            ON gsq.SquareId = gsr.SquareId
+        WHERE gs.UserId = ?
+          AND gs.CompletedAt IS NOT NULL
+        ORDER BY gs.SessionId ASC, gsr.RoundNumber ASC
+        """,
+        (user_id,),
+    )
+    rows = cur.fetchall()
+
+    buckets: dict[str, dict] = {}
+
+    for row in rows:
+        region = _classify_region(
+            float(row.MinLat),
+            float(row.MinLon),
+            float(row.MaxLat),
+            float(row.MaxLon),
+        )
+
+        if region not in buckets:
+            buckets[region] = {
+                'region': region,
+                'round_count': 0,
+                'total_score': 0,
+            }
+
+        buckets[region]['round_count'] += 1
+        buckets[region]['total_score'] += int(row.Score)
+
+    results = []
+    for region_data in buckets.values():
+        results.append({
+            'region': region_data['region'],
+            'round_count': int(region_data['round_count']),
+            'total_score': int(region_data['total_score']),
+            'average_score': round(
+                region_data['total_score'] / region_data['round_count'],
+                2,
+            ) if region_data['round_count'] else 0.0,
+        })
+
+    results.sort(key=lambda row: (-row['average_score'], -row['round_count'], row['region']))
+    return results
+
+def _build_summary(
+    history: list[dict],
+    most_obscure_city: dict | None,
+    most_used_city: dict | None,
+    region_performance: list[dict],
+    strongest_country: dict | None,
+) -> dict:
     games_played = len(history)
     perfect_games_played = sum(1 for game in history if game['is_perfect'])
     total_points = sum(int(game['total_score']) for game in history)
-    average_points = round(total_points / games_played, 2) if games_played else 0.0
     total_squares_solved = sum(int(game['solved_count']) for game in history)
+    average_points = round(total_points / games_played, 2) if games_played else 0.0
     average_squares_solved = round(total_squares_solved / games_played, 2) if games_played else 0.0
 
     best_game = max(
@@ -361,6 +535,7 @@ def _build_summary(history: list[dict], most_obscure_city: dict | None, most_use
 
     current_game_streak = _calculate_game_streak(history)
     current_perfect_streak = _calculate_perfect_streak(history)
+    best_region = region_performance[0] if region_performance else None
 
     return {
         'games_played': int(games_played),
@@ -375,8 +550,9 @@ def _build_summary(history: list[dict], most_obscure_city: dict | None, most_use
         'current_perfect_streak': int(current_perfect_streak),
         'most_obscure_city': most_obscure_city,
         'most_used_city': most_used_city,
+        'best_region': best_region,
+        'strongest_country': strongest_country,
     }
-
 
 def _calculate_game_streak(history: list[dict]) -> int:
     if not history:
@@ -410,7 +586,6 @@ def _calculate_game_streak(history: list[dict]) -> int:
         break
 
     return streak
-
 
 def _calculate_perfect_streak(history: list[dict]) -> int:
     if not history:

@@ -79,15 +79,29 @@ function renderSummary(summary) {
     setText('statsPerfectGamesPlayed', numberFmt(summary.perfect_games_played));
     setText('statsBestScore', numberFmt(summary.best_score));
     setText('statsBestScoreDate', summary.best_score_date ? formatDate(summary.best_score_date) : '—');
-    setText('statsAveragePoints', numberFmt(summary.average_points));
+    setText('statsAveragePoints', numberFmt(summary.average_points));    
     setText('statsTotalPoints', numberFmt(summary.total_points));
     setText('statsTotalSquaresSolved', numberFmt(summary.total_squares_solved));
     setText('statsAverageSquaresSolved', numberFmt(summary.average_squares_solved));
     setText('statsGameStreak', numberFmt(summary.current_game_streak));
     setText('statsPerfectStreak', numberFmt(summary.current_perfect_streak));
 
+    if (summary.strongest_country) {
+        setText('statsStrongestCountry', summary.strongest_country.country_code);
+        setText(
+            'statsStrongestCountryMeta',
+            `${numberFmt(summary.strongest_country.average_score)} avg pts · ${numberFmt(summary.strongest_country.guess_count)} guesses`
+        );
+    } else {
+        setText('statsStrongestCountry', '—');
+        setText('statsStrongestCountryMeta', '—');
+    }
+
     if (summary.most_obscure_city) {
-        setText('statsMostObscureCity', summary.most_obscure_city.city_name || '—');
+        setText(
+            'statsMostObscureCity',
+            `${summary.most_obscure_city.city_name}, ${summary.most_obscure_city.country_code}`
+        );
         setText(
             'statsMostObscureCityMeta',
             `Population ${numberFmt(summary.most_obscure_city.population)} · Notoriety ${numberFmt(summary.most_obscure_city.notoriety_score)}`
@@ -98,7 +112,10 @@ function renderSummary(summary) {
     }
 
     if (summary.most_used_city) {
-        setText('statsMostUsedCity', summary.most_used_city.city_name || '—');
+        setText(
+            'statsMostUsedCity',
+            `${summary.most_used_city.city_name}, ${summary.most_used_city.country_code}`
+        );
         setText(
             'statsMostUsedCityMeta',
             `${numberFmt(summary.most_used_city.times_used)} uses · Population ${numberFmt(summary.most_used_city.population)}`
@@ -106,6 +123,17 @@ function renderSummary(summary) {
     } else {
         setText('statsMostUsedCity', '—');
         setText('statsMostUsedCityMeta', '—');
+    }
+
+    if (summary.best_region) {
+        setText('statsBestRegion', summary.best_region.region);
+        setText(
+            'statsBestRegionMeta',
+            `${numberFmt(summary.best_region.average_score)} avg pts · ${numberFmt(summary.best_region.round_count)} rounds`
+        );
+    } else {
+        setText('statsBestRegion', '—');
+        setText('statsBestRegionMeta', '—');
     }
 }
 
@@ -225,8 +253,7 @@ function renderProfile(payload) {
     const username = payload.user?.username || `User ${payload.user?.user_id ?? ''}`.trim();
 
     setText('profileUsername', username);
-    setText('profileHeroName', username);
-    setText('profileAccountType', payload.user?.is_authenticated ? 'Authenticated' : 'Anonymous');
+    setText('profileHeroName', username);    
 
     renderSummary(payload.summary);
     renderHistory(payload.history || []);

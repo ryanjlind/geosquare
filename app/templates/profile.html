@@ -6,34 +6,28 @@
     <title>GeoSquare Profile</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/stats.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/stats.css') }}">    
     <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
 </head>
 <body>
     <div class="profile-layout">
         <aside class="profile-sidebar">
-            <div class="sidebar-mobile-header">
-                <div class="sidebar-mobile-header-title">Menu</div>
-            </div>
-
+            
             <div class="sidebar-divider"></div>
+            
             <h1>GeoSquare</h1>
             <a href="/" class="sidebar-support-link-btn">Back to Game</a>
             <button id="loginBtn">Login to play across devices</button>
             <button id="logoutBtn" class="hidden">Logout</button>
+            
             <div class="sidebar-divider"></div>
 
             <div id="profileUserBlock" class="profile-user-block hidden">
                 <div class="label">Player</div>
                 <div id="profileUsername" class="profile-username">—</div>
-
-                <div class="label">Account</div>
-                <div id="profileAccountType" class="value">—</div>
             </div>
-
-            <div id="profileEmptyState" class="profile-empty-state hidden">
+                        <div id="profileEmptyState" class="profile-empty-state hidden">
                 <div class="label">Profile</div>
                 <div class="value">No profile found.</div>
             </div>
@@ -135,6 +129,18 @@
                         <div class="stats-card-label">City Used Most Times</div>
                         <div id="statsMostUsedCity" class="stats-card-value">—</div>
                         <div id="statsMostUsedCityMeta" class="stats-card-subvalue">—</div>
+                    </div>
+
+                    <div class="stats-card">
+                        <div class="stats-card-label">Strongest Country</div>
+                        <div id="statsStrongestCountry" class="stats-card-value">—</div>
+                        <div id="statsStrongestCountryMeta" class="stats-card-subvalue">—</div>
+                    </div>
+
+                    <div class="stats-card">
+                        <div class="stats-card-label">Best Region</div>
+                        <div id="statsBestRegion" class="stats-card-value">—</div>
+                        <div id="statsBestRegionMeta" class="stats-card-subvalue">—</div>
                     </div>
                 </section>
 
