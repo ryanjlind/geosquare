@@ -38,7 +38,6 @@ Required env vars:
 - `SQL_DATABASE`
 - `SQL_USERNAME`
 - `SQL_PASSWORD`
-- `CESIUM_ION_TOKEN`
 
 ## LICENSE
 
