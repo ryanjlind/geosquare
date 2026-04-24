@@ -9,7 +9,7 @@ from app.core.auth import (
     begin_lastlogin_link,
     resolve_lastlogin_conflict,
     get_lastlogin_client,
-    is_local_auth_bypass_enabled,
+    is_local_auth_bypass_enabled
 )
 from app.core.game_service import (
     get_daily_square_data,
@@ -18,8 +18,9 @@ from app.core.game_service import (
     resolve_request_identity,
     submit_guess,
     submit_pass,
-    get_all_daily_square_data,    
-    get_all_daily_square_data_preview
+    get_all_daily_square_data,   
+    get_all_daily_square_data_preview,
+    get_user_id_from_cookie
 )
 from app.core.user import is_username_available, set_username
 
@@ -62,27 +63,13 @@ def daily_square():
 @main_bp.route('/api/all-daily-squares')
 def all_daily_squares():
     identity = resolve_request_identity()
-    game_date = request.args.get('game_date')
-
-    if game_date:
-        print(identity.get('user_id'))
-        if identity.get('user_id') != 152:
-            return jsonify({'error': 'forbidden'}), 403
-
-        response_body, status_code = get_all_daily_square_data_preview(game_date)
-    else:
-        response_body, status_code = get_all_daily_square_data(
-            identity['user_id'],
-            identity['session_id']
-        )
-
-    response = jsonify(response_body)
-    response.status_code = status_code
-    return attach_session_cookie(
-        response,
+    response_body, status_code = get_all_daily_square_data(
         identity['user_id'],
         identity['session_id']
     )
+    response = jsonify(response_body)
+    response.status_code = status_code
+    return attach_session_cookie(response, identity['user_id'], identity['session_id'])
 
 @main_bp.route('/api/game-state')
 def game_state():
@@ -293,3 +280,17 @@ def set_username_route():
 @main_bp.route('/preview')
 def preview():
     return render_template('preview.html')
+
+@main_bp.route('/api/all-daily-squares/preview')
+def all_daily_squares_preview():
+    game_date = request.args.get('game_date')
+
+    user_id = get_user_id_from_cookie()
+    if user_id != 152:
+        return jsonify({'error': 'forbidden'}), 403
+
+    response_body, status_code = get_all_daily_square_data_preview(game_date)
+
+    response = jsonify(response_body)
+    response.status_code = status_code
+    return response

@@ -29,7 +29,7 @@ const gameDate = params.get('game_date');
 async function load() {
     await initCesium();
 
-    const res = await fetch(`/api/all-daily-squares?game_date=${gameDate}`);
+    const res = await fetch(`/api/all-daily-squares/preview?game_date=${gameDate}`);
     const data = await res.json();
 
     await renderAllSquares(data.rounds);
