@@ -105,6 +105,21 @@ export function drawCities(cities) {
     }
 }
 
+export function drawLabel({ text, latitude, longitude }) {
+    window.geoViewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(longitude, latitude),
+        label: {
+            text,
+            font: '16px sans-serif',
+            showBackground: true,
+            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+            verticalOrigin: Cesium.VerticalOrigin.CENTER,
+            pixelOffset: new Cesium.Cartesian2(0, 0),
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0.0, 30000000.0),
+        }
+    });
+}
+
 export function zoomToSquare(bounds) {
     const centerLat = (bounds.min_lat + bounds.max_lat) / 2;
     const centerLon = (bounds.min_lon + bounds.max_lon) / 2;
