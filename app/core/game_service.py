@@ -714,18 +714,26 @@ def get_all_daily_square_data_preview(game_date: str) -> tuple[dict, int]:
         rounds = []
 
         for round_number in range(1, 6):
-            print(round_number)
-            base = get_daily_square_data(round_number, game_id)
+            print(f"ROUND START {round_number}", flush=True)
 
-            reveal_cities = get_reveal_cities_for_square(
-                base['square_id'],
-                excluded_city=None
-            )
+            try:
+                base = get_daily_square_data(round_number, game_id)
+                print(f"ROUND BASE OK {round_number}", flush=True)
 
-            rounds.append({
-                **base,
-                'player_guess': None,
-                'reveal_cities': reveal_cities
-            })
+                reveal_cities = get_reveal_cities_for_square(
+                    base['square_id'],
+                    excluded_city=None
+                )
+                print(f"ROUND REVEAL OK {round_number}", flush=True)
+
+                rounds.append({
+                    **base,
+                    'player_guess': None,
+                    'reveal_cities': reveal_cities
+                })
+
+            except Exception as e:
+                print(f"ROUND FAILED {round_number}: {repr(e)}", flush=True)
+                raise
 
     return {'rounds': rounds}, 200
