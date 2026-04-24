@@ -65,6 +65,7 @@ def all_daily_squares():
     game_date = request.args.get('game_date')
 
     if game_date:
+        print(identity.get('user_id'))
         if identity.get('user_id') != 152:
             return jsonify({'error': 'forbidden'}), 403
 
