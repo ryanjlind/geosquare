@@ -707,13 +707,14 @@ def get_all_daily_square_data_preview(game_date: str) -> tuple[dict, int]:
         cur = conn.cursor()
 
         game_id = get_game_id_by_date(cur, game_date)
-
+        print(f"game_id={game_id}", flush=True)
         if game_id is None:
             return {'error': 'No game found for date.'}, 404
 
         rounds = []
 
         for round_number in range(1, 6):
+            print(round_number)
             base = get_daily_square_data(round_number, game_id)
 
             reveal_cities = get_reveal_cities_for_square(
