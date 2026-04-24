@@ -285,9 +285,9 @@ def preview():
 def all_daily_squares_preview():
 
     game_date = request.args.get('game_date')
-    print(f"preview mode={game_date}")
+    print(f"preview mode={game_date}", flush=True)
     user_id = get_user_id_from_cookie()
-    print(f"user_id={user_id}")
+    print(f"user_id={user_id}", flush=True)
     if user_id != 152:
         return jsonify({'error': 'forbidden'}), 403
 
