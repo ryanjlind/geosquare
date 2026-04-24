@@ -222,6 +222,55 @@ def get_daily_square_data(round_number: int) -> dict:
             'round_number': int(row.RoundNumber),
             'game_id': int(row.GameId),
         }
+    
+def get_daily_square_data_for_game(round_number: int, game_id: int) -> dict:
+    with get_conn() as conn:
+        cur = conn.cursor()
+
+        row = get_square_for_round(cur, game_id, round_number)
+        cities_rows = get_square_cities(cur, int(row.SquareId))
+        city_count_row = get_square_city_count(cur, int(row.SquareId))
+
+        cities = [
+            {
+                'city_name': city.CityName,
+                'country_code': city.CountryCode,
+                'latitude': float(city.Latitude),
+                'longitude': float(city.Longitude),
+                'population': int(city.Population),
+            }
+            for city in cities_rows
+        ]
+
+        return {
+            'square_id': int(row.SquareId),
+            'config_key': row.ConfigKey,
+            'seed': {'lat': float(row.SeedLat), 'lon': float(row.SeedLon)},
+            'bounds': {
+                'min_lat': float(row.MinLat),
+                'min_lon': float(row.MinLon),
+                'max_lat': float(row.MaxLat),
+                'max_lon': float(row.MaxLon),
+            },
+            'total_population': int(row.TotalPopulation),
+            'qualifying_city_count': int(row.QualifyingCityCount),
+            'width_degrees': float(row.WidthDegrees),
+            'height_degrees': float(row.HeightDegrees),
+            'generated_at': row.GeneratedAt.isoformat(),
+            'rules': {
+                'min_total_population': int(row.MinTotalPopulation),
+                'min_city_count': int(row.MinCityCount),
+                'min_city_population': int(row.MinCityPopulation),
+                'max_square_width_degrees': float(row.MaxSquareWidthDegrees),
+                'max_square_height_degrees': float(row.MaxSquareHeightDegrees),
+                'step_degrees': float(row.StepDegrees),
+            },
+            'cities': cities,
+            'total_city_count': int(city_count_row.TotalCityCount),
+            'largest_city': cities[0],
+            'round_number': int(row.RoundNumber),
+            'game_id': int(row.GameId),
+        }
 
 def submit_guess(payload: dict, user_id: int, session_id: int | None) -> tuple[dict, int]:
     t0 = perf_counter()
@@ -717,7 +766,7 @@ def get_all_daily_square_data_preview(game_date: str) -> tuple[dict, int]:
             print(f"ROUND START {round_number}", flush=True)
 
             try:
-                base = get_daily_square_data(round_number, game_id)
+                base = get_daily_square_data_for_game(round_number, game_id)
                 print(f"ROUND BASE OK {round_number}", flush=True)
 
                 reveal_cities = get_reveal_cities_for_square(
