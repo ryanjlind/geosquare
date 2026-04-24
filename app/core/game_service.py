@@ -695,8 +695,35 @@ def get_all_daily_square_data(user_id: int, session_id: int | None) -> tuple[dic
 
         rounds.append({
             **base,
-            'player_guess': guess,              # <-- includes lat/lon now
+            'player_guess': guess,   
             'reveal_cities': reveal_cities
         })
+
+    return {'rounds': rounds}, 200
+
+def get_all_daily_square_data_preview(game_date: str) -> tuple[dict, int]:
+    with get_conn() as conn:
+        cur = conn.cursor()
+
+        game_id = _require_today_game(cur, game_date)
+
+        if game_id is None:
+            return {'error': 'No game found for date.'}, 404
+
+        rounds = []
+
+        for round_number in range(1, 6):
+            base = get_daily_square_data(round_number, game_id)
+
+            reveal_cities = get_reveal_cities_for_square(
+                base['square_id'],
+                excluded_city=None
+            )
+
+            rounds.append({
+                **base,
+                'player_guess': None,
+                'reveal_cities': reveal_cities
+            })
 
     return {'rounds': rounds}, 200

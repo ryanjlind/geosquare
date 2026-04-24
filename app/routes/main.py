@@ -19,6 +19,7 @@ from app.core.game_service import (
     submit_guess,
     submit_pass,
     get_all_daily_square_data,    
+    get_all_daily_square_data_preview
 )
 from app.core.user import is_username_available, set_username
 
@@ -61,13 +62,26 @@ def daily_square():
 @main_bp.route('/api/all-daily-squares')
 def all_daily_squares():
     identity = resolve_request_identity()
-    response_body, status_code = get_all_daily_square_data(
+    game_date = request.args.get('game_date')
+
+    if game_date:
+        if identity.get('user_id') != 152:
+            return jsonify({'error': 'forbidden'}), 403
+
+        response_body, status_code = get_all_daily_square_data_preview(game_date)
+    else:
+        response_body, status_code = get_all_daily_square_data(
+            identity['user_id'],
+            identity['session_id']
+        )
+
+    response = jsonify(response_body)
+    response.status_code = status_code
+    return attach_session_cookie(
+        response,
         identity['user_id'],
         identity['session_id']
     )
-    response = jsonify(response_body)
-    response.status_code = status_code
-    return attach_session_cookie(response, identity['user_id'], identity['session_id'])
 
 @main_bp.route('/api/game-state')
 def game_state():
@@ -274,3 +288,7 @@ def set_username_route():
         return jsonify({'ok': False, 'error': error}), 400
 
     return jsonify({'ok': True})
+
+@main_bp.route('/preview')
+def preview():
+    return render_template('preview.html')
