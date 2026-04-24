@@ -21,7 +21,8 @@ from app.core.game_queries import (
     find_city_anywhere,
     get_best_guess_for_user,
     get_completed_sessions_for_user,
-    get_round_stats_for_sessions
+    get_round_stats_for_sessions,
+    get_game_id_by_date
 )
 from app.core.matching import find_matching_city
 from app.core.scoring import compute_score
@@ -705,7 +706,7 @@ def get_all_daily_square_data_preview(game_date: str) -> tuple[dict, int]:
     with get_conn() as conn:
         cur = conn.cursor()
 
-        game_id = _require_today_game(cur, game_date)
+        game_id = get_game_id_by_date(cur, game_date)
 
         if game_id is None:
             return {'error': 'No game found for date.'}, 404

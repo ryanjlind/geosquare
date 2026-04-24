@@ -283,9 +283,11 @@ def preview():
 
 @main_bp.route('/api/all-daily-squares/preview')
 def all_daily_squares_preview():
-    game_date = request.args.get('game_date')
 
+    game_date = request.args.get('game_date')
+    print(f"preview mode={game_date}")
     user_id = get_user_id_from_cookie()
+    print(f"user_id={user_id}")
     if user_id != 152:
         return jsonify({'error': 'forbidden'}), 403
 

@@ -331,3 +331,15 @@ def get_round_stats_for_sessions(cur, session_ids: list[int]) -> dict[int, dict]
         }
         for row in cur.fetchall()
     }
+
+def get_game_id_by_date(cur, game_date: str):
+    cur.execute(
+        """
+        SELECT GameId
+        FROM Games
+        WHERE GameDate = ?
+        """,
+        (game_date,)
+    )
+    row = cur.fetchone()
+    return int(row.GameId) if row else None
