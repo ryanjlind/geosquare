@@ -778,7 +778,7 @@ def get_all_daily_square_data_preview(game_date: str) -> tuple[dict, int]:
                 rounds.append({
                     **base,
                     'player_guess': None,
-                    'reveal_cities': reveal_cities
+                    'label': f"Round {round_number}"
                 })
 
             except Exception as e:

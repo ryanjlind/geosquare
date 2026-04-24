@@ -163,36 +163,48 @@ export function renderRoundMap(data) {
     zoomToSquare(data.bounds);
 }
 
-export async function renderAllSquares(rounds) {
+export async function renderAllSquares(rounds, options = {}) {
+    const { preview = false } = options;
+
     clearMap();
 
     for (const round of rounds) {
         drawSquare(round);
 
-        if (round.player_guess && round.player_guess.latitude != null && round.player_guess.longitude != null) {
-            drawCities([{
-                city_name: round.player_guess.city_name,
-                label: `${round.player_guess.city_name} (${numberFmt(round.player_guess.population || 0)})`,
-                latitude: round.player_guess.latitude,
-                longitude: round.player_guess.longitude,
-                pixel_size: 8,
-                color: Cesium.Color.LIME,
-                outline_color: Cesium.Color.BLACK,
-                outline_width: 2,
-            }]);
+        if (!preview) {
+            if (round.player_guess && round.player_guess.latitude != null && round.player_guess.longitude != null) {
+                drawCities([{
+                    city_name: round.player_guess.city_name,
+                    label: `${round.player_guess.city_name} (${numberFmt(round.player_guess.population || 0)})`,
+                    latitude: round.player_guess.latitude,
+                    longitude: round.player_guess.longitude,
+                    pixel_size: 8,
+                    color: Cesium.Color.LIME,
+                    outline_color: Cesium.Color.BLACK,
+                    outline_width: 2,
+                }]);
+            }
+
+            if (round.reveal_cities && round.reveal_cities.length) {
+                drawCities(
+                    round.reveal_cities.map(city => ({
+                        ...city,
+                        label: `${city.city_name} (${numberFmt(city.population)})`,
+                        pixel_size: 6,
+                        color: Cesium.Color.CYAN,
+                        outline_color: Cesium.Color.BLACK,
+                        outline_width: 1,
+                    }))
+                );
+            }
         }
 
-        if (round.reveal_cities && round.reveal_cities.length) {
-            drawCities(
-                round.reveal_cities.map(city => ({
-                    ...city,
-                    label: `${city.city_name} (${numberFmt(city.population)})`,
-                    pixel_size: 6,
-                    color: Cesium.Color.CYAN,
-                    outline_color: Cesium.Color.BLACK,
-                    outline_width: 1,
-                }))
-            );
+        if (preview && round.label) {
+            drawLabel({
+                text: round.label,
+                latitude: round.seed.lat,
+                longitude: round.seed.lon
+            });
         }
     }
 

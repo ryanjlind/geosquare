@@ -32,7 +32,7 @@ async function load() {
     const res = await fetch(`/api/all-daily-squares/preview?game_date=${gameDate}`);
     const data = await res.json();
 
-    await renderAllSquares(data.rounds);
+    await renderAllSquares(data.rounds, { preview: true });
 }
 
 load();
