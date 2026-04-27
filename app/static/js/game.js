@@ -48,7 +48,7 @@ function updateExpandButton(square) {
 function renderRound(data) {
     renderSidebar(data);
     renderRoundMap(data);
-    updateExpandButton(data);
+   // updateExpandButton(data);
 }
 
 async function loadEndGameRounds() {
