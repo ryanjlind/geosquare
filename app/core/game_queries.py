@@ -15,6 +15,7 @@ def get_square_for_round(cur, game_id: int, round_number: int):
         SELECT TOP 1
             g.GameId,
             gr.RoundNumber,
+            gr.ExpansionLevel,
             gs.SquareId,
             gs.SeedLat,
             gs.SeedLon,
@@ -41,6 +42,7 @@ def get_square_for_round(cur, game_id: int, round_number: int):
         WHERE g.GameId = ?
           AND gr.RoundNumber = ?
     """, game_id, round_number)
+
     return cur.fetchone()
 
 

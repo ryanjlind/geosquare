@@ -36,9 +36,19 @@ import { initAuth, resolveAuthConflict } from './auth.js';
 
 let endGameRounds = [];
 
+function updateExpandButton(square) {
+    const btn = document.getElementById('expandBtn');
+
+    const currentLevel = square.expansion_level ?? 0;
+    const maxLevel = 4;
+
+    btn.style.display = currentLevel < maxLevel ? 'inline-block' : 'none';
+}
+
 function renderRound(data) {
     renderSidebar(data);
     renderRoundMap(data);
+    updateExpandButton(data);
 }
 
 async function loadEndGameRounds() {
@@ -74,6 +84,11 @@ function wireGuessing() {
 function wireRoundButtons() {
     document.getElementById('nextBtn').onclick = handleNextRound;
     document.getElementById('passBtn').onclick = handlePass;
+}
+
+function wireExpandButton() {
+    const btn = document.getElementById('expandBtn');
+    btn.onclick = handleExpand;
 }
 
 function handleGuessKeyDown(e) {
@@ -234,6 +249,7 @@ export async function initGame() {
     restoreSavedState(state);
     wireGuessing();
     wireRoundButtons();
+    wireExpandButton();
     wireRoundTable(handleEndGameRoundSelect);
     initFeedback();
 
@@ -258,4 +274,8 @@ export async function initGame() {
     if (state.completed_at) {
         await enterEndGameGlobe();
     }
+}
+
+async function handleExpand() {
+    console.log('expand_clicked');
 }

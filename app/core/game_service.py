@@ -195,6 +195,7 @@ def get_daily_square_data(round_number: int) -> dict:
 
         return {
             'square_id': int(row.SquareId),
+            'expansion_level': int(row.ExpansionLevel),
             'config_key': row.ConfigKey,
             'seed': {'lat': float(row.SeedLat), 'lon': float(row.SeedLon)},
             'bounds': {
@@ -745,7 +746,8 @@ def get_all_daily_square_data(user_id: int, session_id: int | None) -> tuple[dic
 
         rounds.append({
             **base,
-            'player_guess': guess,   
+            'expansion_level': base.get('expansion_level', 0),
+            'player_guess': guess,
             'reveal_cities': reveal_cities
         })
 
