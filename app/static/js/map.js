@@ -184,7 +184,21 @@ export async function renderAllSquares(rounds, options = {}) {
     clearMap();
 
     for (const round of rounds) {
-        drawSquare(round);
+        for (const level of round.levels) {
+            drawSquare({
+                bounds: level.bounds
+            });
+        }
+
+        if (preview) {
+            for (const level of round.levels) {
+                drawLabel({
+                    text: `${round.round_number} L${level.expansion_level}`,
+                    latitude: level.seed.lat,
+                    longitude: level.seed.lon
+                });
+            }
+        }
 
         if (!preview) {
             if (round.player_guess && round.player_guess.latitude != null && round.player_guess.longitude != null) {
@@ -212,14 +226,6 @@ export async function renderAllSquares(rounds, options = {}) {
                     }))
                 );
             }
-        }
-
-        if (preview && round.label) {
-            drawLabel({
-                text: round.label,
-                latitude: round.seed.lat,
-                longitude: round.seed.lon
-            });
         }
     }
 

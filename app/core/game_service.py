@@ -757,32 +757,60 @@ def get_all_daily_square_data_preview(game_date: str) -> tuple[dict, int]:
 
         game_id = get_game_id_by_date(cur, game_date)
         print(f"game_id={game_id}", flush=True)
+
         if game_id is None:
             return {'error': 'No game found for date.'}, 404
 
-        rounds = []
+        cur.execute("""
+            SELECT
+                r.RoundNumber,
+                r.ExpansionLevel,
+                s.SquareId,
+                s.SeedLat,
+                s.SeedLon,
+                s.MinLat,
+                s.MinLon,
+                s.MaxLat,
+                s.MaxLon
+            FROM GeoSquare.dbo.GameRounds r
+            JOIN GeoSquare.dbo.GameSquares s
+                ON s.SquareId = r.SquareId
+            WHERE r.GameId = ?
+            ORDER BY r.RoundNumber, r.ExpansionLevel
+        """, (game_id,))
 
-        for round_number in range(1, 6):
-            print(f"ROUND START {round_number}", flush=True)
+        rows = cur.fetchall()
 
-            try:
-                base = get_daily_square_data_for_game(round_number, game_id)
-                print(f"ROUND BASE OK {round_number}", flush=True)
+        rounds_map = {}
 
-                reveal_cities = get_reveal_cities_for_square(
-                    base['square_id'],
-                    excluded_city=None
-                )
-                print(f"ROUND REVEAL OK {round_number}", flush=True)
+        for r in rows:
+            round_num = int(r.RoundNumber)
+            level = int(r.ExpansionLevel)
 
-                rounds.append({
-                    **base,
-                    'player_guess': None,
-                    'label': f"Round {round_number}"
-                })
+            rounds_map.setdefault(round_num, []).append({
+                'square_id': int(r.SquareId),
+                'round_number': round_num,
+                'expansion_level': level,
+                'seed': {
+                    'lat': float(r.SeedLat),
+                    'lon': float(r.SeedLon),
+                },
+                'bounds': {
+                    'min_lat': float(r.MinLat),
+                    'min_lon': float(r.MinLon),
+                    'max_lat': float(r.MaxLat),
+                    'max_lon': float(r.MaxLon),
+                },
+                'player_guess': None,
+                'label': f"Round {round_num} Level {level}"
+            })
 
-            except Exception as e:
-                print(f"ROUND FAILED {round_number}: {repr(e)}", flush=True)
-                raise
+        rounds = [
+            {
+                'round_number': r,
+                'levels': rounds_map[r]
+            }
+            for r in sorted(rounds_map.keys())
+        ]
 
-    return {'rounds': rounds}, 200
+        return {'rounds': rounds}, 200
