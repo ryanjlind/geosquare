@@ -345,3 +345,18 @@ def get_game_id_by_date(cur, game_date: str):
     )
     row = cur.fetchone()
     return int(row.GameId) if row else None
+
+def has_next_expansion_level(cur, game_id: int, round_number: int) -> bool:
+    cur.execute("""
+        SELECT TOP 1 1
+        FROM GeoSquare.dbo.GameRounds
+        WHERE GameId = ?
+          AND RoundNumber = ?
+          AND ExpansionLevel = (
+              SELECT ExpansionLevel + 1
+              FROM GeoSquare.dbo.GameRounds
+              WHERE GameId = ? AND RoundNumber = ?
+          )
+    """, (game_id, round_number, game_id, round_number))
+
+    return cur.fetchone() is not None

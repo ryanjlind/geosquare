@@ -38,17 +38,13 @@ let endGameRounds = [];
 
 function updateExpandButton(square) {
     const btn = document.getElementById('expandBtn');
-
-    const currentLevel = square.expansion_level ?? 0;
-    const maxLevel = 4;
-
-    btn.style.display = currentLevel < maxLevel ? 'inline-block' : 'none';
+    btn.style.display = square.has_next_expansion ? 'inline-block' : 'none';
 }
 
 function renderRound(data) {
     renderSidebar(data);
     renderRoundMap(data);
-   // updateExpandButton(data);
+    updateExpandButton(data);
 }
 
 async function loadEndGameRounds() {

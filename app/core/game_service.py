@@ -22,7 +22,8 @@ from app.core.game_queries import (
     get_best_guess_for_user,
     get_completed_sessions_for_user,
     get_round_stats_for_sessions,
-    get_game_id_by_date
+    get_game_id_by_date,
+    has_next_expansion_level
 )
 from app.core.matching import find_matching_city
 from app.core.scoring import compute_score
@@ -181,6 +182,7 @@ def get_daily_square_data(round_number: int) -> dict:
         row = get_square_for_round(cur, game_id, round_number)
         cities_rows = get_square_cities(cur, int(row.SquareId))
         city_count_row = get_square_city_count(cur, int(row.SquareId))
+        has_next_expansion = has_next_expansion_level(cur, game_id, round_number)
 
         cities = [
             {
@@ -196,6 +198,7 @@ def get_daily_square_data(round_number: int) -> dict:
         return {
             'square_id': int(row.SquareId),
             'expansion_level': int(row.ExpansionLevel),
+            'has_next_expansion': has_next_expansion,
             'config_key': row.ConfigKey,
             'seed': {'lat': float(row.SeedLat), 'lon': float(row.SeedLon)},
             'bounds': {
