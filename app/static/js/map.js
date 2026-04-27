@@ -185,6 +185,7 @@ export async function renderAllSquares(rounds, options = {}) {
 
     for (const round of rounds) {
         for (const level of round.levels) {
+            console.log('ROUND DEBUG', round);
             drawSquare({
                 bounds: level.bounds
             });
