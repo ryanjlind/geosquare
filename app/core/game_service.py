@@ -749,7 +749,11 @@ def get_all_daily_square_data(user_id: int, session_id: int | None) -> tuple[dic
 
         rounds.append({
             **base,
-            'expansion_level': base.get('expansion_level', 0),
+            'levels': [{
+                'bounds': base['bounds'],
+                'expansion_level': base.get('expansion_level', 0),
+                'seed': base['seed']
+            }],
             'player_guess': guess,
             'reveal_cities': reveal_cities
         })
