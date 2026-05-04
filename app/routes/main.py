@@ -20,7 +20,9 @@ from app.core.game_service import (
     submit_pass,
     get_all_daily_square_data,   
     get_all_daily_square_data_preview,
-    get_user_id_from_cookie
+    get_user_id_from_cookie,
+    get_square_id_for_round,
+    expand_square
 )
 from app.core.user import is_username_available, set_username
 
@@ -296,3 +298,18 @@ def all_daily_squares_preview():
     response = jsonify(response_body)
     response.status_code = status_code
     return response
+
+@main_bp.route('/api/expand', methods=['POST'])
+def expand():
+    identity = resolve_request_identity()
+    payload = request.get_json(silent=True) or {}
+
+    response_body, status_code = expand_square(
+        identity['user_id'],
+        identity['session_id'],
+        int(payload.get('round_number'))
+    )
+
+    response = jsonify(response_body)
+    response.status_code = status_code
+    return attach_session_cookie(response, identity['user_id'], identity['session_id'])

@@ -23,7 +23,10 @@ from app.core.game_queries import (
     get_completed_sessions_for_user,
     get_round_stats_for_sessions,
     get_game_id_by_date,
-    has_next_expansion_level
+    has_next_expansion_level,
+    get_active_session_square,
+    get_next_expansion_square,
+    update_session_round_square
 )
 from app.core.matching import find_matching_city
 from app.core.scoring import compute_score
@@ -823,3 +826,42 @@ def get_all_daily_square_data_preview(game_date: str) -> tuple[dict, int]:
         ]
 
         return {'rounds': rounds}, 200
+    
+def expand_square(user_id: int, session_id: int, round_number: int):
+    with get_conn() as conn:
+        cur = conn.cursor()
+
+        session = _get_current_session(cur, user_id, session_id)
+        if not session:
+            return {'error': 'No session'}, 404
+
+        game_id = int(session.GameId)
+        session_id = int(session.SessionId)
+
+        current_square_id = get_active_session_square(cur, session_id, round_number)
+        if not current_square_id:
+            square_row = get_square_id_for_round(cur, game_id, round_number)
+            current_square_id = square_row.SquareId
+            create_session_round(cur, session_id, round_number, current_square_id)
+
+        next_square = get_next_expansion_square(cur, game_id, round_number, current_square_id)
+
+        if not next_square:
+            conn.commit()
+            return {'ok': True, 'has_next_expansion': False}, 200
+
+        update_session_round_square(
+            cur,
+            session_id,
+            round_number,
+            int(next_square.SquareId)
+        )
+
+        conn.commit()
+
+        return {
+            'ok': True,
+            'square_id': int(next_square.SquareId),
+            'expansion_level': int(next_square.ExpansionLevel),
+            'has_next_expansion': has_next_expansion_level(cur, game_id, round_number),
+        }, 200
