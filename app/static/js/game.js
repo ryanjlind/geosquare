@@ -33,6 +33,8 @@ import {
 import { wireStatsOverlay, showEndGameSummary } from './stats.js';
 import { initFeedback } from './feedback.js';
 import { initAuth, resolveAuthConflict } from './auth.js';
+import { expandSquareRequest } from './api.js';
+import { drawSquare } from './map.js';
 
 let endGameRounds = [];
 
@@ -273,5 +275,16 @@ export async function initGame() {
 }
 
 async function handleExpand() {
-    console.log('expand_clicked');
+    const roundNumber = gameState.currentRound;
+
+    const { response, data } = await expandSquareRequest(roundNumber);
+
+    if (!response.ok || !data.square_id) {
+        return;
+    }
+
+    drawSquare({
+        bounds: data.bounds,
+        round_number: roundNumber
+    });
 }

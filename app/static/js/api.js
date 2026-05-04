@@ -48,3 +48,13 @@ export async function fetchPlayerStats() {
     const { data } = await fetchJson('/api/player-stats');
     return data;
 }
+
+export async function expandSquareRequest(roundNumber) {
+    const { response, data } = await fetchJson('/api/expand', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ round_number: roundNumber }),
+    });
+
+    return { response, data };
+}

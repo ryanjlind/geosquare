@@ -1,5 +1,8 @@
 import { postClientLog, numberFmt } from './utils.js';
 
+let expansionEntity = null;
+let currentBounds = null;
+
 export async function initCesium() {
     await postClientLog('init_cesium_started', {
         href: window.location.href,
@@ -297,4 +300,73 @@ export function showIncorrectGuessedCity(city) {
         entity.label.fillColor = Cesium.Color.RED.withAlpha(alpha);
         entity.label.backgroundColor = Cesium.Color.BLACK.withAlpha(Math.max(alpha - 0.3, 0));
     }, 60);
+}
+
+export function setCurrentBounds(bounds) {
+    currentBounds = bounds;
+}
+
+function animateExpansion(from, to, duration = 900) {
+    const start = performance.now();
+
+    if (expansionEntity) {
+        window.geoViewer.entities.remove(expansionEntity);
+        expansionEntity = null;
+    }
+
+    expansionEntity = window.geoViewer.entities.add({
+        rectangle: {
+            coordinates: Cesium.Rectangle.fromDegrees(
+                from.min_lon,
+                from.min_lat,
+                from.max_lon,
+                from.max_lat
+            ),
+            material: Cesium.Color.YELLOW.withAlpha(0.35),
+            outline: true,
+            outlineColor: Cesium.Color.YELLOW,
+            outlineWidth: 2,
+        }
+    });
+
+    function step(now) {
+        const t = Math.min((now - start) / duration, 1);
+
+        const minLat = from.min_lat + (to.min_lat - from.min_lat) * t;
+        const maxLat = from.max_lat + (to.max_lat - from.max_lat) * t;
+        const minLon = from.min_lon + (to.min_lon - from.min_lon) * t;
+        const maxLon = from.max_lon + (to.max_lon - from.max_lon) * t;
+
+        expansionEntity.rectangle.coordinates =
+            Cesium.Rectangle.fromDegrees(minLon, minLat, maxLon, maxLat);
+
+        if (t < 1) {
+            requestAnimationFrame(step);
+            return;
+        }
+
+        window.geoViewer.entities.remove(expansionEntity);
+        expansionEntity = null;
+
+        drawSquare({ bounds: to });
+        setCurrentBounds(to);
+    }
+
+    requestAnimationFrame(step);
+}
+
+async function handleExpand() {
+    const roundNumber = gameState.currentRound;
+
+    const { response, data } = await expandSquareRequest(roundNumber);
+
+    if (!response.ok || !data.square_id) {
+        return;
+    }
+
+    if (!currentBounds) {
+        return;
+    }
+
+    animateExpansion(currentBounds, data.bounds);
 }

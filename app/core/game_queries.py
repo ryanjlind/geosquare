@@ -360,3 +360,55 @@ def has_next_expansion_level(cur, game_id: int, round_number: int) -> bool:
     """, (game_id, round_number, game_id, round_number))
 
     return cur.fetchone() is not None
+
+def get_round_expansion_square(cur, game_id: int, round_number: int, expansion_level: int):
+    cur.execute("""
+        SELECT TOP 1
+            SquareId,
+            ExpansionLevel
+        FROM GeoSquare.dbo.GameRounds
+        WHERE GameId = ?
+          AND RoundNumber = ?
+          AND ExpansionLevel = ?
+    """, (game_id, round_number, expansion_level))
+    return cur.fetchone()
+
+def update_session_round_square(cur, session_id: int, round_number: int, square_id: int):
+    cur.execute("""
+        UPDATE GeoSquare.dbo.GameSessionRounds
+        SET SquareId = ?
+        WHERE SessionId = ?
+          AND RoundNumber = ?
+    """, (square_id, session_id, round_number))
+
+def get_active_session_square(cur, session_id: int, round_number: int):
+    cur.execute("""
+        SELECT TOP 1 SquareId
+        FROM dbo.GameSessionRounds
+        WHERE SessionId = ?
+          AND RoundNumber = ?
+        ORDER BY SessionRoundId DESC
+    """, (session_id, round_number))
+
+    row = cur.fetchone()
+    return row[0] if row else None
+
+def get_next_expansion_square(cur, game_id: int, round_number: int, current_square_id: int):
+    cur.execute("""
+        SELECT TOP 1
+            gs.SquareId,
+            gr.ExpansionLevel
+        FROM dbo.GameRounds gr
+        INNER JOIN dbo.GameSquares gs ON gs.SquareId = gr.SquareId
+        WHERE gr.GameId = ?
+          AND gr.RoundNumber = ?
+          AND gr.ExpansionLevel = (
+              SELECT ExpansionLevel + 1
+              FROM dbo.GameRounds
+              WHERE GameId = ?
+                AND RoundNumber = ?
+                AND SquareId = ?
+          )
+    """, game_id, round_number, game_id, round_number, current_square_id)
+
+    return cur.fetchone()
