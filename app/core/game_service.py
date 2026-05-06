@@ -439,25 +439,51 @@ def expand_square(user_id: int, session_id: int, round_number: int):
         }, 200
     
 def get_all_daily_square_data(user_id: int, session_id: int | None):
+    import time
+    t0 = time.perf_counter()
+    print(f"get_all_daily_square_data: start user_id={user_id}, session_id={session_id}")
+
     with get_conn() as conn:
+        t_conn = time.perf_counter()
+        print(f"conn acquired: {t_conn - t0:.6f}s")
+
         cur = conn.cursor()
+        t_cur = time.perf_counter()
+        print(f"cursor created: {t_cur - t_conn:.6f}s")
 
         session = get_current_session(cur, user_id, session_id)
+        t_session = time.perf_counter()
+        print(f"get_current_session: {t_session - t_cur:.6f}s")
+
         if session is None:
+            print("no session")
             return {"error": "No game found for today."}, 404
 
-        completed = map_completed_rounds(
-            get_completed_round_rows(cur, int(session.SessionId))
-        )
+        rows = get_completed_round_rows(cur, int(session.SessionId))
+        t_rows = time.perf_counter()
+        print(f"get_completed_round_rows: {t_rows - t_session:.6f}s")
+
+        completed = map_completed_rounds(rows)
+        t_completed = time.perf_counter()
+        print(f"map_completed_rounds: {t_completed - t_rows:.6f}s")
 
         completed_by_round = {
             int(r["round_number"]): r for r in completed
         }
+        t_map = time.perf_counter()
+        print(f"build completed_by_round: {t_map - t_completed:.6f}s")
 
     rounds = []
+    t_after_db = time.perf_counter()
+    print(f"db block total: {t_after_db - t0:.6f}s")
 
     for round_number in range(1, 6):
+        t_round_start = time.perf_counter()
+        print(f"round {round_number}: start")
+
         base = get_daily_square_data(user_id, session_id, round_number)
+        t_base = time.perf_counter()
+        print(f"round {round_number}: get_daily_square_data {t_base - t_round_start:.6f}s")
 
         completed_round = completed_by_round.get(round_number)
         guess = None
@@ -476,6 +502,8 @@ def get_all_daily_square_data(user_id: int, session_id: int | None):
             base["square_id"],
             excluded_city=excluded_city,
         )
+        t_reveal = time.perf_counter()
+        print(f"round {round_number}: get_reveal_cities_for_square {t_reveal - t_base:.6f}s")
 
         rounds.append({
             **base,
@@ -487,6 +515,12 @@ def get_all_daily_square_data(user_id: int, session_id: int | None):
             "player_guess": guess,
             "reveal_cities": reveal_cities,
         })
+
+        t_round_end = time.perf_counter()
+        print(f"round {round_number}: total {t_round_end - t_round_start:.6f}s")
+
+    t_end = time.perf_counter()
+    print(f"get_all_daily_square_data: total {t_end - t0:.6f}s")
 
     return {"rounds": rounds}, 200
 
