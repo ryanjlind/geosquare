@@ -95,17 +95,26 @@ def all_daily_squares():
 
 @main_bp.route("/api/game-state")
 def game_state():
-    identity = _identity()
+    print("game_state: start", flush=True)
 
-    body, status = get_game_state_payload(
-        identity["user_id"],
-        identity["session_id"],
-    )
+    identity = _identity()
+    print(f"game_state: identity={identity}",flush=True)
+
+    try:
+        body, status = get_game_state_payload(
+            identity["user_id"],
+            identity["session_id"],
+        )
+        print(f"game_state: payload status={status}",flush=True)
+    except Exception as e:
+        print(f"game_state: exception in get_game_state_payload: {e}",flush=True)
+        raise
 
     resp = jsonify(body)
     resp.status_code = status
-    return attach_session_cookie(resp, identity["user_id"], identity["session_id"])
+    print("game_state: response built",flush=True)
 
+    return attach_session_cookie(resp, identity["user_id"], identity["session_id"])
 
 @main_bp.route("/api/guess", methods=["POST"])
 def guess():

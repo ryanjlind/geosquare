@@ -255,32 +255,73 @@ def submit_pass(payload: dict, user_id: int, session_id: int | None):
 
 
 def get_game_state_payload(user_id: int, session_id: int | None):
-    with get_conn() as conn:
-        cur = conn.cursor()
+    print(f"get_game_state_payload: start user_id={user_id}, session_id={session_id}")
 
-        cur.execute(
-            """
-            SELECT AuthProviderSubject, Username
-            FROM Users
-            WHERE UserId = ?
-            """,
-            (user_id,),
-        )
+    with get_conn() as conn:
+        print("get_game_state_payload: got connection")
+        cur = conn.cursor()
+        print("get_game_state_payload: got cursor")
+
+        try:
+            cur.execute(
+                """
+                SELECT AuthProviderSubject, Username
+                FROM Users
+                WHERE UserId = ?
+                """,
+                (user_id,),
+            )
+            print("get_game_state_payload: executed user query")
+        except Exception as e:
+            print(f"get_game_state_payload: user query failed: {e}")
+            raise
+
         user_row = cur.fetchone()
+        print(f"get_game_state_payload: user_row={user_row}")
+
         is_authenticated = bool(user_row and user_row.AuthProviderSubject)
         username = user_row.Username if user_row else None
 
-        session = get_current_session(cur, user_id, session_id)
+        try:
+            session = get_current_session(cur, user_id, session_id)
+            print(f"get_game_state_payload: session={session}")
+        except Exception as e:
+            print(f"get_game_state_payload: get_current_session failed: {e}")
+            raise
+
         if session is None:
+            print("get_game_state_payload: no session")
             return {"error": "No game found for today."}, 404
 
-        completed = map_completed_rounds(
-            get_completed_round_rows(cur, int(session.SessionId))
-        )
+        try:
+            rows = get_completed_round_rows(cur, int(session.SessionId))
+            print(f"get_game_state_payload: completed rows={rows}")
+        except Exception as e:
+            print(f"get_game_state_payload: get_completed_round_rows failed: {e}")
+            raise
 
-        conn.commit()
+        try:
+            completed = map_completed_rounds(rows)
+            print(f"get_game_state_payload: completed mapped={completed}")
+        except Exception as e:
+            print(f"get_game_state_payload: map_completed_rounds failed: {e}")
+            raise
 
-        return map_game_state(session, completed, is_authenticated, username), 200
+        try:
+            conn.commit()
+            print("get_game_state_payload: commit done")
+        except Exception as e:
+            print(f"get_game_state_payload: commit failed: {e}")
+            raise
+
+        try:
+            result = map_game_state(session, completed, is_authenticated, username)
+            print(f"get_game_state_payload: final result built")
+        except Exception as e:
+            print(f"get_game_state_payload: map_game_state failed: {e}")
+            raise
+
+        return result, 200
 
 
 def get_player_stats_payload(user_id: int):
