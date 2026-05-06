@@ -1,7 +1,10 @@
 import { postClientLog, numberFmt } from './utils.js';
+import { gameState } from './state.js';
+import { expandSquareRequest } from './api.js';
 
 let expansionEntity = null;
 let currentBounds = null;
+let baseSquareEntity = null;
 
 export async function initCesium() {
     await postClientLog('init_cesium_started', {
@@ -74,7 +77,11 @@ export function clearMap() {
 export function drawSquare(data) {
     const b = data.bounds;
 
-    window.geoViewer.entities.add({
+    if (baseSquareEntity) {
+        window.geoViewer.entities.remove(baseSquareEntity);
+    }
+
+    baseSquareEntity = window.geoViewer.entities.add({
         name: `Round ${data.round_number || ''}`.trim(),
         rectangle: {
             coordinates: Cesium.Rectangle.fromDegrees(b.min_lon, b.min_lat, b.max_lon, b.max_lat),
@@ -84,6 +91,8 @@ export function drawSquare(data) {
             outlineWidth: 2,
         }
     });
+
+    setCurrentBounds(b);
 }
 
 export function drawCities(cities) {
@@ -302,6 +311,15 @@ export function showIncorrectGuessedCity(city) {
     }, 60);
 }
 
+export function updateExpandButton(square) {
+    const btn = document.getElementById('expandBtn');
+
+    const shouldShow = Boolean(square && square.has_next_expansion);
+
+    btn.style.display = shouldShow ? 'inline-block' : 'none';
+    btn.disabled = !shouldShow;
+}
+
 export function setCurrentBounds(bounds) {
     currentBounds = bounds;
 }
@@ -345,28 +363,73 @@ function animateExpansion(from, to, duration = 900) {
             return;
         }
 
+        if (baseSquareEntity) {
+            window.geoViewer.entities.remove(baseSquareEntity);
+        }
+
+        baseSquareEntity = window.geoViewer.entities.add({
+            rectangle: {
+                coordinates: Cesium.Rectangle.fromDegrees(
+                    to.min_lon,
+                    to.min_lat,
+                    to.max_lon,
+                    to.max_lat
+                ),
+                material: Cesium.Color.YELLOW.withAlpha(0.2),
+                outline: true,
+                outlineColor: Cesium.Color.YELLOW,
+                outlineWidth: 2,
+            }
+        });
+
+        setCurrentBounds(to);
+
         window.geoViewer.entities.remove(expansionEntity);
         expansionEntity = null;
-
-        drawSquare({ bounds: to });
-        setCurrentBounds(to);
     }
 
     requestAnimationFrame(step);
 }
 
-async function handleExpand() {
-    const roundNumber = gameState.currentRound;
+export async function handleExpand() {
+    const btn = document.getElementById('expandBtn');
+    if (btn.disabled) return;
 
-    const { response, data } = await expandSquareRequest(roundNumber);
+    btn.disabled = true;
+    btn.classList.add('pressed');
 
-    if (!response.ok || !data.square_id) {
-        return;
+    try {
+        const roundNumber = gameState.currentRound;
+
+        const { response, data } = await expandSquareRequest(roundNumber);
+
+        if (!response.ok) {
+            throw new Error(data?.error || 'Expand request failed');
+        }
+
+        if (!data || !data.square_id || !data.bounds) {
+            throw new Error('Invalid expand response payload');
+        }
+
+        const previousBounds = currentBounds;
+
+        animateExpansion(previousBounds, data.bounds);
+
+        currentBounds = data.bounds;
+
+        const updatedSquareState = {
+            has_next_expansion: Boolean(data.has_next_expansion)
+        };
+
+        updateExpandButton(updatedSquareState);
+
+        document.dispatchEvent(
+            new CustomEvent('squareExpanded', {
+                detail: { has_next_expansion: data.has_next_expansion }
+            })
+        );
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('pressed');
     }
-
-    if (!currentBounds) {
-        return;
-    }
-
-    animateExpansion(currentBounds, data.bounds);
 }

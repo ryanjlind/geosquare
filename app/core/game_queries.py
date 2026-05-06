@@ -87,12 +87,14 @@ def get_latest_session_round(cur, session_id: int):
             SessionId,
             RoundNumber,
             SquareId,
-            Score
+            Score,
+            RoundStatus
         FROM dbo.GameSessionRounds
         WHERE SessionId = ?
         ORDER BY RoundNumber DESC, SessionRoundId DESC
     """, session_id)
     return cur.fetchone()
+
 
 
 def create_session(cur, user_id: int, game_id: int):
@@ -114,12 +116,13 @@ def create_session(cur, user_id: int, game_id: int):
 
 def get_square_id_for_round(cur, game_id: int, round_number: int):
     cur.execute("""
-        SELECT TOP 1
-            gs.SquareId
+       SELECT TOP 1
+            gs.SquareId,
+            gr.ExpansionLevel
         FROM dbo.GameRounds gr
         INNER JOIN dbo.GameSquares gs ON gr.SquareId = gs.SquareId
         WHERE gr.GameId = ?
-          AND gr.RoundNumber = ?
+        AND gr.RoundNumber = ?
     """, game_id, round_number)
     return cur.fetchone()
 
@@ -149,27 +152,13 @@ def get_session_round(cur, session_id: int, round_number: int):
             SessionId,
             RoundNumber,
             SquareId,
-            Score
+            Score,
+            RoundStatus
         FROM dbo.GameSessionRounds
         WHERE SessionId = ?
           AND RoundNumber = ?
         ORDER BY SessionRoundId DESC
     """, session_id, round_number)
-    return cur.fetchone()
-
-def create_session_round(cur, session_id: int, round_number: int, square_id: int):
-    cur.execute("""
-        INSERT INTO dbo.GameSessionRounds
-            (SessionId, RoundNumber, SquareId, Score)
-        OUTPUT
-            inserted.SessionRoundId,
-            inserted.SessionId,
-            inserted.RoundNumber,
-            inserted.SquareId,
-            inserted.Score
-        VALUES
-            (?, ?, ?, 0)
-    """, session_id, round_number, square_id)
     return cur.fetchone()
 
 def insert_correct_guess(cur, session_round_id: int, city_name: str, population: int, score: int):
@@ -235,10 +224,10 @@ def get_completed_round_rows(cur, session_id: int):
             gsr.SessionRoundId,
             gsr.RoundNumber,
             gsr.SquareId,
+            gsr.RoundStatus,
             gsr.Score,
             gg.CityName,
             gg.Population,
-            gg.Score AS GuessScore,
             gg.GuessedAt,
             ranked.CityId,
             ranked.PopRank,
@@ -266,8 +255,10 @@ def get_completed_round_rows(cur, session_id: int):
             AND ranked.CityName = gg.CityName
             AND ranked.Population = gg.Population
         WHERE gsr.SessionId = ?
-        ORDER BY gsr.RoundNumber ASC, gg.GuessedAt ASC, gg.GuessId ASC
+          AND gsr.RoundStatus IN ('Completed', 'Passed')
+        ORDER BY gsr.RoundNumber ASC, gg.GuessedAt ASC
     """, session_id)
+
     return cur.fetchall()
 
 def get_completed_sessions_for_user(cur, user_id: int, through_game_date: str):
@@ -318,12 +309,12 @@ def get_round_stats_for_sessions(cur, session_ids: list[int]) -> dict[int, dict]
 
     cur.execute(f"""
         SELECT
-            gsr.SessionId,
+            SessionId,
             COUNT(*) AS TotalRounds,
-            SUM(CASE WHEN gsr.Score > 0 THEN 1 ELSE 0 END) AS SolvedRounds
-        FROM dbo.GameSessionRounds gsr
-        WHERE gsr.SessionId IN ({placeholders})
-        GROUP BY gsr.SessionId
+            SUM(CASE WHEN RoundStatus = 'Completed' THEN 1 ELSE 0 END) AS SolvedRounds
+        FROM dbo.GameSessionRounds
+        WHERE SessionId IN ({placeholders})
+        GROUP BY SessionId
     """, *session_ids)
 
     return {
@@ -346,18 +337,32 @@ def get_game_id_by_date(cur, game_date: str):
     row = cur.fetchone()
     return int(row.GameId) if row else None
 
-def has_next_expansion_level(cur, game_id: int, round_number: int) -> bool:
+def has_next_expansion_level(cur, game_id: int, round_number: int, square_id: int) -> bool:
     cur.execute("""
         SELECT TOP 1 1
-        FROM GeoSquare.dbo.GameRounds
+        FROM dbo.GameRounds
         WHERE GameId = ?
           AND RoundNumber = ?
-          AND ExpansionLevel = (
-              SELECT ExpansionLevel + 1
-              FROM GeoSquare.dbo.GameRounds
-              WHERE GameId = ? AND RoundNumber = ?
-          )
-    """, (game_id, round_number, game_id, round_number))
+          AND SquareId = ?
+    """, (game_id, round_number, square_id))
+
+    row = cur.fetchone()
+    if not row:
+        return False
+
+    cur.execute("""
+        SELECT TOP 1 1
+        FROM dbo.GameRounds
+        WHERE GameId = ?
+          AND RoundNumber = ?
+          AND ExpansionLevel >
+              (SELECT ExpansionLevel
+               FROM dbo.GameRounds
+               WHERE GameId = ?
+                 AND RoundNumber = ?
+                 AND SquareId = ?)
+        ORDER BY ExpansionLevel ASC
+    """, (game_id, round_number, game_id, round_number, square_id))
 
     return cur.fetchone() is not None
 
@@ -383,15 +388,20 @@ def update_session_round_square(cur, session_id: int, round_number: int, square_
 
 def get_active_session_square(cur, session_id: int, round_number: int):
     cur.execute("""
-        SELECT TOP 1 SquareId
-        FROM dbo.GameSessionRounds
-        WHERE SessionId = ?
-          AND RoundNumber = ?
-        ORDER BY SessionRoundId DESC
+        SELECT TOP 1 gsr.SquareId, gr.ExpansionLevel
+        FROM dbo.GameSessionRounds gsr
+            INNER JOIN dbo.GameSessions gs
+                ON gsr.SessionId = gs.SessionId
+            INNER JOIN dbo.GameRounds gr 
+                ON gsr.SquareId = gr.SquareId 
+                AND gs.GameId = gr.GameId
+                AND gsr.RoundNumber = gr.RoundNumber
+        WHERE gsr.SessionId = ?
+          AND gsr.RoundNumber = ?
+        ORDER BY gsr.SessionRoundId DESC
     """, (session_id, round_number))
 
-    row = cur.fetchone()
-    return row[0] if row else None
+    return cur.fetchone()    
 
 def get_next_expansion_square(cur, game_id: int, round_number: int, current_square_id: int):
     cur.execute("""
@@ -399,16 +409,95 @@ def get_next_expansion_square(cur, game_id: int, round_number: int, current_squa
             gs.SquareId,
             gr.ExpansionLevel
         FROM dbo.GameRounds gr
-        INNER JOIN dbo.GameSquares gs ON gs.SquareId = gr.SquareId
+        INNER JOIN dbo.GameSquares gs
+            ON gs.SquareId = gr.SquareId
         WHERE gr.GameId = ?
           AND gr.RoundNumber = ?
-          AND gr.ExpansionLevel = (
-              SELECT ExpansionLevel + 1
-              FROM dbo.GameRounds
-              WHERE GameId = ?
-                AND RoundNumber = ?
-                AND SquareId = ?
-          )
-    """, game_id, round_number, game_id, round_number, current_square_id)
+          AND gr.ExpansionLevel >
+              (SELECT ExpansionLevel
+               FROM dbo.GameRounds
+               WHERE GameId = ?
+                 AND RoundNumber = ?
+                 AND SquareId = ?)
+        ORDER BY gr.ExpansionLevel ASC
+    """, (game_id, round_number, game_id, round_number, current_square_id))
 
     return cur.fetchone()
+
+def get_square_by_id(cur, square_id: int):
+    cur.execute("""
+        SELECT TOP 1
+            gr.GameId,
+            gr.RoundNumber,
+            gr.ExpansionLevel,
+
+            gs.SquareId,
+            gs.SeedLat,
+            gs.SeedLon,
+            gs.MinLat,
+            gs.MinLon,
+            gs.MaxLat,
+            gs.MaxLon,
+            gs.TotalPopulation,
+            gs.QualifyingCityCount,
+            gs.WidthDegrees,
+            gs.HeightDegrees,
+            gs.GeneratedAt,
+
+            c.ConfigKey,
+            c.MinTotalPopulation,
+            c.MinCityCount,
+            c.MinCityPopulation,
+            c.MaxSquareWidthDegrees,
+            c.MaxSquareHeightDegrees,
+            c.StepDegrees
+
+        FROM dbo.GameRounds gr
+        INNER JOIN dbo.GameSquares gs
+            ON gs.SquareId = gr.SquareId
+        INNER JOIN dbo.GameConfig c
+            ON gs.ConfigId = c.ConfigId
+        WHERE gs.SquareId = ?
+        ORDER BY gr.RoundNumber DESC, gr.ExpansionLevel DESC
+    """, square_id)
+
+    return cur.fetchone()
+
+def upsert_session_round_expand(cur, session_id: int, round_number: int, square_id: int):
+    cur.execute("""
+        MERGE dbo.GameSessionRounds AS target
+        USING (SELECT ? AS SessionId, ? AS RoundNumber) AS src
+        ON target.SessionId = src.SessionId AND target.RoundNumber = src.RoundNumber
+        WHEN MATCHED THEN
+            UPDATE SET SquareId = ?, RoundStatus = 'Expanded'
+        WHEN NOT MATCHED THEN
+            INSERT (SessionId, RoundNumber, SquareId, RoundStatus, Score)
+            VALUES (?, ?, ?, 'Expanded', 0);
+    """, session_id, round_number, square_id, session_id, round_number, square_id)
+
+def set_round_completed(cur, session_id: int, round_number: int, square_id: int, score: int):
+    cur.execute("""
+        MERGE dbo.GameSessionRounds AS target
+        USING (SELECT ? AS SessionId, ? AS RoundNumber) AS src
+        ON target.SessionId = src.SessionId AND target.RoundNumber = src.RoundNumber
+        WHEN MATCHED THEN
+            UPDATE SET
+                SquareId = ?,
+                RoundStatus = 'Completed',
+                Score = ?
+        WHEN NOT MATCHED THEN
+            INSERT (SessionId, RoundNumber, SquareId, RoundStatus, Score)
+            VALUES (?, ?, ?, 'Completed', ?);
+    """, session_id, round_number, square_id, score, session_id, round_number, square_id, score)
+
+def set_round_passed(cur, session_id: int, round_number: int, square_id: int):
+    cur.execute("""
+        MERGE dbo.GameSessionRounds AS target
+        USING (SELECT ? AS SessionId, ? AS RoundNumber) AS src
+        ON target.SessionId = src.SessionId AND target.RoundNumber = src.RoundNumber
+        WHEN MATCHED THEN
+            UPDATE SET SquareId = ?, RoundStatus = 'Passed'
+        WHEN NOT MATCHED THEN
+            INSERT (SessionId, RoundNumber, SquareId, RoundStatus, Score)
+            VALUES (?, ?, ?, 'Passed', 0);
+    """, session_id, round_number, square_id, session_id, round_number, square_id)

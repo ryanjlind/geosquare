@@ -31,3 +31,14 @@
     width: calc(100vw - 360px);
     height: 100vh;
 }
+
+#guessControls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#guessButtons {
+    display: flex;
+    gap: 8px;
+}

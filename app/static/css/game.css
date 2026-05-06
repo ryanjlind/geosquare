@@ -42,28 +42,37 @@
 
 #guessBtn,
 #passBtn,
-#nextBtn {
-    padding: 10px 16px;
+#nextBtn,
+#expandBtn {
+    padding: 8px;
     border: 1px solid #3a4658;
     background: #1d2633;
     color: #e9eef5;
-    font-size: 14px;
-    font-weight: 700;
-    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 4px;
     cursor: pointer;
     white-space: nowrap;
 }
 
+#penalty {
+    margin: 2px;
+    font-size: 8px;
+    color: #EE0000
+}
+
 #guessBtn:hover,
 #passBtn:hover,
-#nextBtn:hover {
+#nextBtn:hover,
+#expandBtn:hover {
     background: #253244;
     border-color: #51627c;
 }
 
 #guessBtn:disabled,
 #passBtn:disabled,
-#nextBtn:disabled {
+#nextBtn:disabled,
+#expandBtn:disabled {
     opacity: 0.55;
     cursor: default;
 }

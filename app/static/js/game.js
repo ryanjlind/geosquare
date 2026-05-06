@@ -9,7 +9,9 @@ import {
     renderEndGameRound,
     drawCities,
     showGuessedCity,
-    showIncorrectGuessedCity
+    showIncorrectGuessedCity,
+    handleExpand,
+    updateExpandButton
 } from './map.js';
 import {
     setMetaError,
@@ -28,7 +30,7 @@ import {
     setSelectedRoundRow,
     showAuthConflictModal,
     hideAuthConflictModal,
-    wireAuthConflictModal,
+    wireAuthConflictModal    
 } from './ui.js';
 import { wireStatsOverlay, showEndGameSummary } from './stats.js';
 import { initFeedback } from './feedback.js';
@@ -37,11 +39,6 @@ import { expandSquareRequest } from './api.js';
 import { drawSquare } from './map.js';
 
 let endGameRounds = [];
-
-function updateExpandButton(square) {
-    const btn = document.getElementById('expandBtn');
-    btn.style.display = square.has_next_expansion ? 'inline-block' : 'none';
-}
 
 function renderRound(data) {
     renderSidebar(data);
@@ -182,8 +179,19 @@ export async function submitGuess() {
         const { data } = await submitGuessRequest(guess, gameState.currentRound);
 
         if (data.correct) {
-            setGuessFeedback(`<b>${escapeHtml(data.city.toUpperCase())}</b> is the ${data.rank === 1 ? 'largest' : `${ordinal(data.rank)} largest`} city in the square.<br><br>
-            With a population of ${numberFmt(data.population)}, you are awarded <b>${numberFmt(data.score)}</b> points.<br>`);
+            const expansionLevel = data.expansion_level || 0;
+
+            let expansionText = "";
+
+            if (expansionLevel > 0) {
+                const penalty = expansionLevel * 20;
+                expansionText = ` and a -${penalty}% expansion penalty`;
+            }
+
+            setGuessFeedback(
+                `<b>${escapeHtml(data.city.toUpperCase())}</b> is the ${data.rank === 1 ? 'largest' : `${ordinal(data.rank)} largest`} city in the square.<br><br>
+                With a population of ${numberFmt(data.population)}${expansionText}, you are awarded <b>${numberFmt(data.score)}</b> points.<br>`
+            );
 
             showGuessedCity(data);
             addRoundRow(data, gameState.currentRound);
@@ -248,6 +256,9 @@ export async function initGame() {
     wireGuessing();
     wireRoundButtons();
     wireExpandButton();
+    document.addEventListener('squareExpanded', (e) => {
+        updateExpandButton(e.detail);
+    });
     wireRoundTable(handleEndGameRoundSelect);
     initFeedback();
 
@@ -272,19 +283,4 @@ export async function initGame() {
     if (state.completed_at) {
         await enterEndGameGlobe();
     }
-}
-
-async function handleExpand() {
-    const roundNumber = gameState.currentRound;
-
-    const { response, data } = await expandSquareRequest(roundNumber);
-
-    if (!response.ok || !data.square_id) {
-        return;
-    }
-
-    drawSquare({
-        bounds: data.bounds,
-        round_number: roundNumber
-    });
 }
