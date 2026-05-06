@@ -239,25 +239,28 @@ def get_completed_round_rows(cur, session_id: int):
             AND gg.IsCorrect = 1
         LEFT JOIN (
             SELECT
-                SquareId,
-                CityId,
-                CityName,
-                Population,
-                Latitude,
-                Longitude,
+                gsc.SquareId,
+                gsc.CityId,
+                gsc.CityName,
+                gsc.Population,
+                gsc.Latitude,
+                gsc.Longitude,
                 ROW_NUMBER() OVER (
-                    PARTITION BY SquareId
-                    ORDER BY Population DESC, CityName ASC
+                    PARTITION BY gsc.SquareId
+                    ORDER BY gsc.Population DESC, gsc.CityName ASC
                 ) AS PopRank
-            FROM dbo.GameSquareCities
+            FROM dbo.GameSquareCities gsc
+            INNER JOIN dbo.GameSessionRounds gsr2
+                ON gsr2.SquareId = gsc.SquareId
+            WHERE gsr2.SessionId = ?
         ) ranked
             ON ranked.SquareId = gsr.SquareId
             AND ranked.CityName = gg.CityName
             AND ranked.Population = gg.Population
         WHERE gsr.SessionId = ?
-          AND gsr.RoundStatus IN ('Completed', 'Passed')
+        AND gsr.RoundStatus IN ('Completed', 'Passed')
         ORDER BY gsr.RoundNumber ASC, gg.GuessedAt ASC
-    """, session_id)
+    """, session_id, session_id)
 
     return cur.fetchall()
 
