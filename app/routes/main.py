@@ -1,9 +1,11 @@
-from flask import Blueprint, jsonify, render_template, request, current_app, url_for, redirect, make_response
-from email.message import EmailMessage
 import os
 import smtplib
 import json
 import logging
+import time
+
+from flask import Blueprint, jsonify, render_template, request, current_app, url_for, redirect, make_response
+from email.message import EmailMessage
 from datetime import datetime, timezone
 
 from app.core.auth import (
@@ -95,24 +97,28 @@ def all_daily_squares():
 
 @main_bp.route("/api/game-state")
 def game_state():
-    print("game_state: start", flush=True)
+    print(f"{time.perf_counter():.9f} game_state: start", flush=True)
 
     identity = _identity()
-    print(f"game_state: identity={identity}",flush=True)
+    print(f"{time.perf_counter():.9f} game_state: identity={identity}", flush=True)
 
     try:
+        print(f"{time.perf_counter():.9f} game_state: before get_game_state_payload call", flush=True)
+
         body, status = get_game_state_payload(
             identity["user_id"],
             identity["session_id"],
         )
-        print(f"game_state: payload status={status}",flush=True)
+
+        print(f"{time.perf_counter():.9f} game_state: after get_game_state_payload call", flush=True)
+        print(f"{time.perf_counter():.9f} game_state: payload status={status}", flush=True)
     except Exception as e:
-        print(f"game_state: exception in get_game_state_payload: {e}",flush=True)
+        print(f"{time.perf_counter():.9f} game_state: exception in get_game_state_payload: {e}", flush=True)
         raise
 
     resp = jsonify(body)
     resp.status_code = status
-    print("game_state: response built",flush=True)
+    print(f"{time.perf_counter():.9f} game_state: response built", flush=True)
 
     return attach_session_cookie(resp, identity["user_id"], identity["session_id"])
 

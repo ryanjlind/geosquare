@@ -255,71 +255,46 @@ def submit_pass(payload: dict, user_id: int, session_id: int | None):
 
 
 def get_game_state_payload(user_id: int, session_id: int | None):
-    print(f"get_game_state_payload: start user_id={user_id}, session_id={session_id}")
+    import time
+    print(f"{time.perf_counter():.9f} get_game_state_payload: ENTER", flush=True)
 
     with get_conn() as conn:
-        print("get_game_state_payload: got connection")
+        print(f"{time.perf_counter():.9f} get_game_state_payload: got connection", flush=True)
         cur = conn.cursor()
-        print("get_game_state_payload: got cursor")
+        print(f"{time.perf_counter():.9f} get_game_state_payload: got cursor", flush=True)
 
-        try:
-            cur.execute(
-                """
-                SELECT AuthProviderSubject, Username
-                FROM Users
-                WHERE UserId = ?
-                """,
-                (user_id,),
-            )
-            print("get_game_state_payload: executed user query")
-        except Exception as e:
-            print(f"get_game_state_payload: user query failed: {e}")
-            raise
+        cur.execute(
+            """
+            SELECT AuthProviderSubject, Username
+            FROM Users
+            WHERE UserId = ?
+            """,
+            (user_id,),
+        )
+        print(f"{time.perf_counter():.9f} get_game_state_payload: executed user query", flush=True)
 
         user_row = cur.fetchone()
-        print(f"get_game_state_payload: user_row={user_row}")
+        print(f"{time.perf_counter():.9f} get_game_state_payload: fetched user_row", flush=True)
 
         is_authenticated = bool(user_row and user_row.AuthProviderSubject)
         username = user_row.Username if user_row else None
 
-        try:
-            session = get_current_session(cur, user_id, session_id)
-            print(f"get_game_state_payload: session={session}")
-        except Exception as e:
-            print(f"get_game_state_payload: get_current_session failed: {e}")
-            raise
+        session = get_current_session(cur, user_id, session_id)
+        print(f"{time.perf_counter():.9f} get_game_state_payload: got session", flush=True)
 
         if session is None:
-            print("get_game_state_payload: no session")
             return {"error": "No game found for today."}, 404
 
-        try:
-            rows = get_completed_round_rows(cur, int(session.SessionId))
-            print(f"get_game_state_payload: completed rows={rows}")
-        except Exception as e:
-            print(f"get_game_state_payload: get_completed_round_rows failed: {e}")
-            raise
+        completed = map_completed_rounds(
+            get_completed_round_rows(cur, int(session.SessionId))
+        )
+        print(f"{time.perf_counter():.9f} get_game_state_payload: completed mapped", flush=True)
 
-        try:
-            completed = map_completed_rounds(rows)
-            print(f"get_game_state_payload: completed mapped={completed}")
-        except Exception as e:
-            print(f"get_game_state_payload: map_completed_rounds failed: {e}")
-            raise
+        conn.commit()
+        print(f"{time.perf_counter():.9f} get_game_state_payload: commit", flush=True)
 
-        try:
-            conn.commit()
-            print("get_game_state_payload: commit done")
-        except Exception as e:
-            print(f"get_game_state_payload: commit failed: {e}")
-            raise
-
-        try:
-            result = map_game_state(session, completed, is_authenticated, username)
-            print(f"get_game_state_payload: final result built")
-        except Exception as e:
-            print(f"get_game_state_payload: map_game_state failed: {e}")
-            raise
+        result = map_game_state(session, completed, is_authenticated, username)
+        print(f"{time.perf_counter():.9f} get_game_state_payload: result built", flush=True)
 
         return result, 200
 
