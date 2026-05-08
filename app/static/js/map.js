@@ -74,17 +74,26 @@ export function clearMap() {
     window.geoViewer.entities.removeAll();
 }
 
-export function drawSquare(data) {
+export function drawSquare(data, options = {}) {
+    const {
+        replaceExisting = true
+    } = options;
+
     const b = data.bounds;
 
-    if (baseSquareEntity) {
+    if (replaceExisting && baseSquareEntity) {
         window.geoViewer.entities.remove(baseSquareEntity);
     }
 
-    baseSquareEntity = window.geoViewer.entities.add({
+    const entity = window.geoViewer.entities.add({
         name: `Round ${data.round_number || ''}`.trim(),
         rectangle: {
-            coordinates: Cesium.Rectangle.fromDegrees(b.min_lon, b.min_lat, b.max_lon, b.max_lat),
+            coordinates: Cesium.Rectangle.fromDegrees(
+                b.min_lon,
+                b.min_lat,
+                b.max_lon,
+                b.max_lat
+            ),
             material: Cesium.Color.YELLOW.withAlpha(0.2),
             outline: true,
             outlineColor: Cesium.Color.YELLOW,
@@ -92,7 +101,12 @@ export function drawSquare(data) {
         }
     });
 
-    setCurrentBounds(b);
+    if (replaceExisting) {
+        baseSquareEntity = entity;
+        setCurrentBounds(b);
+    }
+
+    return entity;
 }
 
 export function drawCities(cities) {
@@ -198,9 +212,14 @@ export async function renderAllSquares(rounds, options = {}) {
     for (const round of rounds) {
         for (const level of round.levels) {
             console.log('ROUND DEBUG', round);
-            drawSquare({
-                bounds: level.bounds
-            });
+            drawSquare(
+                {
+                    bounds: level.bounds
+                },
+                {
+                    replaceExisting: false
+                }
+            );
         }
 
         if (preview) {
