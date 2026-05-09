@@ -113,12 +113,12 @@ def get_daily_square_data(user_id: int, session_id: int | None, round_number: in
 
         return map_square(row, cities_rows, city_count_row, has_next)
 
-
 def submit_guess(payload: dict, user_id: int, session_id: int | None):
     t0 = perf_counter()
 
     guess_text = (payload.get("guess") or "").strip()
     round_number = int(payload.get("round_number", 1))
+    confirmed_city_id = payload.get("confirmed_city_id")
 
     if not guess_text:
         return {"error": "Guess is required."}, 400
@@ -146,66 +146,94 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None):
             return {"error": "No square found for that round."}, 404
 
         rows = get_ranked_square_cities(cur, square_id)
-        matched = find_matching_city(rows, guess_text)
 
-        if matched:
-            population = int(matched.Population)
-            score = compute_score(rows, population)
-            expansion_level = int(expansion_level)
-            score = int(score * (1 - (expansion_level * 0.2)))
+        if confirmed_city_id is not None:
+            matched = None
+            for r in rows:
+                if int(r.CityId) == int(confirmed_city_id):
+                    matched = r
+                    break
 
-            set_round_completed(cur, session_id, round_number, square_id, score)
+            if matched is None:
+                return {"error": "Invalid confirmation selection."}, 400
 
-            session_round = get_session_round(cur, session_id, round_number)
-            session_round_id = int(session_round.SessionRoundId)
+            result_type = "match"
+        else:
+            result = find_matching_city(rows, guess_text)
+            result_type = result.get("type")
 
-            insert_correct_guess(
-                cur,
-                session_round_id,
-                matched.CityName,
-                population,
-                score,
-            )
+            if result_type == "match":
+                matched = result["row"]
 
-            increment_session_total_score(cur, session_id, score)
+            if result_type == "confirmation_required":
+                return {
+                    "ok": True,
+                    "requires_confirmation": True,
+                    "candidates": result.get("suggestions", []),
+                    "guess": guess_text,
+                }, 200
 
-            updated = get_session_total_score(cur, session_id)
+            if result_type == "no_match":
+                nearby = find_city_anywhere(cur, guess_text)
+                conn.commit()
 
-            if round_number == 5:
-                complete_session(cur, session_id)
+                return {
+                    "ok": True,
+                    "correct": False,
+                    "city": guess_text,
+                    "score": 0,
+                    "total_score": int(session.TotalScore),
+                    "matched_city": {
+                        "city_name": nearby.CityName,
+                        "country_code": nearby.CountryCode,
+                        "latitude": float(nearby.Latitude),
+                        "longitude": float(nearby.Longitude),
+                        "population": int(nearby.Population),
+                    } if nearby else None,
+                }, 200
 
-            conn.commit()
+            if result_type != "match":
+                return {"error": "Invalid match result."}, 500
 
-            return {
-                "ok": True,
-                "correct": True,
-                "city": matched.CityName,
-                "country_code": matched.CountryCode,
-                "latitude": float(matched.Latitude),
-                "longitude": float(matched.Longitude),
-                "population": population,
-                "score": score,
-                "rank": int(matched.PopRank),
-                "total_score": int(updated.TotalScore),                
-                "expansion_level": expansion_level,
-            }, 200
+        population = int(matched.Population)
+        score = compute_score(rows, population)
+        expansion_level = int(expansion_level)
+        score = int(score * (1 - (expansion_level * 0.2)))
 
-        nearby = find_city_anywhere(cur, guess_text)
+        set_round_completed(cur, session_id, round_number, square_id, score)
+
+        session_round = get_session_round(cur, session_id, round_number)
+        session_round_id = int(session_round.SessionRoundId)
+
+        insert_correct_guess(
+            cur,
+            session_round_id,
+            matched.CityName,
+            population,
+            score,
+        )
+
+        increment_session_total_score(cur, session_id, score)
+
+        updated = get_session_total_score(cur, session_id)
+
+        if round_number == 5:
+            complete_session(cur, session_id)
+
         conn.commit()
 
         return {
             "ok": True,
-            "correct": False,
-            "city": guess_text,
-            "score": 0,
-            "total_score": int(session.TotalScore),
-            "matched_city": {
-                "city_name": nearby.CityName,
-                "country_code": nearby.CountryCode,
-                "latitude": float(nearby.Latitude),
-                "longitude": float(nearby.Longitude),
-                "population": int(nearby.Population),
-            } if nearby else None,
+            "correct": True,
+            "city": matched.CityName,
+            "country_code": matched.CountryCode,
+            "latitude": float(matched.Latitude),
+            "longitude": float(matched.Longitude),
+            "population": population,
+            "score": score,
+            "rank": int(matched.PopRank),
+            "total_score": int(updated.TotalScore),
+            "expansion_level": expansion_level,
         }, 200
 
 

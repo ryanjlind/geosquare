@@ -165,18 +165,29 @@ export async function handlePass() {
 
 export async function submitGuess() {
     const guessBtn = document.getElementById('guessBtn');
-    const guessInput = document.getElementById('guessInput');
-
-    if (guessBtn.disabled) {
-        return;
-    }
+    const guessInput = document.getElementById('guessInput');    
 
     guessBtn.disabled = true;
     guessInput.disabled = true;
+
     const guess = getGuessValue();
 
     try {
         const { data } = await submitGuessRequest(guess, gameState.currentRound);
+
+        if (data.requires_confirmation) {
+            window.pendingGuessConfirmation = {
+                guess,
+                round: gameState.currentRound,
+                candidates: data.candidates
+            };
+
+            if (typeof showGuessConfirmationModal === "function") {
+                showGuessConfirmationModal(data.candidates, guess);
+            }
+
+            return;
+        }
 
         if (data.correct) {
             const expansionLevel = data.expansion_level || 0;
@@ -283,4 +294,64 @@ export async function initGame() {
     if (state.completed_at) {
         await enterEndGameGlobe();
     }
+}
+
+export function showGuessConfirmationModal(candidates) {
+    const modal = document.getElementById('guessConflictModal');
+    const list = document.getElementById('guessConflictList');
+
+    list.innerHTML = '';
+
+    const title = document.createElement('div');
+    title.className = 'modal-title';
+    title.textContent = 'Did you mean:';
+    list.appendChild(title);
+
+    candidates.forEach(c => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'modal-btn';
+        btn.textContent = `${c.city} (${c.country_code})`;
+
+        btn.onclick = async () => {
+            modal.classList.add('hidden');
+
+            const pending = window.pendingGuessConfirmation;
+            if (!pending) return;
+
+            const guessBtn = document.getElementById('guessBtn');
+            const guessInput = document.getElementById('guessInput');
+
+            guessBtn.disabled = true;
+            guessInput.disabled = true;
+
+            try {
+                guessInput.value = `${c.city}, ${c.country_code}`;
+                await submitGuess();
+                window.pendingGuessConfirmation = null;
+            } finally {
+                guessBtn.disabled = false;
+                guessInput.disabled = false;
+                focusGuessInput();
+            }
+        };
+
+        list.appendChild(btn);
+    });
+
+    const noneBtn = document.createElement('button');
+    noneBtn.type = 'button';
+    noneBtn.className = 'modal-btn';
+    noneBtn.textContent = 'None of the above';
+
+    noneBtn.onclick = async () => {
+        const modal = document.getElementById('guessConflictModal');
+        modal.classList.add('hidden');
+
+        window.pendingGuessConfirmation = null;
+    };
+
+    list.appendChild(noneBtn);
+
+    modal.classList.remove('hidden');
 }

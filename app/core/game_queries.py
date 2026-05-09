@@ -129,6 +129,7 @@ def get_square_id_for_round(cur, game_id: int, round_number: int):
 def get_ranked_square_cities(cur, square_id: int):
     cur.execute("""
         SELECT
+            c.CityId,
             c.CityName,
             c.CountryCode,
             c.Latitude,
@@ -139,7 +140,7 @@ def get_ranked_square_cities(cur, square_id: int):
             gc.ProvinceCodes
         FROM dbo.GameSquareCities c
         LEFT JOIN dbo.GeoCities gc
-            ON gc.CityId = c.CityId   
+            ON gc.CityId = c.CityId
         WHERE c.SquareId = ?
         ORDER BY c.Population DESC
     """, square_id)

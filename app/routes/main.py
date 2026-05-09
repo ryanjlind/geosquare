@@ -126,6 +126,7 @@ def game_state():
 def guess():
     identity = _identity()
     payload = request.get_json(silent=True) or {}
+    print(f"guess payload:{payload}",flush=True)
 
     body, status = submit_guess(payload, identity["user_id"], identity["session_id"])
 

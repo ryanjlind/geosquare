@@ -127,16 +127,28 @@ def find_matching_city(rows, guess_text: str):
 
         if guess_keys & city_keys:
             print(f'MATCH (direct): {row.CityName}')
-            return row
+            return {
+                "type": "match",
+                "row": row,
+            }
 
     print('No direct match. Trying exact phonetic...')
+
+    confirmation_candidates = []
 
     for row in candidate_rows:
         city_keys = build_match_keys(row.CityName)
 
+        direct_alt_match = False
+
         if getattr(row, 'AlternateNames', None):
             for alt_name in row.AlternateNames.split('|||'):
-                city_keys |= build_match_keys(alt_name)
+                alt_keys = build_match_keys(alt_name)
+
+                if guess_keys & alt_keys:
+                    direct_alt_match = True
+
+                city_keys |= alt_keys
 
         city_phonetic_keys = {
             phonetic_key(key)
@@ -145,8 +157,47 @@ def find_matching_city(rows, guess_text: str):
         }
 
         if guess_phonetic_keys & city_phonetic_keys:
+
+            if direct_alt_match:
+                normalized_city = normalize_place_name(row.CityName)
+
+                first_differs = (
+                    normalized_guess
+                    and normalized_city
+                    and normalized_guess[0] != normalized_city[0]
+                )
+
+                last_differs = (
+                    normalized_guess
+                    and normalized_city
+                    and normalized_guess[-1] != normalized_city[-1]
+                )
+
+                if first_differs and last_differs:
+                    print(f'CONFIRMATION REQUIRED: {guess_text} -> {row.CityName}')
+
+                    confirmation_candidates.append({
+                        "city_id": int(row.CityId),
+                        "city": row.CityName,
+                        "country_code": row.CountryCode,
+                    })
+
+                    continue
+
             print(f'MATCH (phonetic): {row.CityName}')
-            return row
+
+            return {
+                "type": "match",
+                "row": row,
+            }
+
+    if confirmation_candidates:
+        return {
+            "type": "confirmation_required",
+            "suggestions": confirmation_candidates,
+        }
 
     print('REJECTED')
-    return None
+    return {
+        "type": "no_match",
+    }
