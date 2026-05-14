@@ -207,6 +207,210 @@ def set_username_route():
 
     return jsonify({"ok": True})
 
+@main_bp.route("/api/feedback", methods=["POST"])
+def feedback():
+    data = request.form
+
+    msg = EmailMessage()
+    msg["Subject"] = f"GeoSquare Feedback ({data.get('type')})"
+    msg["From"] = os.environ["SMTP_FROM"]
+    msg["To"] = os.environ["FEEDBACK_EMAIL"]
+
+    diagnostics = data.get("diagnostics")
+
+    body = f"""
+Type: {data.get('type')}
+Platform: {data.get('platform')}
+Include Diagnostics: {data.get('includeDiagnostics')}
+Allow Email: {data.get('allowEmail')}
+User Email: {data.get('email')}
+
+Description:
+{data.get('description')}
+"""
+
+    if data.get("includeDiagnostics") == "true" and diagnostics:
+        body += f"""
+
+Diagnostics:
+{diagnostics}
+"""
+
+    msg.set_content(body)
+
+    for file in request.files.getlist("screenshots"):
+        msg.add_attachment(
+            file.read(),
+            maintype="image",
+            subtype="png",
+            filename=file.filename,
+        )
+
+    with smtplib.SMTP(
+        os.environ["SMTP_HOST"],
+        int(os.environ["SMTP_PORT"]),
+    ) as s:
+        s.starttls()
+        s.login(
+            os.environ["SMTP_USER"],
+            os.environ["SMTP_PASS"],
+        )
+        s.send_message(msg)
+
+    return jsonify({"ok": True})
+
+
+@main_bp.route("/login")
+def login():
+    if is_local_auth_bypass_enabled():
+        popup_url = url_for(
+            "main.auth_callback",
+            dev_sub="local-test-user",
+        )
+        return redirect(popup_url)
+
+    client = get_lastlogin_client()
+    redirect_uri = url_for("main.auth_callback", _external=True)
+
+    return client.authorize_redirect(redirect_uri)
+
+
+@main_bp.route("/auth/callback")
+def auth_callback():
+    if is_local_auth_bypass_enabled():
+        user_info = {
+            "sub": request.args.get(
+                "dev_sub",
+                "local-test-user",
+            )
+        }
+    else:
+        client = get_lastlogin_client()
+        token = client.authorize_access_token()
+        user_info = token.get("userinfo") or {}
+
+    identity = _identity()
+
+    result = begin_lastlogin_link(
+        current_user_id=identity["user_id"],
+        subject=user_info.get("sub"),
+    )
+
+    print(
+        f"[AUTH] subject={user_info.get('sub')} "
+        f"current_user_id={identity['user_id']} "
+        f"result={result}",
+        flush=True,
+    )
+
+    def build_popup_response(payload, user_id, session_id):
+        message_json = json.dumps(payload)
+
+        response = make_response(
+            f"""
+<!doctype html>
+<html>
+<body>
+<script>
+window.opener.postMessage({message_json}, window.location.origin);
+window.close();
+</script>
+</body>
+</html>
+"""
+        )
+
+        return attach_session_cookie(
+            response,
+            user_id,
+            session_id,
+        )
+
+    status = result.get("status")
+
+    if status in (
+        "linked_current_user",
+        "already_linked",
+        "switched_to_linked_user",
+    ):
+        print(
+            f"[AUTH] success -> user_id={result['user_id']} status={status}",
+            flush=True,
+        )
+
+        return build_popup_response(
+            {"type": "auth_success"},
+            result["user_id"],
+            None,
+        )
+
+    if status == "conflict":
+        print(
+            f"[AUTH] conflict -> current_user_id={identity['user_id']}",
+            flush=True,
+        )
+
+        return build_popup_response(
+            {
+                "type": "auth_conflict",
+                "message": "How should GeoSquare handle the conflict?",
+            },
+            identity["user_id"],
+            identity["session_id"],
+        )
+
+    print(f"[AUTH] error -> result={result}", flush=True)
+
+    return build_popup_response(
+        {
+            "type": "auth_error",
+            "message": result.get("message", "Login failed."),
+        },
+        identity["user_id"],
+        identity["session_id"],
+    )
+
+
+@main_bp.route("/auth/resolve", methods=["POST"])
+def auth_resolve():
+    payload = request.get_json(silent=True) or {}
+
+    result = resolve_lastlogin_conflict(
+        payload.get("action")
+    )
+
+    if result["status"] == "resolved":
+        response = jsonify({"ok": True})
+
+        return attach_session_cookie(
+            response,
+            result["user_id"],
+            None,
+        )
+
+    if result["status"] == "aborted":
+        response = jsonify({
+            "ok": True,
+            "aborted": True,
+        })
+
+        return attach_session_cookie(
+            response,
+            result["user_id"],
+            None,
+        )
+
+    return jsonify({
+        "ok": False,
+        "error": result["message"],
+    }), 400
+
+
+@main_bp.route("/logout", methods=["POST"])
+def logout():
+    response = jsonify({"ok": True})
+    response.delete_cookie(COOKIE_NAME)
+    return response
 
 @main_bp.route("/preview")
 def preview():
