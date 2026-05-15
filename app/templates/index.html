@@ -305,5 +305,14 @@
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
     <script type="module" src="{{ url_for('static', filename='js/app.js') }}?v=2"></script>
     <script type="module" src="{{ url_for('static', filename='js/mobile.js') }}?v=2"></script>
+    <script>
+        window.addEventListener("load", () => {
+            const guessInput = document.getElementById("guessInput");
+
+            if (guessInput) {
+                guessInput.focus();
+            }
+        });
+</script>
 </body>
 </html>
