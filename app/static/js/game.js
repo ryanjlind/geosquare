@@ -44,6 +44,13 @@ function renderRound(data) {
     renderSidebar(data);
     renderRoundMap(data);
     updateExpandButton(data);
+
+    const guessInput = document.getElementById('guessInput');
+
+    if (guessInput) {
+        guessInput.focus();
+        guessInput.select();
+    }
 }
 
 async function loadEndGameRounds() {
