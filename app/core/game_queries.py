@@ -216,7 +216,7 @@ def find_city_anywhere(cur, guess_text: str):
         WHERE IsActive = 1
           AND CityNameLower = LOWER(?)
         ORDER BY Population DESC, CityId ASC
-    """, guess_text)
+    """, guess_text.encode("utf-8"))
     return cur.fetchone()
 
 def get_completed_round_rows(cur, session_id: int):
