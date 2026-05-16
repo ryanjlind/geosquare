@@ -56,6 +56,7 @@ def get_reveal_cities_for_square(square_id: int, excluded_city: dict | None = No
             JOIN dbo.GeoCities gc
                 ON gc.CityId = gsc.CityId
             WHERE gsc.SquareId = ?
+            AND gc.FeatureCode <> 'PPLX'
         """
 
         if excluded_city:

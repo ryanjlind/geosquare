@@ -342,6 +342,7 @@ def _get_most_obscure_city(cur, user_id: int) -> dict | None:
             WHERE gs.UserId = ?
               AND gs.CompletedAt IS NOT NULL
               AND gc.NotorietyScore IS NOT NULL
+              AND gc.FeatureCode <> 'PPLX'
         )
         SELECT TOP 1
             CityId,

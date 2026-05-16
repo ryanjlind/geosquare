@@ -142,6 +142,7 @@ def get_ranked_square_cities(cur, square_id: int):
         LEFT JOIN dbo.GeoCities gc
             ON gc.CityId = c.CityId
         WHERE c.SquareId = ?
+            AND gc.FeatureCode <> 'PPLX'
         ORDER BY c.Population DESC
     """, square_id)
     return cur.fetchall()
