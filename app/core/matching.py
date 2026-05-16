@@ -173,7 +173,7 @@ def find_matching_city(rows, guess_text: str):
                     and normalized_guess[-1] != normalized_city[-1]
                 )
 
-                if first_differs and last_differs:
+                if first_differs or last_differs:
                     print(f'CONFIRMATION REQUIRED: {guess_text} -> {row.CityName}')
 
                     confirmation_candidates.append({
