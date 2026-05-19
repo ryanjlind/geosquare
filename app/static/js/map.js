@@ -83,43 +83,57 @@ export function drawSquare(data, options = {}) {
         baseSquareEntity = null;
     }
 
-    const crossesDateline = b.min_lon > b.max_lon;
+    const wrapLon = (lon) => {
+        lon = ((lon + 180) % 360 + 360) % 360 - 180;
+        return lon;
+    };
 
-    const makeRect = (west, east) => {
+    const makeEntity = (west, east, south, north) => {
         return window.geoViewer.entities.add({
             name: `Round ${data.round_number || ''}`.trim(),
             rectangle: {
-                coordinates: Cesium.Rectangle.fromDegrees(
-                    west,
-                    b.min_lat,
-                    east,
-                    b.max_lat
-                ),
+                coordinates: Cesium.Rectangle.fromDegrees(west, south, east, north),
                 material: Cesium.Color.YELLOW.withAlpha(0.2),
                 outline: true,
                 outlineColor: Cesium.Color.YELLOW,
-                outlineWidth: 2,
+                outlineWidth: 2
             }
         });
     };
 
-    let entity;
+    let minLat = b.min_lat;
+    let maxLat = b.max_lat;
+    let minLon = wrapLon(b.min_lon);
+    let maxLon = wrapLon(b.max_lon);
+
+    const entities = [];
+
+    const splitLat = (south, north) => {
+        if (south < -90 && north > 90) {
+            entities.push(makeEntity(minLon, 180, -90, 90));
+            entities.push(makeEntity(-180, maxLon, -90, 90));
+        } else {
+            entities.push(makeEntity(minLon, maxLon, south, north));
+        }
+    };
+
+    const crossesDateline = b.min_lon > b.max_lon;
 
     if (!crossesDateline) {
-        entity = makeRect(b.min_lon, b.max_lon);
+        splitLat(minLat, maxLat);
     } else {
-        const westPart = makeRect(b.min_lon, 180);
-        const eastPart = makeRect(-180, b.max_lon);
-
-        entity = { westPart, eastPart };
+        entities.push(makeEntity(minLon, 180, minLat, maxLat));
+        entities.push(makeEntity(-180, maxLon, minLat, maxLat));
     }
 
+    const result = entities.length === 1 ? entities[0] : { parts: entities };
+
     if (replaceExisting) {
-        baseSquareEntity = entity;
+        baseSquareEntity = result;
         setCurrentBounds(b);
     }
 
-    return entity;
+    return result;
 }
 
 export function drawCities(cities) {
