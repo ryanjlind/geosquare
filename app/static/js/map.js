@@ -83,16 +83,30 @@ export function drawSquare(data, options = {}) {
         baseSquareEntity = null;
     }
 
-    const wrapLon = (lon) => {
-        lon = ((lon + 180) % 360 + 360) % 360 - 180;
+    const normalizeLon = (lon) => {
+        if (typeof lon !== "number") return 0;
+        while (lon > 180) lon -= 360;
+        while (lon < -180) lon += 360;
         return lon;
+    };
+
+    const normalizeLat = (lat) => {
+        if (typeof lat !== "number") return 0;
+        if (lat > 90) return 90;
+        if (lat < -90) return -90;
+        return lat;
     };
 
     const makeEntity = (west, east, south, north) => {
         return window.geoViewer.entities.add({
             name: `Round ${data.round_number || ''}`.trim(),
             rectangle: {
-                coordinates: Cesium.Rectangle.fromDegrees(west, south, east, north),
+                coordinates: Cesium.Rectangle.fromDegrees(
+                    west,
+                    south,
+                    east,
+                    north
+                ),
                 material: Cesium.Color.YELLOW.withAlpha(0.2),
                 outline: true,
                 outlineColor: Cesium.Color.YELLOW,
@@ -101,26 +115,20 @@ export function drawSquare(data, options = {}) {
         });
     };
 
-    let minLat = b.min_lat;
-    let maxLat = b.max_lat;
-    let minLon = wrapLon(b.min_lon);
-    let maxLon = wrapLon(b.max_lon);
+    let minLon = normalizeLon(b.min_lon);
+    let maxLon = normalizeLon(b.max_lon);
+    let minLat = normalizeLat(b.min_lat);
+    let maxLat = normalizeLat(b.max_lat);
+
+    if (minLat > maxLat) [minLat, maxLat] = [maxLat, minLat];
 
     const entities = [];
-
-    const splitLat = (south, north) => {
-        if (south < -90 && north > 90) {
-            entities.push(makeEntity(minLon, 180, -90, 90));
-            entities.push(makeEntity(-180, maxLon, -90, 90));
-        } else {
-            entities.push(makeEntity(minLon, maxLon, south, north));
-        }
-    };
 
     const crossesDateline = b.min_lon > b.max_lon;
 
     if (!crossesDateline) {
-        splitLat(minLat, maxLat);
+        if (minLon > maxLon) [minLon, maxLon] = [maxLon, minLon];
+        entities.push(makeEntity(minLon, maxLon, minLat, maxLat));
     } else {
         entities.push(makeEntity(minLon, 180, minLat, maxLat));
         entities.push(makeEntity(-180, maxLon, minLat, maxLat));
