@@ -78,13 +78,31 @@ export function drawSquare(data, options = {}) {
     const { replaceExisting = true } = options;
     const b = data.bounds;
 
+    console.log("[drawSquare] ENTER", {
+        rawBounds: b,
+        round: data.round_number
+    });
+
     if (replaceExisting && baseSquareEntity) {
+        console.log("[drawSquare] removing baseSquareEntity");
         window.geoViewer.entities.remove(baseSquareEntity);
     }
 
-    const clampLat = (lat) => Math.max(-90, Math.min(90, lat));
+    const clampLat = (lat) => {
+        const out = Math.max(-90, Math.min(90, lat));
+        if (out !== lat) {
+            console.log("[LAT CLAMP]", { input: lat, output: out });
+        }
+        return out;
+    };
 
-    const normLon = (lon) => ((lon + 180) % 360 + 360) % 360 - 180;
+    const normLon = (lon) => {
+        const out = ((lon + 180) % 360 + 360) % 360 - 180;
+        if (out !== lon) {
+            console.log("[LON NORMALIZE]", { input: lon, output: out });
+        }
+        return out;
+    };
 
     const minLat = clampLat(b.min_lat);
     const maxLat = clampLat(b.max_lat);
@@ -92,18 +110,47 @@ export function drawSquare(data, options = {}) {
     const westRaw = b.min_lon;
     const eastRaw = b.max_lon;
 
+    console.log("[PRECHECK]", {
+        westRaw,
+        eastRaw,
+        minLat,
+        maxLat
+    });
+
     const spansDateline = (eastRaw - westRaw) > 180 || westRaw > eastRaw;
 
-    const add = (west, east) =>
-        window.geoViewer.entities.add({
+    console.log("[SPANS DATELINE]", spansDateline);
+
+    const add = (west, east, label) => {
+        console.log("[RECT INPUT]", {
+            label,
+            west,
+            east,
+            minLat,
+            maxLat,
+            westType: typeof west,
+            eastType: typeof east
+        });
+
+        const rect = Cesium.Rectangle.fromDegrees(
+            west,
+            minLat,
+            east,
+            maxLat
+        );
+
+        console.log("[RECT CREATED]", {
+            label,
+            westRad: rect.west,
+            eastRad: rect.east,
+            southRad: rect.south,
+            northRad: rect.north
+        });
+
+        const entity = window.geoViewer.entities.add({
             name: `Round ${data.round_number || ''}`.trim(),
             rectangle: {
-                coordinates: Cesium.Rectangle.fromDegrees(
-                    west,
-                    minLat,
-                    east,
-                    maxLat
-                ),
+                coordinates: rect,
                 material: Cesium.Color.YELLOW.withAlpha(0.2),
                 outline: true,
                 outlineColor: Cesium.Color.YELLOW,
@@ -111,21 +158,32 @@ export function drawSquare(data, options = {}) {
             }
         });
 
+        console.log("[ENTITY CREATED]", label);
+
+        return entity;
+    };
+
     let entity;
 
     if (!spansDateline) {
-        entity = add(westRaw, eastRaw);
+        console.log("[PATH] single rectangle");
+        entity = add(westRaw, eastRaw, "single");
     } else {
+        console.log("[PATH] dateline split");
+
         entity = {
-            a: add(normLon(westRaw), 180),
-            b: add(-180, normLon(eastRaw))
+            a: add(normLon(westRaw), 180, "left"),
+            b: add(-180, normLon(eastRaw), "right")
         };
     }
 
     if (replaceExisting) {
         baseSquareEntity = entity;
         setCurrentBounds(b);
+        console.log("[STATE UPDATED]", baseSquareEntity);
     }
+
+    console.log("[drawSquare] EXIT");
 
     return entity;
 }
