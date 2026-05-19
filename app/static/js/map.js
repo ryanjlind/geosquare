@@ -75,38 +75,43 @@ export function clearMap() {
 }
 
 export function drawSquare(data, options = {}) {
-    const {
-        replaceExisting = true
-    } = options;
-
+    const { replaceExisting = true } = options;
     const b = data.bounds;
 
     if (replaceExisting && baseSquareEntity) {
         window.geoViewer.entities.remove(baseSquareEntity);
     }
 
-    const entity = window.geoViewer.entities.add({
-        name: `Round ${data.round_number || ''}`.trim(),
-        rectangle: {
-            coordinates: Cesium.Rectangle.fromDegrees(
-                b.min_lon,
-                b.min_lat,
-                b.max_lon,
-                b.max_lat
-            ),
-            material: Cesium.Color.YELLOW.withAlpha(0.2),
-            outline: true,
-            outlineColor: Cesium.Color.YELLOW,
-            outlineWidth: 2,
-        }
+    const rect = Cesium.Rectangle.fromDegrees(
+        b.min_lon,
+        b.min_lat,
+        b.max_lon,
+        b.max_lat
+    );
+
+    const geometryInstance = new Cesium.GeometryInstance({
+        geometry: new Cesium.RectangleGeometry({
+            rectangle: rect,
+            vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT
+        })
     });
 
+    const primitive = new Cesium.Primitive({
+        geometryInstances: geometryInstance,
+        appearance: new Cesium.PerInstanceColorAppearance({
+            translucent: true,
+            closed: true
+        })
+    });
+
+    window.geoViewer.scene.primitives.add(primitive);
+
     if (replaceExisting) {
-        baseSquareEntity = entity;
+        baseSquareEntity = primitive;
         setCurrentBounds(b);
     }
 
-    return entity;
+    return primitive;
 }
 
 export function drawCities(cities) {
