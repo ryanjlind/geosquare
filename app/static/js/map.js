@@ -79,92 +79,47 @@ export function drawSquare(data, options = {}) {
     const b = data.bounds;
 
     if (replaceExisting && baseSquareEntity) {
-        window.geoViewer.scene.primitives.remove(baseSquareEntity);
+        window.geoViewer.entities.remove(baseSquareEntity);
         baseSquareEntity = null;
     }
 
-    const toRad = Cesium.Math.toRadians;
+    const crossesDateline = b.min_lon > b.max_lon;
 
-    const normalizeLat = (latRad) => {
-        if (latRad > Math.PI / 2) latRad = Math.PI - latRad;
-        if (latRad < -Math.PI / 2) latRad = -Math.PI - latRad;
-        return latRad;
-    };
-
-    const wrapLon = (lonRad) => {
-        const twoPi = 2 * Math.PI;
-        return ((lonRad + Math.PI) % twoPi + twoPi) % twoPi - Math.PI;
-    };
-
-    let west = toRad(b.min_lon);
-    let east = toRad(b.max_lon);
-    let south = toRad(b.min_lat);
-    let north = toRad(b.max_lat);
-
-    south = normalizeLat(south);
-    north = normalizeLat(north);
-
-    west = wrapLon(west);
-    east = wrapLon(east);
-
-    const instances = [];
-
-    const spansDateline = east < west;
-
-    if (!spansDateline) {
-        instances.push(new Cesium.GeometryInstance({
-            geometry: new Cesium.RectangleGeometry({
-                rectangle: new Cesium.Rectangle(west, south, east, north),
-                vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT
-            }),
-            attributes: {
-                color: Cesium.ColorGeometryInstanceAttribute.fromColor(
-                    Cesium.Color.GREEN.withAlpha(0.4)
-                )
+    const makeRect = (west, east) => {
+        return window.geoViewer.entities.add({
+            name: `Round ${data.round_number || ''}`.trim(),
+            rectangle: {
+                coordinates: Cesium.Rectangle.fromDegrees(
+                    west,
+                    b.min_lat,
+                    east,
+                    b.max_lat
+                ),
+                material: Cesium.Color.YELLOW.withAlpha(0.2),
+                outline: true,
+                outlineColor: Cesium.Color.YELLOW,
+                outlineWidth: 2,
             }
-        }));
+        });
+    };
+
+    let entity;
+
+    if (!crossesDateline) {
+        entity = makeRect(b.min_lon, b.max_lon);
     } else {
-        instances.push(new Cesium.GeometryInstance({
-            geometry: new Cesium.RectangleGeometry({
-                rectangle: new Cesium.Rectangle(west, south, Math.PI, north),
-                vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT
-            }),
-            attributes: {
-                color: Cesium.ColorGeometryInstanceAttribute.fromColor(
-                    Cesium.Color.GREEN.withAlpha(0.4)
-                )
-            }
-        }));
+        const westPart = makeRect(b.min_lon, 180);
+        const eastPart = makeRect(-180, b.max_lon);
 
-        instances.push(new Cesium.GeometryInstance({
-            geometry: new Cesium.RectangleGeometry({
-                rectangle: new Cesium.Rectangle(-Math.PI, south, east, north),
-                vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT
-            }),
-            attributes: {
-                color: Cesium.ColorGeometryInstanceAttribute.fromColor(
-                    Cesium.Color.GREEN.withAlpha(0.4)
-                )
-            }
-        }));
+        entity = { westPart, eastPart };
     }
 
-    const primitive = new Cesium.Primitive({
-        geometryInstances: instances,
-        appearance: new Cesium.PerInstanceColorAppearance({
-            translucent: true,
-            closed: true
-        })
-    });
-
-    window.geoViewer.scene.primitives.add(primitive);
-
     if (replaceExisting) {
-        baseSquareEntity = primitive;
+        baseSquareEntity = entity;
         setCurrentBounds(b);
     }
 
-    return primitive;
+    return entity;
 }
 
 export function drawCities(cities) {
