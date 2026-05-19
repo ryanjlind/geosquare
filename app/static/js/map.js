@@ -79,25 +79,42 @@ export function drawSquare(data, options = {}) {
     const b = data.bounds;
 
     if (replaceExisting && baseSquareEntity) {
-        window.geoViewer.entities.remove(baseSquareEntity);
+        window.geoViewer.scene.primitives.remove(baseSquareEntity);
+        baseSquareEntity = null;
     }
 
-    const rect = Cesium.Rectangle.fromDegrees(
-        b.min_lon,
-        b.min_lat,
-        b.max_lon,
-        b.max_lat
-    );
+    const west = Cesium.Math.toRadians(b.min_lon);
+    const east = Cesium.Math.toRadians(b.max_lon);
+    const south = Cesium.Math.toRadians(b.min_lat);
+    const north = Cesium.Math.toRadians(b.max_lat);
 
-    const geometryInstance = new Cesium.GeometryInstance({
-        geometry: new Cesium.RectangleGeometry({
-            rectangle: rect,
-            vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT
-        })
-    });
+    const instances = [];
+
+    if (east <= Math.PI) {
+        instances.push(new Cesium.GeometryInstance({
+            geometry: new Cesium.RectangleGeometry({
+                rectangle: new Cesium.Rectangle(west, south, east, north),
+                vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT
+            })
+        }));
+    } else {
+        instances.push(new Cesium.GeometryInstance({
+            geometry: new Cesium.RectangleGeometry({
+                rectangle: new Cesium.Rectangle(west, south, Math.PI, north),
+                vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT
+            })
+        }));
+
+        instances.push(new Cesium.GeometryInstance({
+            geometry: new Cesium.RectangleGeometry({
+                rectangle: new Cesium.Rectangle(-Math.PI, south, east - 2 * Math.PI, north),
+                vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT
+            })
+        }));
+    }
 
     const primitive = new Cesium.Primitive({
-        geometryInstances: geometryInstance,
+        geometryInstances: instances,
         appearance: new Cesium.PerInstanceColorAppearance({
             translucent: true,
             closed: true
