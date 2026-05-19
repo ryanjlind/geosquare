@@ -114,66 +114,78 @@ export function drawSquare(data, options = {}) {
 
     const entities = [];
 
-    const minLon = b.min_lon;
-    const maxLon = b.max_lon;
-    const minLat = b.min_lat;
-    const maxLat = b.max_lat;
+    const minLatRaw = b.min_lat;
+    const maxLatRaw = b.max_lat;
+    const minLonRaw = b.min_lon;
+    const maxLonRaw = b.max_lon;
 
-    const lonOverflowPos = maxLon > 180;
-    const lonOverflowNeg = minLon < -180;
-    const latOverflowPos = maxLat > 90;
-    const latOverflowNeg = minLat < -90;
+    const clampLat = (v) => Math.max(-90, Math.min(90, v));
 
-    console.log("[OVERFLOW]", {
-        lonOverflowPos,
-        lonOverflowNeg,
-        latOverflowPos,
-        latOverflowNeg
-    });
+    const minLat = clampLat(minLatRaw);
+    const maxLat = clampLat(maxLatRaw);
+
+    const latSplit = minLatRaw < -90 || maxLatRaw > 90;
 
     const addRect = (w, e, s, n, label) => {
         entities.push(add(w, e, s, n, label));
     };
 
-    const clampLatInsideCesium = (lat) => {
-        if (lat > 90) return 90;
-        if (lat < -90) return -90;
-        return lat;
+    const normalizeOverflow = (min, max) => {
+        if (max <= 180 && min >= -180) return { type: "normal", min, max };
+
+        const segments = [];
+
+        let start = min;
+
+        while (start < max) {
+            const end = Math.min(start, 180);
+            if (start <= 180) {
+                segments.push([start, Math.min(max, 180)]);
+            }
+            if (max > 180) {
+                const extraStart = -180;
+                const extraEnd = -180 + (max - 180);
+                segments.push([extraStart, extraEnd]);
+            }
+            break;
+        }
+
+        return { type: "split", segments };
     };
 
-    const safeMinLat = clampLatInsideCesium(minLat);
-    const safeMaxLat = clampLatInsideCesium(maxLat);
+    const lon = normalizeOverflow(minLonRaw, maxLonRaw);
 
-    if (!lonOverflowPos && !lonOverflowNeg && !latOverflowPos && !latOverflowNeg) {
+    console.log("[SPLIT RESULT]", lon, { latSplit });
+
+    if (lon.type === "normal" && !latSplit) {
         console.log("[PATH] single");
-        addRect(minLon, maxLon, safeMinLat, safeMaxLat, "single");
+        addRect(minLonRaw, maxLonRaw, minLat, maxLat, "single");
     }
 
-    if (lonOverflowPos && !latOverflowPos && !latOverflowNeg) {
-        console.log("[PATH] lon + overflow positive");
+    if (lon.type === "split" && !latSplit) {
+        console.log("[PATH] lon split");
 
-        const extra = maxLon - 180;
+        const [a, b2] = lon.segments[0];
+        const [c, d] = lon.segments[1];
 
-        addRect(minLon, 180, safeMinLat, safeMaxLat, "left");
-        addRect(180, 180 + extra, safeMinLat, safeMaxLat, "right");
+        addRect(a, b2, minLat, maxLat, "left");
+        addRect(c, d, minLat, maxLat, "right");
     }
 
-    if (lonOverflowNeg && !latOverflowPos && !latOverflowNeg) {
-        console.log("[PATH] lon + overflow negative");
+    if (latSplit && lon.type === "normal") {
+        console.log("[PATH] lat split");
 
-        const extra = -180 - minLon;
-
-        addRect(minLon, -180, safeMinLat, safeMaxLat, "left");
-        addRect(-180 - extra, maxLon, safeMinLat, safeMaxLat, "right");
+        addRect(minLonRaw, maxLonRaw, -90, 90, "lat");
     }
 
-    if (latOverflowPos || latOverflowNeg) {
-        console.log("[PATH] latitude overflow");
+    if (latSplit && lon.type === "split") {
+        console.log("[PATH] lat + lon split");
 
-        const s = Math.max(-90, minLat);
-        const n = Math.min(90, maxLat);
+        const [a, b2] = lon.segments[0];
+        const [c, d] = lon.segments[1];
 
-        addRect(minLon, maxLon, s, n, "lat-clipped");
+        addRect(a, b2, -90, 90, "lat-left");
+        addRect(c, d, -90, 90, "lat-right");
     }
 
     const result = entities.length === 1 ? entities[0] : { parts: entities };
