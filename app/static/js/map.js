@@ -88,56 +88,10 @@ export function drawSquare(data, options = {}) {
         window.geoViewer.entities.remove(baseSquareEntity);
     }
 
-    const clampLat = (lat) => {
-        const out = Math.max(-90, Math.min(90, lat));
-        if (out !== lat) {
-            console.log("[LAT CLAMP]", { input: lat, output: out });
-        }
-        return out;
-    };
+    const add = (west, east, south, north, label) => {
+        console.log("[RECT INPUT]", { label, west, east, south, north });
 
-    const normLon = (lon) => {
-        const out = ((lon + 180) % 360 + 360) % 360 - 180;
-        if (out !== lon) {
-            console.log("[LON NORMALIZE]", { input: lon, output: out });
-        }
-        return out;
-    };
-
-    const minLat = clampLat(b.min_lat);
-    const maxLat = clampLat(b.max_lat);
-
-    const westRaw = b.min_lon;
-    const eastRaw = b.max_lon;
-
-    console.log("[PRECHECK]", {
-        westRaw,
-        eastRaw,
-        minLat,
-        maxLat
-    });
-
-    const spansDateline = (eastRaw - westRaw) > 180 || westRaw > eastRaw;
-
-    console.log("[SPANS DATELINE]", spansDateline);
-
-    const add = (west, east, label) => {
-        console.log("[RECT INPUT]", {
-            label,
-            west,
-            east,
-            minLat,
-            maxLat,
-            westType: typeof west,
-            eastType: typeof east
-        });
-
-        const rect = Cesium.Rectangle.fromDegrees(
-            west,
-            minLat,
-            east,
-            maxLat
-        );
+        const rect = Cesium.Rectangle.fromDegrees(west, south, east, north);
 
         console.log("[RECT CREATED]", {
             label,
@@ -163,29 +117,61 @@ export function drawSquare(data, options = {}) {
         return entity;
     };
 
-    let entity;
+    const minLatRaw = b.min_lat;
+    const maxLatRaw = b.max_lat;
+    const minLonRaw = b.min_lon;
+    const maxLonRaw = b.max_lon;
 
-    if (!spansDateline) {
+    const minLat = Math.max(-90, Math.min(90, minLatRaw));
+    const maxLat = Math.max(-90, Math.min(90, maxLatRaw));
+
+    const latSplit = minLatRaw < -90 || maxLatRaw > 90;
+    const lonSplit =
+        minLonRaw < -180 || minLonRaw > 180 ||
+        maxLonRaw < -180 || maxLonRaw > 180;
+
+    console.log("[SPLIT FLAGS]", { latSplit, lonSplit });
+
+    const entities = [];
+
+    const push = (e) => entities.push(e);
+
+    if (!latSplit && !lonSplit) {
         console.log("[PATH] single rectangle");
-        entity = add(westRaw, eastRaw, "single");
-    } else {
-        console.log("[PATH] dateline split");
+        push(add(minLonRaw, maxLonRaw, minLat, maxLat, "single"));
+    } else if (!latSplit && lonSplit) {
+        console.log("[PATH] lon split");
 
-        entity = {
-            a: add(normLon(westRaw), 180, "left"),
-            b: add(-180, normLon(eastRaw), "right")
-        };
+        const left = Math.max(-180, minLonRaw);
+        const right = Math.min(180, maxLonRaw);
+
+        push(add(-180, right, minLat, maxLat, "left"));
+        push(add(left, 180, minLat, maxLat, "right"));
+    } else if (latSplit && !lonSplit) {
+        console.log("[PATH] lat split");
+
+        push(add(minLonRaw, maxLonRaw, -90, 90, "lat-only"));
+    } else {
+        console.log("[PATH] lat + lon split");
+
+        const left = Math.max(-180, minLonRaw);
+        const right = Math.min(180, maxLonRaw);
+
+        push(add(-180, right, -90, 90, "bottom-left"));
+        push(add(left, 180, -90, 90, "bottom-right"));
     }
 
+    const result = entities.length === 1 ? entities[0] : { parts: entities };
+
     if (replaceExisting) {
-        baseSquareEntity = entity;
+        baseSquareEntity = result;
         setCurrentBounds(b);
         console.log("[STATE UPDATED]", baseSquareEntity);
     }
 
     console.log("[drawSquare] EXIT");
 
-    return entity;
+    return result;
 }
 
 export function drawCities(cities) {
