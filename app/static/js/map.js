@@ -116,21 +116,36 @@ export function drawSquare(data, options = {}) {
             geometry: new Cesium.RectangleGeometry({
                 rectangle: new Cesium.Rectangle(west, south, east, north),
                 vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT
-            })
+            }),
+            attributes: {
+                color: Cesium.ColorGeometryInstanceAttribute.fromColor(
+                    Cesium.Color.GREEN.withAlpha(0.4)
+                )
+            }
         }));
     } else {
         instances.push(new Cesium.GeometryInstance({
             geometry: new Cesium.RectangleGeometry({
                 rectangle: new Cesium.Rectangle(west, south, Math.PI, north),
                 vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT
-            })
+            }),
+            attributes: {
+                color: Cesium.ColorGeometryInstanceAttribute.fromColor(
+                    Cesium.Color.GREEN.withAlpha(0.4)
+                )
+            }
         }));
 
         instances.push(new Cesium.GeometryInstance({
             geometry: new Cesium.RectangleGeometry({
                 rectangle: new Cesium.Rectangle(-Math.PI, south, east, north),
                 vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT
-            })
+            }),
+            attributes: {
+                color: Cesium.ColorGeometryInstanceAttribute.fromColor(
+                    Cesium.Color.GREEN.withAlpha(0.4)
+                )
+            }
         }));
     }
 
