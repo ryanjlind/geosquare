@@ -85,18 +85,27 @@ export function drawSquare(data, options = {}) {
 
     const toRad = Cesium.Math.toRadians;
 
+    const normalizeLat = (latRad) => {
+        if (latRad > Math.PI / 2) latRad = Math.PI - latRad;
+        if (latRad < -Math.PI / 2) latRad = -Math.PI - latRad;
+        return latRad;
+    };
+
     const wrapLon = (lonRad) => {
         const twoPi = 2 * Math.PI;
         return ((lonRad + Math.PI) % twoPi + twoPi) % twoPi - Math.PI;
     };
 
-    const westRaw = toRad(b.min_lon);
-    const eastRaw = toRad(b.max_lon);
-    const south = toRad(b.min_lat);
-    const north = toRad(b.max_lat);
+    let west = toRad(b.min_lon);
+    let east = toRad(b.max_lon);
+    let south = toRad(b.min_lat);
+    let north = toRad(b.max_lat);
 
-    const west = wrapLon(westRaw);
-    const east = wrapLon(eastRaw);
+    south = normalizeLat(south);
+    north = normalizeLat(north);
+
+    west = wrapLon(west);
+    east = wrapLon(east);
 
     const instances = [];
 
