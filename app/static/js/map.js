@@ -78,13 +78,9 @@ export function drawSquare(data, options = {}) {
     const { replaceExisting = true } = options;
     const b = data.bounds;
 
-    console.log("[drawSquare] ENTER", {
-        rawBounds: b,
-        round: data.round_number
-    });
+    console.log("[drawSquare] ENTER", { rawBounds: b, round: data.round_number });
 
     if (replaceExisting && baseSquareEntity) {
-        console.log("[drawSquare] removing baseSquareEntity");
         window.geoViewer.entities.remove(baseSquareEntity);
     }
 
@@ -113,52 +109,71 @@ export function drawSquare(data, options = {}) {
         });
 
         console.log("[ENTITY CREATED]", label);
-
         return entity;
     };
 
-    const minLatRaw = b.min_lat;
-    const maxLatRaw = b.max_lat;
-    const minLonRaw = b.min_lon;
-    const maxLonRaw = b.max_lon;
-
-    const minLat = Math.max(-90, Math.min(90, minLatRaw));
-    const maxLat = Math.max(-90, Math.min(90, maxLatRaw));
-
-    const latSplit = minLatRaw < -90 || maxLatRaw > 90;
-    const lonSplit =
-        minLonRaw < -180 || minLonRaw > 180 ||
-        maxLonRaw < -180 || maxLonRaw > 180;
-
-    console.log("[SPLIT FLAGS]", { latSplit, lonSplit });
-
     const entities = [];
 
-    const push = (e) => entities.push(e);
+    const minLon = b.min_lon;
+    const maxLon = b.max_lon;
+    const minLat = b.min_lat;
+    const maxLat = b.max_lat;
 
-    if (!latSplit && !lonSplit) {
-        console.log("[PATH] single rectangle");
-        push(add(minLonRaw, maxLonRaw, minLat, maxLat, "single"));
-    } else if (!latSplit && lonSplit) {
-        console.log("[PATH] lon split");
+    const lonOverflowPos = maxLon > 180;
+    const lonOverflowNeg = minLon < -180;
+    const latOverflowPos = maxLat > 90;
+    const latOverflowNeg = minLat < -90;
 
-        const left = Math.max(-180, minLonRaw);
-        const right = Math.min(180, maxLonRaw);
+    console.log("[OVERFLOW]", {
+        lonOverflowPos,
+        lonOverflowNeg,
+        latOverflowPos,
+        latOverflowNeg
+    });
 
-        push(add(-180, right, minLat, maxLat, "left"));
-        push(add(left, 180, minLat, maxLat, "right"));
-    } else if (latSplit && !lonSplit) {
-        console.log("[PATH] lat split");
+    const addRect = (w, e, s, n, label) => {
+        entities.push(add(w, e, s, n, label));
+    };
 
-        push(add(minLonRaw, maxLonRaw, -90, 90, "lat-only"));
-    } else {
-        console.log("[PATH] lat + lon split");
+    const clampLatInsideCesium = (lat) => {
+        if (lat > 90) return 90;
+        if (lat < -90) return -90;
+        return lat;
+    };
 
-        const left = Math.max(-180, minLonRaw);
-        const right = Math.min(180, maxLonRaw);
+    const safeMinLat = clampLatInsideCesium(minLat);
+    const safeMaxLat = clampLatInsideCesium(maxLat);
 
-        push(add(-180, right, -90, 90, "bottom-left"));
-        push(add(left, 180, -90, 90, "bottom-right"));
+    if (!lonOverflowPos && !lonOverflowNeg && !latOverflowPos && !latOverflowNeg) {
+        console.log("[PATH] single");
+        addRect(minLon, maxLon, safeMinLat, safeMaxLat, "single");
+    }
+
+    if (lonOverflowPos && !latOverflowPos && !latOverflowNeg) {
+        console.log("[PATH] lon + overflow positive");
+
+        const extra = maxLon - 180;
+
+        addRect(minLon, 180, safeMinLat, safeMaxLat, "left");
+        addRect(180, 180 + extra, safeMinLat, safeMaxLat, "right");
+    }
+
+    if (lonOverflowNeg && !latOverflowPos && !latOverflowNeg) {
+        console.log("[PATH] lon + overflow negative");
+
+        const extra = -180 - minLon;
+
+        addRect(minLon, -180, safeMinLat, safeMaxLat, "left");
+        addRect(-180 - extra, maxLon, safeMinLat, safeMaxLat, "right");
+    }
+
+    if (latOverflowPos || latOverflowNeg) {
+        console.log("[PATH] latitude overflow");
+
+        const s = Math.max(-90, minLat);
+        const n = Math.min(90, maxLat);
+
+        addRect(minLon, maxLon, s, n, "lat-clipped");
     }
 
     const result = entities.length === 1 ? entities[0] : { parts: entities };
