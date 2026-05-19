@@ -83,14 +83,26 @@ export function drawSquare(data, options = {}) {
         baseSquareEntity = null;
     }
 
-    const west = Cesium.Math.toRadians(b.min_lon);
-    const east = Cesium.Math.toRadians(b.max_lon);
-    const south = Cesium.Math.toRadians(b.min_lat);
-    const north = Cesium.Math.toRadians(b.max_lat);
+    const toRad = Cesium.Math.toRadians;
+
+    const wrapLon = (lonRad) => {
+        const twoPi = 2 * Math.PI;
+        return ((lonRad + Math.PI) % twoPi + twoPi) % twoPi - Math.PI;
+    };
+
+    const westRaw = toRad(b.min_lon);
+    const eastRaw = toRad(b.max_lon);
+    const south = toRad(b.min_lat);
+    const north = toRad(b.max_lat);
+
+    const west = wrapLon(westRaw);
+    const east = wrapLon(eastRaw);
 
     const instances = [];
 
-    if (east <= Math.PI) {
+    const spansDateline = east < west;
+
+    if (!spansDateline) {
         instances.push(new Cesium.GeometryInstance({
             geometry: new Cesium.RectangleGeometry({
                 rectangle: new Cesium.Rectangle(west, south, east, north),
@@ -107,7 +119,7 @@ export function drawSquare(data, options = {}) {
 
         instances.push(new Cesium.GeometryInstance({
             geometry: new Cesium.RectangleGeometry({
-                rectangle: new Cesium.Rectangle(-Math.PI, south, east - 2 * Math.PI, north),
+                rectangle: new Cesium.Rectangle(-Math.PI, south, east, north),
                 vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT
             })
         }));
