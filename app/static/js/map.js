@@ -80,70 +80,58 @@ export function drawSquare(data, options = {}) {
 
     if (replaceExisting && baseSquareEntity) {
         window.geoViewer.entities.remove(baseSquareEntity);
-        baseSquareEntity = null;
     }
 
-    const normalizeLon = (lon) => {
-        if (typeof lon !== "number") return 0;
-        while (lon > 180) lon -= 360;
-        while (lon < -180) lon += 360;
-        return lon;
-    };
+    const entities = [];
 
-    const normalizeLat = (lat) => {
-        if (typeof lat !== "number") return 0;
-        if (lat > 90) return 90;
-        if (lat < -90) return -90;
-        return lat;
-    };
-
-    const makeEntity = (west, east, south, north) => {
+    const addRect = (minLon, minLat, maxLon, maxLat) => {
         return window.geoViewer.entities.add({
             name: `Round ${data.round_number || ''}`.trim(),
             rectangle: {
                 coordinates: Cesium.Rectangle.fromDegrees(
-                    west,
-                    south,
-                    east,
-                    north
+                    minLon,
+                    minLat,
+                    maxLon,
+                    maxLat
                 ),
                 material: Cesium.Color.YELLOW.withAlpha(0.2),
                 outline: true,
                 outlineColor: Cesium.Color.YELLOW,
-                outlineWidth: 2
+                outlineWidth: 2,
             }
         });
     };
 
-    let minLon = normalizeLon(b.min_lon);
-    let maxLon = normalizeLon(b.max_lon);
-    let minLat = normalizeLat(b.min_lat);
-    let maxLat = normalizeLat(b.max_lat);
+    const minLat = Math.max(-90, b.min_lat);
+    const maxLat = Math.min(90, b.max_lat);
 
-    if (minLat > maxLat) [minLat, maxLat] = [maxLat, minLat];
+    const spansLat = b.min_lat < -90 || b.max_lat > 90;
+    const spansLon = b.min_lon < -180 || b.max_lon > 180;
 
-    const entities = [];
+    const minLon = b.min_lon;
+    const maxLon = b.max_lon;
 
-    const crossesDateline = b.min_lon > b.max_lon;
-
-    if (!crossesDateline) {
-        if (minLon > maxLon) [minLon, maxLon] = [maxLon, minLon];
-        entities.push(makeEntity(minLon, maxLon, minLat, maxLat));
-    } else {
-        entities.push(makeEntity(minLon, 180, minLat, maxLat));
-        entities.push(makeEntity(-180, maxLon, minLat, maxLat));
-    }
-
-    const result = entities.length === 1 ? entities[0] : { parts: entities };
-
-    if (replaceExisting) {
-        baseSquareEntity = result;
+    if (!spansLat && !spansLon) {
+        const entity = addRect(minLon, minLat, maxLon, maxLat);
+        baseSquareEntity = entity;
         setCurrentBounds(b);
+        return entity;
     }
 
-    return result;
-}
+    if (spansLon) {
+        const left = addRect(minLon, minLat, 180, maxLat);
+        const right = addRect(-180, minLat, maxLon, maxLat);
 
+        baseSquareEntity = { left, right };
+        setCurrentBounds(b);
+        return baseSquareEntity;
+    }
+
+    const entity = addRect(minLon, minLat, maxLon, maxLat);
+    baseSquareEntity = entity;
+    setCurrentBounds(b);
+    return entity;
+}
 export function drawCities(cities) {
     for (const city of cities) {
         window.geoViewer.entities.add({
