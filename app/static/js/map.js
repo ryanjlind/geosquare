@@ -82,16 +82,26 @@ export function drawSquare(data, options = {}) {
         window.geoViewer.entities.remove(baseSquareEntity);
     }
 
-    const entities = [];
+    const clampLat = (lat) => Math.max(-90, Math.min(90, lat));
 
-    const addRect = (minLon, minLat, maxLon, maxLat) => {
-        return window.geoViewer.entities.add({
+    const normLon = (lon) => ((lon + 180) % 360 + 360) % 360 - 180;
+
+    const minLat = clampLat(b.min_lat);
+    const maxLat = clampLat(b.max_lat);
+
+    const westRaw = b.min_lon;
+    const eastRaw = b.max_lon;
+
+    const spansDateline = (eastRaw - westRaw) > 180 || westRaw > eastRaw;
+
+    const add = (west, east) =>
+        window.geoViewer.entities.add({
             name: `Round ${data.round_number || ''}`.trim(),
             rectangle: {
                 coordinates: Cesium.Rectangle.fromDegrees(
-                    minLon,
+                    west,
                     minLat,
-                    maxLon,
+                    east,
                     maxLat
                 ),
                 material: Cesium.Color.YELLOW.withAlpha(0.2),
@@ -100,38 +110,26 @@ export function drawSquare(data, options = {}) {
                 outlineWidth: 2,
             }
         });
-    };
 
-    const minLat = Math.max(-90, b.min_lat);
-    const maxLat = Math.min(90, b.max_lat);
+    let entity;
 
-    const spansLat = b.min_lat < -90 || b.max_lat > 90;
-    const spansLon = b.min_lon < -180 || b.max_lon > 180;
+    if (!spansDateline) {
+        entity = add(westRaw, eastRaw);
+    } else {
+        entity = {
+            a: add(normLon(westRaw), 180),
+            b: add(-180, normLon(eastRaw))
+        };
+    }
 
-    const minLon = b.min_lon;
-    const maxLon = b.max_lon;
-
-    if (!spansLat && !spansLon) {
-        const entity = addRect(minLon, minLat, maxLon, maxLat);
+    if (replaceExisting) {
         baseSquareEntity = entity;
         setCurrentBounds(b);
-        return entity;
     }
 
-    if (spansLon) {
-        const left = addRect(minLon, minLat, 180, maxLat);
-        const right = addRect(-180, minLat, maxLon, maxLat);
-
-        baseSquareEntity = { left, right };
-        setCurrentBounds(b);
-        return baseSquareEntity;
-    }
-
-    const entity = addRect(minLon, minLat, maxLon, maxLat);
-    baseSquareEntity = entity;
-    setCurrentBounds(b);
     return entity;
 }
+
 export function drawCities(cities) {
     for (const city of cities) {
         window.geoViewer.entities.add({
