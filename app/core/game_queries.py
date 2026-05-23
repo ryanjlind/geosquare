@@ -216,6 +216,7 @@ def find_city_anywhere(cur, guess_text: str):
         FROM dbo.GeoCities
         WHERE IsActive = 1
           AND CityNameLower = LOWER(?)
+          AND FeatureCode <> 'PPLX'
         ORDER BY Population DESC, CityId ASC
     """, guess_text.encode("utf-8"))
     return cur.fetchone()
