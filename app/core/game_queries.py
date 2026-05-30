@@ -1,4 +1,5 @@
 from app.helpers.date import get_effective_game_date
+from app.helpers.text import strip_accents
 
 def get_today_game(cur):
     game_date = get_effective_game_date()    
@@ -11,30 +12,8 @@ def get_today_game(cur):
     return cur.fetchone()
 
 def get_square_for_round(cur, game_id: int, round_number: int):
-    cur.execute("""
-        SELECT TOP 1
-            g.GameId,
-            gr.RoundNumber,
-            gr.ExpansionLevel,
-            gs.SquareId,
-            gs.SeedLat,
-            gs.SeedLon,
-            gs.MinLat,
-            gs.MinLon,
-            gs.MaxLat,
-            gs.MaxLon,
-            gs.TotalPopulation,
-            gs.QualifyingCityCount,
-            gs.WidthDegrees,
-            gs.HeightDegrees,
-            gs.GeneratedAt,
-            c.ConfigKey,
-            c.MinTotalPopulation,
-            c.MinCityCount,
-            c.MinCityPopulation,
-            c.MaxSquareWidthDegrees,
-            c.MaxSquareHeightDegrees,
-            c.StepDegrees
+    cur.execute(f"""
+        SELECT TOP 1 {_SQUARE_SELECT_COLUMNS}
         FROM dbo.Games g
         INNER JOIN dbo.GameRounds gr ON g.GameId = gr.GameId
         INNER JOIN dbo.GameSquares gs ON gr.SquareId = gs.SquareId
@@ -205,6 +184,8 @@ def complete_session(cur, session_id: int):
     """, session_id)
 
 def find_city_anywhere(cur, guess_text: str):
+    normalized_guess = strip_accents(guess_text).lower().strip()
+
     cur.execute("""
         SELECT TOP 1
             CityId,
@@ -215,10 +196,10 @@ def find_city_anywhere(cur, guess_text: str):
             Population
         FROM dbo.GeoCities
         WHERE IsActive = 1
-          AND CityNameLower = LOWER(?)
+          AND CityNameLower = ?
           AND FeatureCode <> 'PPLX'
         ORDER BY Population DESC, CityId ASC
-    """, guess_text.encode("utf-8"))
+    """, normalized_guess)
     return cur.fetchone()
 
 def get_completed_round_rows(cur, session_id: int):
@@ -430,34 +411,35 @@ def get_next_expansion_square(cur, game_id: int, round_number: int, current_squa
 
     return cur.fetchone()
 
+# Shared square column selection for get_square_for_round and get_square_by_id
+_SQUARE_SELECT_COLUMNS = """
+    gr.GameId,
+    gr.RoundNumber,
+    gr.ExpansionLevel,
+    gs.SquareId,
+    gs.SeedLat,
+    gs.SeedLon,
+    gs.MinLat,
+    gs.MinLon,
+    gs.MaxLat,
+    gs.MaxLon,
+    gs.TotalPopulation,
+    gs.QualifyingCityCount,
+    gs.WidthDegrees,
+    gs.HeightDegrees,
+    gs.GeneratedAt,
+    c.ConfigKey,
+    c.MinTotalPopulation,
+    c.MinCityCount,
+    c.MinCityPopulation,
+    c.MaxSquareWidthDegrees,
+    c.MaxSquareHeightDegrees,
+    c.StepDegrees
+"""
+
 def get_square_by_id(cur, square_id: int):
-    cur.execute("""
-        SELECT TOP 1
-            gr.GameId,
-            gr.RoundNumber,
-            gr.ExpansionLevel,
-
-            gs.SquareId,
-            gs.SeedLat,
-            gs.SeedLon,
-            gs.MinLat,
-            gs.MinLon,
-            gs.MaxLat,
-            gs.MaxLon,
-            gs.TotalPopulation,
-            gs.QualifyingCityCount,
-            gs.WidthDegrees,
-            gs.HeightDegrees,
-            gs.GeneratedAt,
-
-            c.ConfigKey,
-            c.MinTotalPopulation,
-            c.MinCityCount,
-            c.MinCityPopulation,
-            c.MaxSquareWidthDegrees,
-            c.MaxSquareHeightDegrees,
-            c.StepDegrees
-
+    cur.execute(f"""
+        SELECT TOP 1 {_SQUARE_SELECT_COLUMNS}
         FROM dbo.GameRounds gr
         INNER JOIN dbo.GameSquares gs
             ON gs.SquareId = gr.SquareId
@@ -469,41 +451,24 @@ def get_square_by_id(cur, square_id: int):
 
     return cur.fetchone()
 
-def upsert_session_round_expand(cur, session_id: int, round_number: int, square_id: int):
+def _upsert_session_round(cur, session_id: int, round_number: int, square_id: int, round_status: str, score: int = 0):
+    """Helper to upsert session rounds with MERGE pattern."""
     cur.execute("""
         MERGE dbo.GameSessionRounds AS target
         USING (SELECT ? AS SessionId, ? AS RoundNumber) AS src
         ON target.SessionId = src.SessionId AND target.RoundNumber = src.RoundNumber
         WHEN MATCHED THEN
-            UPDATE SET SquareId = ?, RoundStatus = 'Expanded'
+            UPDATE SET SquareId = ?, RoundStatus = ?, Score = ?
         WHEN NOT MATCHED THEN
             INSERT (SessionId, RoundNumber, SquareId, RoundStatus, Score)
-            VALUES (?, ?, ?, 'Expanded', 0);
-    """, session_id, round_number, square_id, session_id, round_number, square_id)
+            VALUES (?, ?, ?, ?, ?);
+    """, session_id, round_number, square_id, round_status, score, session_id, round_number, square_id, round_status, score)
+
+def upsert_session_round_expand(cur, session_id: int, round_number: int, square_id: int):
+    _upsert_session_round(cur, session_id, round_number, square_id, 'Expanded', 0)
 
 def set_round_completed(cur, session_id: int, round_number: int, square_id: int, score: int):
-    cur.execute("""
-        MERGE dbo.GameSessionRounds AS target
-        USING (SELECT ? AS SessionId, ? AS RoundNumber) AS src
-        ON target.SessionId = src.SessionId AND target.RoundNumber = src.RoundNumber
-        WHEN MATCHED THEN
-            UPDATE SET
-                SquareId = ?,
-                RoundStatus = 'Completed',
-                Score = ?
-        WHEN NOT MATCHED THEN
-            INSERT (SessionId, RoundNumber, SquareId, RoundStatus, Score)
-            VALUES (?, ?, ?, 'Completed', ?);
-    """, session_id, round_number, square_id, score, session_id, round_number, square_id, score)
+    _upsert_session_round(cur, session_id, round_number, square_id, 'Completed', score)
 
 def set_round_passed(cur, session_id: int, round_number: int, square_id: int):
-    cur.execute("""
-        MERGE dbo.GameSessionRounds AS target
-        USING (SELECT ? AS SessionId, ? AS RoundNumber) AS src
-        ON target.SessionId = src.SessionId AND target.RoundNumber = src.RoundNumber
-        WHEN MATCHED THEN
-            UPDATE SET SquareId = ?, RoundStatus = 'Passed'
-        WHEN NOT MATCHED THEN
-            INSERT (SessionId, RoundNumber, SquareId, RoundStatus, Score)
-            VALUES (?, ?, ?, 'Passed', 0);
-    """, session_id, round_number, square_id, session_id, round_number, square_id)
+    _upsert_session_round(cur, session_id, round_number, square_id, 'Passed', 0)

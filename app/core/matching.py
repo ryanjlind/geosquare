@@ -1,4 +1,5 @@
 from app.helpers.text import build_match_keys, normalize_place_name
+from app.helpers.logging import debug as log_debug
 
 
 def phonetic_key(text: str) -> str:
@@ -87,15 +88,15 @@ def find_matching_city(rows, guess_text: str):
         if len(key.replace(' ', '')) >= 3
     }
 
-    print(f'\n=== GUESS: {guess_text}')
-    print(f'Precision filter: {precision_filter}')
-    print(f'Normalized: {normalized_guess}')
-    print(f'Keys: {guess_keys}')
-    print(f'Phonetic Keys: {guess_phonetic_keys}')
+    log_debug(f'\n=== GUESS: {guess_text}')
+    log_debug(f'Precision filter: {precision_filter}')
+    log_debug(f'Normalized: {normalized_guess}')
+    log_debug(f'Keys: {guess_keys}')
+    log_debug(f'Phonetic Keys: {guess_phonetic_keys}')
 
     candidate_rows = rows
     if precision_filter:
-        print(f'Trying "{guess_text}, {precision_filter}" with province code filter...')
+        log_debug(f'Trying "{guess_text}, {precision_filter}" with province code filter...')
         province_filtered_rows = []
 
         for r in rows:
@@ -109,30 +110,30 @@ def find_matching_city(rows, guess_text: str):
             if precision_filter in province_codes:
                 province_filtered_rows.append(r)
 
-        print(f'Province code matches: {len(province_filtered_rows)}')
+        log_debug(f'Province code matches: {len(province_filtered_rows)}')
 
         if province_filtered_rows:
             candidate_rows = province_filtered_rows
         else:
-            print(f'Trying "{guess_text}, {precision_filter}" with country code filter...')
+            log_debug(f'Trying "{guess_text}, {precision_filter}" with country code filter...')
             country_filtered_rows = [
                 r for r in rows
                 if (r.CountryCode or '').upper() == precision_filter
             ]
-            print(f'Country code matches: {len(country_filtered_rows)}')
+            log_debug(f'Country code matches: {len(country_filtered_rows)}')
             candidate_rows = country_filtered_rows
 
     for row in candidate_rows:
         city_keys = build_match_keys(row.CityName)
 
         if guess_keys & city_keys:
-            print(f'MATCH (direct): {row.CityName}')
+            log_debug(f'MATCH (direct): {row.CityName}')
             return {
                 "type": "match",
                 "row": row,
             }
 
-    print('No direct match. Trying exact phonetic...')
+    log_debug('No direct match. Trying exact phonetic...')
 
     confirmation_candidates = []
 

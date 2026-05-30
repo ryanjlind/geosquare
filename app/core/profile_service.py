@@ -2,6 +2,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 
 from app.core.db import get_conn
+from app.helpers.logging import debug as log_debug
 
 REGION_ORDER = [
     'Nordic Europe',
@@ -25,7 +26,7 @@ REGION_ORDER = [
 ]
 
 def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
-    print(f"fetching profile for user_id={user_id}")
+    log_debug(f"fetching profile for user_id={user_id}")
     if user_id is None:
         return {
             'profile_found': False,
@@ -35,19 +36,18 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
     with get_conn() as conn:
         cur = conn.cursor()
 
-        print(f'[profile] user_id={user_id}', flush=True)
+        log_debug(f'[profile] user_id={user_id}')
 
         user_row = _get_user_row(cur, user_id)
-        print(
+        log_debug(
             f'[profile] user_row_exists={user_row is not None} '
-            f'username={user_row.Username if user_row else None}',
-            flush=True,
+            f'username={user_row.Username if user_row else None}'
         )
 
         sessions = _get_completed_sessions(cur, user_id)
-        print(f'[profile] completed_session_count={len(sessions)}', flush=True)
+        log_debug(f'[profile] completed_session_count={len(sessions)}')
         if sessions:
-            print(f'[profile] first_session={sessions[0]}', flush=True)
+            log_debug(f'[profile] first_session={sessions[0]}')
         if not sessions:
             return {
                 'profile_found': False,

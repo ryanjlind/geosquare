@@ -3,6 +3,7 @@
 from time import perf_counter
 
 from app.core.db import get_conn
+from app.helpers.logging import debug as log_debug
 from app.core.game_queries import (
     complete_session,
     get_completed_round_rows,
@@ -285,12 +286,12 @@ def submit_pass(payload: dict, user_id: int, session_id: int | None):
 
 def get_game_state_payload(user_id: int, session_id: int | None):
     import time
-    print(f"{time.perf_counter():.9f} get_game_state_payload: ENTER", flush=True)
+    log_debug(f"{time.perf_counter():.9f} get_game_state_payload: ENTER")
 
     with get_conn() as conn:
-        print(f"{time.perf_counter():.9f} get_game_state_payload: got connection", flush=True)
+        log_debug(f"{time.perf_counter():.9f} get_game_state_payload: got connection")
         cur = conn.cursor()
-        print(f"{time.perf_counter():.9f} get_game_state_payload: got cursor", flush=True)
+        log_debug(f"{time.perf_counter():.9f} get_game_state_payload: got cursor")
 
         cur.execute(
             """
@@ -300,16 +301,16 @@ def get_game_state_payload(user_id: int, session_id: int | None):
             """,
             (user_id,),
         )
-        print(f"{time.perf_counter():.9f} get_game_state_payload: executed user query", flush=True)
+        log_debug(f"{time.perf_counter():.9f} get_game_state_payload: executed user query")
 
         user_row = cur.fetchone()
-        print(f"{time.perf_counter():.9f} get_game_state_payload: fetched user_row", flush=True)
+        log_debug(f"{time.perf_counter():.9f} get_game_state_payload: fetched user_row")
 
         is_authenticated = bool(user_row and user_row.AuthProviderSubject)
         username = user_row.Username if user_row else None
 
         session = get_current_session(cur, user_id, session_id)
-        print(f"{time.perf_counter():.9f} get_game_state_payload: got session", flush=True)
+        log_debug(f"{time.perf_counter():.9f} get_game_state_payload: got session")
 
         if session is None:
             return {"error": "No game found for today."}, 404
@@ -317,13 +318,13 @@ def get_game_state_payload(user_id: int, session_id: int | None):
         completed = map_completed_rounds(
             get_completed_round_rows(cur, int(session.SessionId))
         )
-        print(f"{time.perf_counter():.9f} get_game_state_payload: completed mapped", flush=True)
+        log_debug(f"{time.perf_counter():.9f} get_game_state_payload: completed mapped")
 
         conn.commit()
-        print(f"{time.perf_counter():.9f} get_game_state_payload: commit", flush=True)
+        log_debug(f"{time.perf_counter():.9f} get_game_state_payload: commit")
 
         result = map_game_state(session, completed, is_authenticated, username)
-        print(f"{time.perf_counter():.9f} get_game_state_payload: result built", flush=True)
+        log_debug(f"{time.perf_counter():.9f} get_game_state_payload: result built")
 
         return result, 200
 

@@ -30,6 +30,7 @@ from app.core.session_service import resolve_request_identity
 from app.core.user import is_username_available, set_username
 from app.helpers.session import attach_session_cookie, COOKIE_NAME, get_user_id_from_cookie, get_session_id_from_cookie
 from app.core.db import get_conn
+from app.helpers.logging import debug as log_debug
 
 main_bp = Blueprint("main", __name__)
 
@@ -62,7 +63,7 @@ def client_log():
     }
 
     current_app.logger.error(json.dumps(log_record, ensure_ascii=False))
-    print("CLIENT_LOG_RECEIVED:", json.dumps(log_record, ensure_ascii=False))
+    log_debug(f"CLIENT_LOG_RECEIVED: {json.dumps(log_record, ensure_ascii=False)}")
     return jsonify({"ok": True})
 
 
@@ -97,28 +98,28 @@ def all_daily_squares():
 
 @main_bp.route("/api/game-state")
 def game_state():
-    print(f"{time.perf_counter():.9f} game_state: start", flush=True)
+    log_debug(f"{time.perf_counter():.9f} game_state: start")
 
     identity = _identity()
-    print(f"{time.perf_counter():.9f} game_state: identity={identity}", flush=True)
+    log_debug(f"{time.perf_counter():.9f} game_state: identity={identity}")
 
     try:
-        print(f"{time.perf_counter():.9f} game_state: before get_game_state_payload call", flush=True)
+        log_debug(f"{time.perf_counter():.9f} game_state: before get_game_state_payload call")
 
         body, status = get_game_state_payload(
             identity["user_id"],
             identity["session_id"],
         )
 
-        print(f"{time.perf_counter():.9f} game_state: after get_game_state_payload call", flush=True)
-        print(f"{time.perf_counter():.9f} game_state: payload status={status}", flush=True)
+        log_debug(f"{time.perf_counter():.9f} game_state: after get_game_state_payload call")
+        log_debug(f"{time.perf_counter():.9f} game_state: payload status={status}")
     except Exception as e:
-        print(f"{time.perf_counter():.9f} game_state: exception in get_game_state_payload: {e}", flush=True)
+        log_debug(f"{time.perf_counter():.9f} game_state: exception in get_game_state_payload: {e}")
         raise
 
     resp = jsonify(body)
     resp.status_code = status
-    print(f"{time.perf_counter():.9f} game_state: response built", flush=True)
+    log_debug(f"{time.perf_counter():.9f} game_state: response built")
 
     return attach_session_cookie(resp, identity["user_id"], identity["session_id"])
 
@@ -126,7 +127,7 @@ def game_state():
 def guess():
     identity = _identity()
     payload = request.get_json(silent=True) or {}
-    print(f"guess payload:{payload}",flush=True)
+    log_debug(f"guess payload: {payload}")
 
     body, status = submit_guess(payload, identity["user_id"], identity["session_id"])
 

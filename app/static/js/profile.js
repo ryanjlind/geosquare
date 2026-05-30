@@ -1,25 +1,5 @@
-function numberFmt(value) {
-    if (value == null || value === '') {
-        return '—';
-    }
-
-    return new Intl.NumberFormat('en-US').format(value);
-}
-
-function escapeHtml(value) {
-    return String(value ?? '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
-}
-
-async function fetchJson(url, options = {}) {
-    const response = await fetch(url, options);
-    const data = await response.json().catch(() => ({}));
-    return { response, data };
-}
+import { numberFmt, escapeHtml } from './utils.js';
+import { fetchJson } from './api.js';
 
 function setText(id, value) {
     const el = document.getElementById(id);
