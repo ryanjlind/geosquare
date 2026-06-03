@@ -5,13 +5,16 @@ import { escapeHtml, numberFmt, parseFormattedInt } from './utils.js';
 export function buildRoundsFromState(state) {
     return (state.completed_rounds || []).map((round) => {
         const guess = round.guesses && round.guesses.length ? round.guesses[0] : null;
+        const expansionLevel = round.expansion_level ?? 0;
+        const expansionPenalty = expansionLevel > 0 ? `-${expansionLevel * 20}%` : '';
 
         return {
             round: round.round_number ?? 0,
             city: guess ? guess.city_name : '—',
             population: guess ? (guess.population ?? 0) : 0,
             rank: guess ? (guess.rank ?? '—') : '—',
-            points: round.score ?? 0
+            points: round.score ?? 0,
+            expansionPenalty,
         };
     });
 }
@@ -315,7 +318,7 @@ function renderTodayRoundsTable(rounds, total) {
             <td><span class="round-city">${escapeHtml(round.city)}</span></td>
             <td>${numberFmt(round.population)}</td>
             <td>${round.rank}</td>
-            <td>${numberFmt(round.points)}</td>
+            <td>${numberFmt(round.points)}${round.expansionPenalty ? ` <span class="stats-expansion-penalty">[${escapeHtml(round.expansionPenalty)}]</span>` : ''}</td>
         </tr>
     `).join('');
 
@@ -333,8 +336,8 @@ export function renderStatsOverlay(stats, todaySummary) {
     document.getElementById('statsGameDate').textContent = todaySummary.gameDate || '—';
     document.getElementById('statsTodaySolved').textContent = `${solved} / ${totalRounds}`;
     document.getElementById('statsTodayPoints').textContent = numberFmt(todaySummary.total || 0);
-    document.getElementById('statsTodayBestRound').textContent = todaySummary.bestRound
-        ? `${todaySummary.bestRound.city} · R${todaySummary.bestRound.round} · ${numberFmt(todaySummary.bestRound.points)}`
+    document.getElementById('statsTodayBestRound').innerHTML = todaySummary.bestRound
+        ? `${escapeHtml(todaySummary.bestRound.city)} · R${todaySummary.bestRound.round} · ${numberFmt(todaySummary.bestRound.points)}${todaySummary.bestRound.expansionPenalty ? ` <span class="stats-expansion-penalty">[${escapeHtml(todaySummary.bestRound.expansionPenalty)}]</span>` : ''}`
         : '—';
 
     renderTodayRoundsTable(todaySummary.rounds || [], todaySummary.total || 0);
@@ -372,7 +375,8 @@ export async function showEndGameSummary() {
             bestRound = {
                 round: round.round,
                 city: round.city,
-                points: round.points
+                points: round.points,
+                expansionPenalty: round.expansionPenalty,
             };
         }
     }

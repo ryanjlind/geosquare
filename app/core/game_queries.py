@@ -210,6 +210,7 @@ def get_completed_round_rows(cur, session_id: int):
             gsr.SquareId,
             gsr.RoundStatus,
             gsr.Score,
+            gr.ExpansionLevel,
             gg.CityName,
             gg.Population,
             gg.GuessedAt,
@@ -218,6 +219,11 @@ def get_completed_round_rows(cur, session_id: int):
             ranked.Latitude,
             ranked.Longitude
         FROM dbo.GameSessionRounds gsr
+        INNER JOIN dbo.GameSessions gs
+            ON gs.SessionId = gsr.SessionId
+        INNER JOIN dbo.GameRounds gr
+            ON gr.GameId = gs.GameId
+            AND gr.SquareId = gsr.SquareId
         LEFT JOIN dbo.GameGuesses gg
             ON gg.SessionRoundId = gsr.SessionRoundId
             AND gg.IsCorrect = 1

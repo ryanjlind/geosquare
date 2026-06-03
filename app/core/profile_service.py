@@ -167,6 +167,7 @@ def _get_completed_round_rows_for_sessions(cur, session_ids: list[int]):
             gsr.RoundNumber,
             gsr.SquareId,
             gsr.Score,
+            gr.ExpansionLevel,
             gg.CityName,
             gg.Population,
             gg.Score AS GuessScore,
@@ -176,6 +177,11 @@ def _get_completed_round_rows_for_sessions(cur, session_ids: list[int]):
             ranked.Latitude,
             ranked.Longitude
         FROM dbo.GameSessionRounds gsr
+        INNER JOIN dbo.GameSessions gs
+            ON gs.SessionId = gsr.SessionId
+        INNER JOIN dbo.GameRounds gr
+            ON gr.GameId = gs.GameId
+            AND gr.SquareId = gsr.SquareId
         LEFT JOIN dbo.GameGuesses gg
             ON gg.SessionRoundId = gsr.SessionRoundId
         LEFT JOIN (
@@ -215,6 +221,7 @@ def _build_completed_rounds_by_session(rows) -> dict[int, list[dict]]:
                 'session_round_id': int(row.SessionRoundId),
                 'round_number': round_number,
                 'square_id': int(row.SquareId),
+                'expansion_level': int(getattr(row, 'ExpansionLevel', 0) or 0),
                 'score': int(row.Score),
                 'guesses': [],
             }
@@ -256,6 +263,7 @@ def _get_best_round(completed_rounds: list[dict]) -> dict | None:
     return {
         'round_number': int(best_round['round_number']),
         'score': int(best_round['score']),
+        'expansion_level': int(best_round.get('expansion_level', 0) or 0),
         'city_name': best_guess['city_name'] if best_guess else None,
         'population': int(best_guess['population']) if best_guess and best_guess['population'] is not None else None,
         'rank': int(best_guess['rank']) if best_guess and best_guess['rank'] is not None else None,

@@ -30,7 +30,8 @@ import {
     setSelectedRoundRow,
     showAuthConflictModal,
     hideAuthConflictModal,
-    wireAuthConflictModal    
+    wireAuthConflictModal,
+    adjustPopulationDisplay
 } from './ui.js';
 import { wireStatsOverlay, showEndGameSummary } from './stats.js';
 import { initFeedback } from './feedback.js';
@@ -155,6 +156,7 @@ export async function handlePass() {
         rank: '—',
         score: 0
     }, gameState.currentRound);
+    adjustPopulationDisplay();
 
     drawCities([largestCity]);
     playFail();
@@ -213,6 +215,7 @@ export async function submitGuess() {
 
             showGuessedCity(data);
             addRoundRow(data, gameState.currentRound);
+            adjustPopulationDisplay();
             clearGuessInput();
             setGuessBoxVisible(false);
 
@@ -271,6 +274,7 @@ export async function initGame() {
 
     renderRound(data);
     restoreSavedState(state);
+    adjustPopulationDisplay();
     wireGuessing();
     wireRoundButtons();
     wireExpandButton();

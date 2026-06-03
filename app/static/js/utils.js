@@ -6,6 +6,48 @@ export function numberFmt(v) {
     return new Intl.NumberFormat().format(v);
 }
 
+export function measureTextWidth(text, referenceElement) {
+    const temp = document.createElement('span');
+    const style = window.getComputedStyle(referenceElement);
+    temp.style.font = style.font;
+    temp.style.whiteSpace = 'nowrap';
+    temp.textContent = text;
+    document.body.appendChild(temp);
+    const width = temp.offsetWidth;
+    document.body.removeChild(temp);
+    return width;
+}
+
+export function abbreviateNumber(v) {
+    const num = Number(v);
+    if (num >= 1_000_000) {
+        return (num / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+    }
+    if (num >= 1_000) {
+        return (num / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+    }
+    return num.toString();
+}
+
+export function abbreviatePopulationForDisplay(value, columnSelector) {
+    const formatted = numberFmt(value);
+    
+    const referenceCell = document.querySelector(columnSelector);
+    if (!referenceCell) {
+        return formatted;
+    }
+    
+    const width = measureTextWidth(formatted, referenceCell);
+    const columnWidth = referenceCell.offsetWidth - 16; // Account for padding
+    
+    if (width <= columnWidth) {
+        return formatted;
+    }
+    
+    // Need to abbreviate
+    return abbreviateNumber(value);
+}
+
 export function ordinal(n) {
     const mod100 = n % 100;
 

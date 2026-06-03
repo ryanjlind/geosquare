@@ -1,4 +1,4 @@
-import { numberFmt, escapeHtml, parseFormattedInt } from './utils.js';
+import { numberFmt, abbreviateNumber, abbreviatePopulationForDisplay, escapeHtml, parseFormattedInt } from './utils.js';
 
 export function setMetaError(message) {
     document.getElementById('meta').innerHTML = `<div class="value">${escapeHtml(message)}</div>`;
@@ -71,6 +71,11 @@ export function setGuessControlsEnabled(isEnabled) {
     document.getElementById('guessBtn').disabled = !isEnabled;
 }
 
+function formatScoreWithPenalty(score, expansionLevel) {
+    const penalty = expansionLevel ? ` <span class="stats-expansion-penalty">[-${expansionLevel * 20}%]</span>` : '';
+    return `${numberFmt(score)}${penalty}`;
+}
+
 export function hideNextButton() {
     document.getElementById('nextBtn').style.display = 'none';
 }
@@ -91,15 +96,35 @@ export function addRoundRow(result, roundNumber) {
     tr.innerHTML = `
         <td>${roundNumber}</td>
         <td><span class="round-city">${escapeHtml(result.city)}</span></td>
-        <td>${numberFmt(result.population)}</td>
+        <td class="pop-cell">${numberFmt(result.population)}</td>
         <td>${result.rank}</td>
-        <td>${numberFmt(result.score)}</td>
+        <td>${formatScoreWithPenalty(result.score ?? 0, result.expansion_level ?? 0)}</td>
     `;
 
     tbody.appendChild(tr);
 
     const currentTotal = parseFormattedInt(totalEl.textContent);
     totalEl.textContent = numberFmt(currentTotal + result.score);
+}
+
+export function adjustPopulationDisplay() {
+    const popCells = document.querySelectorAll('#roundTable .pop-cell');
+    
+    if (popCells.length === 0) return;
+    
+    const referenceCell = popCells[0];
+    
+    popCells.forEach((cell) => {
+        const value = parseInt(cell.textContent.replace(/,/g, ''), 10);
+        if (isNaN(value)) return;
+        
+        const formatted = numberFmt(value);
+        const width = abbreviatePopulationForDisplay(value, '#roundTable td:nth-child(3)');
+        
+        if (width !== formatted) {
+            cell.textContent = width;
+        }
+    });
 }
 
 export function wireRoundTable(onRoundSelect) {
@@ -134,7 +159,8 @@ export function restoreSavedState(state) {
             city: guess ? guess.city_name : '—',
             population: guess ? (guess.population ?? 0) : 0,
             rank: guess ? (guess.rank ?? '—') : '—',
-            score: round.score ?? 0
+            score: round.score ?? 0,
+            expansion_level: round.expansion_level ?? 0,
         }, round.round_number);
     }
 

@@ -1,4 +1,4 @@
-import { numberFmt, escapeHtml } from './utils.js';
+import { numberFmt, abbreviateNumber, abbreviatePopulationForDisplay, escapeHtml } from './utils.js';
 import { fetchJson } from './api.js';
 
 function setText(id, value) {
@@ -44,13 +44,18 @@ function formatDateTime(dateString) {
     });
 }
 
+function formatScoreWithPenalty(score, expansionLevel) {
+    const penalty = expansionLevel ? ` <span class="stats-expansion-penalty">[-${expansionLevel * 20}%]</span>` : '';
+    return `${numberFmt(score)}${penalty}`;
+}
+
 function formatBestRound(bestRound) {
     if (!bestRound) {
         return '—';
     }
 
     const city = bestRound.city_name ? escapeHtml(bestRound.city_name) : '—';
-    const score = numberFmt(bestRound.score);
+    const score = formatScoreWithPenalty(bestRound.score, bestRound.expansion_level ?? 0);
     return `Round ${bestRound.round_number} · ${city} · ${score} pts`;
 }
 
@@ -133,7 +138,7 @@ function renderRegionPerformance(summaryRows, detailRows) {
                 <td>${d.guessed_population != null ? numberFmt(d.guessed_population) : '—'}</td>
                 <td>${d.top_city_name ? escapeHtml(d.top_city_name) : '—'}</td>
                 <td>${d.top_city_population != null ? numberFmt(d.top_city_population) : '—'}</td>
-                <td>${numberFmt(d.score)}</td>
+                <td>${formatScoreWithPenalty(d.score, d.expansion_level ?? 0)}</td>
             </tr>
         `).join('');
 
@@ -179,9 +184,9 @@ function buildHistoryRoundsTable(completedRounds) {
             <tr>
                 <td>${numberFmt(round.round_number)}</td>
                 <td>${guess ? escapeHtml(guess.city_name || '—') : '—'}</td>
-                <td>${guess && guess.population != null ? numberFmt(guess.population) : '—'}</td>
+                <td class="pop-cell">${guess && guess.population != null ? numberFmt(guess.population) : '—'}</td>
                 <td>${guess && guess.rank != null ? numberFmt(guess.rank) : '—'}</td>
-                <td>${numberFmt(round.score)}</td>
+                <td>${formatScoreWithPenalty(round.score, round.expansion_level ?? 0)}</td>
             </tr>
         `;
     }).join('');
@@ -257,6 +262,26 @@ function renderHistory(history) {
     `).join('');
 
     wireHistoryCards();
+    adjustProfilePopulationDisplay();
+}
+
+function adjustProfilePopulationDisplay() {
+    const popCells = document.querySelectorAll('.profile-history-details .pop-cell');
+    
+    popCells.forEach((cell) => {
+        const text = cell.textContent.trim();
+        if (text === '—') return;
+        
+        const value = parseInt(text.replace(/,/g, ''), 10);
+        if (isNaN(value)) return;
+        
+        const formatted = numberFmt(value);
+        const width = abbreviatePopulationForDisplay(value, '.stats-rounds-table td:nth-child(3)');
+        
+        if (width !== formatted) {
+            cell.textContent = width;
+        }
+    });
 }
 
 function wireHistoryCards() {

@@ -314,6 +314,15 @@
     white-space: nowrap;
 }
 
+#roundTable .stats-expansion-penalty {
+    color: #ff0000;
+    font-size: 0.85em;
+    font-weight: 700;
+    margin-left: 4px;
+    display: inline;
+    white-space: nowrap;
+}
+
 #statsTodayRoundsCard {
     margin-bottom: 12px;
 }

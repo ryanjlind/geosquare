@@ -11,6 +11,7 @@ def map_completed_rounds(rows):
                 "session_round_id": int(r.SessionRoundId),
                 "round_number": round_number,
                 "square_id": int(r.SquareId),
+                "expansion_level": int(getattr(r, "ExpansionLevel", 0) or 0),
                 "score": int(getattr(r, "Score", 0) or 0),
                 "round_status": r.RoundStatus,
                 "guesses": [],

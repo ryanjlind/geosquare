@@ -97,7 +97,7 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 14px;
-    table-layout: fixed;
+    table-layout: auto;
 }
 
 #roundTable th,
@@ -109,13 +109,13 @@
 
 #roundTable th:nth-child(1),
 #roundTable td:nth-child(1) {
-    width: 10px;
+    width: 15px;
     text-align: center;
 }
 
 #roundTable th:nth-child(2),
 #roundTable td:nth-child(2) {
-    width: 100px;
+    width: 75px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -123,16 +123,21 @@
 
 #roundTable th:nth-child(3),
 #roundTable td:nth-child(3) {
-    width: 75px;
+    width: 60px;
     text-align: right;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 #roundTable th:nth-child(4),
-#roundTable td:nth-child(4),
+#roundTable td:nth-child(4) {
+    text-align: center;
+    white-space: nowrap;
+}
+
 #roundTable th:nth-child(5),
 #roundTable td:nth-child(5) {
-    width: 30px;
     text-align: center;
     white-space: nowrap;
 }
@@ -151,6 +156,10 @@
 
 #roundTable tbody tr.selected {
     background: rgba(143, 211, 255, 0.14);
+}
+
+#roundTable tfoot td {
+    text-align: center;
 }
 
 .guess-modal {
