@@ -13,11 +13,11 @@ def create_app() -> Flask:
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format='[%(levelname)s] %(asctime)s %(name)s: %(message)s',
     )
-    logging.getLogger('geosquare').setLevel(logging.DEBUG)
-    app.logger.setLevel(logging.DEBUG)
+    logging.getLogger('geosquare').setLevel(logging.INFO)
+    app.logger.setLevel(logging.INFO)
 
     app.register_blueprint(main_bp)
     app.register_blueprint(profile_bp)

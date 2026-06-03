@@ -3,11 +3,11 @@ from datetime import date, timedelta
 from time import perf_counter
 
 from app.core.db import get_conn
-from app.helpers.logging import debug as log_debug
+from app.helpers.logging import info as log_info
 
 
 def _log_profile_duration(label: str, start: float):
-    log_debug(f'[profile] {label} took {perf_counter() - start:.3f}s')
+    log_info(f'[profile] {label} took {perf_counter() - start:.3f}s')
 
 REGION_ORDER = [
     'Nordic Europe',
@@ -32,7 +32,7 @@ REGION_ORDER = [
 
 def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
     start = perf_counter()
-    log_debug(f"fetching profile for user_id={user_id}")
+    log_info(f"fetching profile for user_id={user_id}")
     if user_id is None:
         _log_profile_duration('get_profile_payload', start)
         return {
@@ -43,18 +43,18 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
     with get_conn() as conn:
         cur = conn.cursor()
 
-        log_debug(f'[profile] user_id={user_id}')
+        log_info(f'[profile] user_id={user_id}')
 
         user_row = _get_user_row(cur, user_id)
-        log_debug(
+        log_info(
             f'[profile] user_row_exists={user_row is not None} '
             f'username={user_row.Username if user_row else None}'
         )
 
         sessions = _get_completed_sessions(cur, user_id)
-        log_debug(f'[profile] completed_session_count={len(sessions)}')
+        log_info(f'[profile] completed_session_count={len(sessions)}')
         if sessions:
-            log_debug(f'[profile] first_session={sessions[0]}')
+            log_info(f'[profile] first_session={sessions[0]}')
         if not sessions:
             _log_profile_duration('get_profile_payload', start)
             return {
