@@ -1,8 +1,13 @@
 from collections import defaultdict
 from datetime import date, timedelta
+from time import perf_counter
 
 from app.core.db import get_conn
 from app.helpers.logging import debug as log_debug
+
+
+def _log_profile_duration(label: str, start: float):
+    log_debug(f'[profile] {label} took {perf_counter() - start:.3f}s')
 
 REGION_ORDER = [
     'Nordic Europe',
@@ -26,8 +31,10 @@ REGION_ORDER = [
 ]
 
 def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
+    start = perf_counter()
     log_debug(f"fetching profile for user_id={user_id}")
     if user_id is None:
+        _log_profile_duration('get_profile_payload', start)
         return {
             'profile_found': False,
             'message': 'No profile found.',
@@ -49,6 +56,7 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
         if sessions:
             log_debug(f'[profile] first_session={sessions[0]}')
         if not sessions:
+            _log_profile_duration('get_profile_payload', start)
             return {
                 'profile_found': False,
                 'message': 'No profile found.',
@@ -99,6 +107,7 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
 
         conn.commit()
 
+    _log_profile_duration('get_profile_payload', start)
     return {
         'profile_found': True,
         'user': {
@@ -113,6 +122,7 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
     }, 200
 
 def _get_user_row(cur, user_id: int):
+    start = perf_counter()
     cur.execute(
         """
         SELECT UserId, AuthProviderSubject, Username
@@ -121,9 +131,12 @@ def _get_user_row(cur, user_id: int):
         """,
         (user_id,),
     )
-    return cur.fetchone()
+    row = cur.fetchone()
+    _log_profile_duration('_get_user_row', start)
+    return row
 
 def _get_completed_sessions(cur, user_id: int) -> list[dict]:
+    start = perf_counter()
     cur.execute(
         """
         SELECT
@@ -154,7 +167,9 @@ def _get_completed_sessions(cur, user_id: int) -> list[dict]:
     ]
 
 def _get_completed_round_rows_for_sessions(cur, session_ids: list[int]):
+    start = perf_counter()
     if not session_ids:
+        _log_profile_duration('_get_completed_round_rows_for_sessions', start)
         return []
 
     placeholders = ', '.join('?' for _ in session_ids)
@@ -207,9 +222,12 @@ def _get_completed_round_rows_for_sessions(cur, session_ids: list[int]):
         session_ids,
     )
 
-    return cur.fetchall()
+    rows = cur.fetchall()
+    _log_profile_duration('_get_completed_round_rows_for_sessions', start)
+    return rows
 
 def _build_completed_rounds_by_session(rows) -> dict[int, list[dict]]:
+    start = perf_counter()
     rounds_by_session = defaultdict(dict)
 
     for row in rows:
@@ -243,9 +261,11 @@ def _build_completed_rounds_by_session(rows) -> dict[int, list[dict]]:
     for session_id, round_map in rounds_by_session.items():
         result[session_id] = [round_map[round_number] for round_number in sorted(round_map.keys())]
 
+    _log_profile_duration('_build_completed_rounds_by_session', start)
     return result
 
 def _get_best_round(completed_rounds: list[dict]) -> dict | None:
+    start = perf_counter()
     scored_rounds = [round_data for round_data in completed_rounds if int(round_data['score']) > 0]
     if not scored_rounds:
         return None
@@ -260,7 +280,7 @@ def _get_best_round(completed_rounds: list[dict]) -> dict | None:
 
     best_guess = best_round['guesses'][-1] if best_round['guesses'] else None
 
-    return {
+    result = {
         'round_number': int(best_round['round_number']),
         'score': int(best_round['score']),
         'expansion_level': int(best_round.get('expansion_level', 0) or 0),
@@ -268,8 +288,11 @@ def _get_best_round(completed_rounds: list[dict]) -> dict | None:
         'population': int(best_guess['population']) if best_guess and best_guess['population'] is not None else None,
         'rank': int(best_guess['rank']) if best_guess and best_guess['rank'] is not None else None,
     }
+    _log_profile_duration('_get_best_round', start)
+    return result
 
 def _get_strongest_country(cur, user_id: int) -> dict | None:
+    start = perf_counter()
     cur.execute(
         """
         WITH RankedGuesses AS (
@@ -311,16 +334,20 @@ def _get_strongest_country(cur, user_id: int) -> dict | None:
     row = cur.fetchone()
 
     if not row:
+        _log_profile_duration('_get_strongest_country', start)
         return None
 
-    return {
+    result = {
         'country_code': row.CountryCode,
         'guess_count': int(row.GuessCount),
         'average_score': round(float(row.AverageScore), 2),
         'total_score': int(row.TotalScore),
     }
+    _log_profile_duration('_get_strongest_country', start)
+    return result
 
 def _get_most_obscure_city(cur, user_id: int) -> dict | None:
+    start = perf_counter()
     cur.execute(
         """
         WITH RankedGuesses AS (
@@ -367,17 +394,22 @@ def _get_most_obscure_city(cur, user_id: int) -> dict | None:
     row = cur.fetchone()
 
     if not row:
+        _log_profile_duration('_get_most_obscure_city', start)
         return None
 
-    return {
+    result = {
         'city_id': int(row.CityId),
         'city_name': row.CityName,
         'country_code': row.CountryCode,
         'population': int(row.Population),
         'notoriety_score': float(row.NotorietyScore),
     }
+    _log_profile_duration('_get_most_obscure_city', start)
+    return result
+
 
 def _get_most_used_city(cur, user_id: int) -> dict | None:
+    start = perf_counter()
     cur.execute(
         """
         WITH RankedGuesses AS (
@@ -420,110 +452,121 @@ def _get_most_used_city(cur, user_id: int) -> dict | None:
     row = cur.fetchone()
 
     if not row:
+        _log_profile_duration('_get_most_used_city', start)
         return None
 
-    return {
+    result = {
         'city_id': int(row.CityId),
         'city_name': row.CityName,
         'country_code': row.CountryCode,
         'population': int(row.Population),
         'times_used': int(row.TimesUsed),
     }
+    _log_profile_duration('_get_most_used_city', start)
+    return result
+
 
 def _classify_region(min_lat: float, min_lon: float, max_lat: float, max_lon: float) -> str:
-    center_lat = (min_lat + max_lat) / 2.0
-    center_lon = (min_lon + max_lon) / 2.0
+    start = perf_counter()
+    try:
+        center_lat = (min_lat + max_lat) / 2.0
+        center_lon = (min_lon + max_lon) / 2.0
 
-    if 54 <= center_lat <= 72 and -25 <= center_lon <= 40:
-        return 'Nordic Europe'
+        if 54 <= center_lat <= 72 and -25 <= center_lon <= 40:
+            return 'Nordic Europe'
 
-    if 43 <= center_lat < 54 and -11 <= center_lon <= 30:
-        return 'Mainland Europe'
+        if 43 <= center_lat < 54 and -11 <= center_lon <= 30:
+            return 'Mainland Europe'
 
-    if 50 <= center_lat <= 72 and 30 < center_lon <= 60:
-        return 'European Russia'
+        if 50 <= center_lat <= 72 and 30 < center_lon <= 60:
+            return 'European Russia'
 
-    if 35 <= center_lat <= 55 and 60 <= center_lon <= 95:
-        return 'Asian Steppe'
+        if 35 <= center_lat <= 55 and 60 <= center_lon <= 95:
+            return 'Asian Steppe'
 
-    if 18 <= center_lat <= 50 and 95 < center_lon <= 125:
-        return 'China'
+        if 18 <= center_lat <= 50 and 95 < center_lon <= 125:
+            return 'China'
 
-    if 30 <= center_lat <= 46 and 125 < center_lon <= 146:
-        return 'Japan / Korea'
+        if 30 <= center_lat <= 46 and 125 < center_lon <= 146:
+            return 'Japan / Korea'
 
-    if 5 <= center_lat <= 35 and 60 <= center_lon < 95:
-        return 'South Asia'
+        if 5 <= center_lat <= 35 and 60 <= center_lon < 95:
+            return 'South Asia'
 
-    if -10 <= center_lat <= 25 and 95 <= center_lon <= 135:
-        return 'Southeast Asia'
+        if -10 <= center_lat <= 25 and 95 <= center_lon <= 135:
+            return 'Southeast Asia'
 
-    if 20 <= center_lat <= 45 and 30 <= center_lon < 60:
-        return 'West Asia'
+        if 20 <= center_lat <= 45 and 30 <= center_lon < 60:
+            return 'West Asia'
 
-    if 20 <= center_lat <= 37 and -17 <= center_lon <= 35:
-        return 'North Africa'
+        if 20 <= center_lat <= 37 and -17 <= center_lon <= 35:
+            return 'North Africa'
 
-    if 4 <= center_lat < 20 and -20 <= center_lon <= 15:
-        return 'West Africa'
+        if 4 <= center_lat < 20 and -20 <= center_lon <= 15:
+            return 'West Africa'
 
-    if -35 <= center_lat < 20 and -20 <= center_lon <= 52:
-        return 'Sub-Saharan Africa'
+        if -35 <= center_lat < 20 and -20 <= center_lon <= 52:
+            return 'Sub-Saharan Africa'
 
-    if 5 <= center_lat <= 28 and -92 <= center_lon <= -58:
-        return 'Caribbean / Central America'
+        if 5 <= center_lat <= 28 and -92 <= center_lon <= -58:
+            return 'Caribbean / Central America'
 
-    if 14 <= center_lat <= 33 and -118 <= center_lon < -86:
-        return 'Mexico'
+        if 14 <= center_lat <= 33 and -118 <= center_lon < -86:
+            return 'Mexico'
 
-    if 25 <= center_lat <= 72 and -170 <= center_lon <= -52:
-        return 'US / Canada'
+        if 25 <= center_lat <= 72 and -170 <= center_lon <= -52:
+            return 'US / Canada'
 
-    if -56 <= center_lat <= 13 and -82 <= center_lon <= -34:
-        return 'South America'
+        if -56 <= center_lat <= 13 and -82 <= center_lon <= -34:
+            return 'South America'
 
-    if -47 <= center_lat <= 0 and 110 <= center_lon <= 179:
-        return 'Oceania'
+        if -47 <= center_lat <= 0 and 110 <= center_lon <= 179:
+            return 'Oceania'
 
-    return 'Other'
+        return 'Other'
+    finally:
+        _log_profile_duration('_classify_region', start)
+
 
 def _get_region_performance(cur, user_id: int) -> tuple[list[dict], list[dict]]:
+    start = perf_counter()
     cur.execute(
-    """
-    SELECT
-        g.GameDate,
-        gsr.RoundNumber,
-        gsr.Score,
-        gg.CityName AS GuessedCity,
-        gg.Population AS GuessedPopulation,
-        topcity.CityName AS TopCityName,
-        topcity.Population AS TopCityPopulation,
-        gsq.MinLat,
-        gsq.MinLon,
-        gsq.MaxLat,
-        gsq.MaxLon
-    FROM dbo.GameSessions gs
-    INNER JOIN dbo.Games g
-        ON g.GameId = gs.GameId
-    INNER JOIN dbo.GameSessionRounds gsr
-        ON gsr.SessionId = gs.SessionId
-    LEFT JOIN dbo.GameGuesses gg
-        ON gg.SessionRoundId = gsr.SessionRoundId
-    INNER JOIN dbo.GameSquares gsq
-        ON gsq.SquareId = gsr.SquareId
-    OUTER APPLY (
-        SELECT TOP 1
-            gsc.CityName,
-            gsc.Population
-        FROM dbo.GameSquareCities gsc
-        WHERE gsc.SquareId = gsr.SquareId
-        ORDER BY gsc.Population DESC, gsc.CityName ASC
-    ) topcity
-    WHERE gs.UserId = ?
-        AND gs.CompletedAt IS NOT NULL
-    ORDER BY g.GameDate DESC, gsr.RoundNumber ASC
-    """,
-    (user_id,),)
+        """
+        SELECT
+            g.GameDate,
+            gsr.RoundNumber,
+            gsr.Score,
+            gg.CityName AS GuessedCity,
+            gg.Population AS GuessedPopulation,
+            topcity.CityName AS TopCityName,
+            topcity.Population AS TopCityPopulation,
+            gsq.MinLat,
+            gsq.MinLon,
+            gsq.MaxLat,
+            gsq.MaxLon
+        FROM dbo.GameSessions gs
+        INNER JOIN dbo.Games g
+            ON g.GameId = gs.GameId
+        INNER JOIN dbo.GameSessionRounds gsr
+            ON gsr.SessionId = gs.SessionId
+        LEFT JOIN dbo.GameGuesses gg
+            ON gg.SessionRoundId = gsr.SessionRoundId
+        INNER JOIN dbo.GameSquares gsq
+            ON gsq.SquareId = gsr.SquareId
+        OUTER APPLY (
+            SELECT TOP 1
+                gsc.CityName,
+                gsc.Population
+            FROM dbo.GameSquareCities gsc
+            WHERE gsc.SquareId = gsr.SquareId
+            ORDER BY gsc.Population DESC, gsc.CityName ASC
+        ) topcity
+        WHERE gs.UserId = ?
+            AND gs.CompletedAt IS NOT NULL
+        ORDER BY g.GameDate DESC, gsr.RoundNumber ASC
+        """,
+        (user_id,),
+    )
     rows = cur.fetchall()
 
     buckets = {
@@ -544,7 +587,7 @@ def _get_region_performance(cur, user_id: int) -> tuple[list[dict], list[dict]]:
         max_lat = float(row.MaxLat)
         max_lon = float(row.MaxLon)
         score = int(row.Score)
-        
+
         region = _classify_region(min_lat, min_lon, max_lat, max_lon)
 
         if region not in buckets:
@@ -588,7 +631,10 @@ def _get_region_performance(cur, user_id: int) -> tuple[list[dict], list[dict]]:
             'average_points': round(total_points / square_count, 2) if square_count else 0.0,
         })
 
+    _log_profile_duration('_get_region_performance', start)
     return summary, details
+    return summary, details
+
 
 def _build_summary(
     history: list[dict],
@@ -596,6 +642,7 @@ def _build_summary(
     most_used_city: dict | None,
     strongest_country: dict | None,
 ) -> dict:
+    start = perf_counter()
     games_played = len(history)
     perfect_games_played = sum(1 for game in history if game['is_perfect'])
     total_points = sum(int(game['total_score']) for game in history)
@@ -614,7 +661,7 @@ def _build_summary(
     current_game_streak = _calculate_game_streak(history)
     current_perfect_streak = _calculate_perfect_streak(history)
 
-    return {
+    result = {
         'games_played': int(games_played),
         'perfect_games_played': int(perfect_games_played),
         'best_score': int(best_game['total_score']) if best_game else 0,
@@ -629,9 +676,13 @@ def _build_summary(
         'most_used_city': most_used_city,
         'strongest_country': strongest_country,
     }
+    _log_profile_duration('_build_summary', start)
+    return result
 
 def _calculate_game_streak(history: list[dict]) -> int:
+    start = perf_counter()
     if not history:
+        _log_profile_duration('_calculate_game_streak', start)
         return 0
 
     ordered_dates = []
@@ -661,10 +712,13 @@ def _calculate_game_streak(history: list[dict]) -> int:
 
         break
 
+    _log_profile_duration('_calculate_game_streak', start)
     return streak
 
 def _calculate_perfect_streak(history: list[dict]) -> int:
+    start = perf_counter()
     if not history:
+        _log_profile_duration('_calculate_perfect_streak', start)
         return 0
 
     streak = 0
@@ -688,4 +742,5 @@ def _calculate_perfect_streak(history: list[dict]) -> int:
 
         break
 
+    _log_profile_duration('_calculate_perfect_streak', start)
     return streak

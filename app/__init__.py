@@ -1,3 +1,4 @@
+import logging
 import os
 from flask import Flask
 from app.routes.main import main_bp
@@ -10,6 +11,13 @@ def create_app() -> Flask:
         static_folder='static',
     )
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='[%(levelname)s] %(asctime)s %(name)s: %(message)s',
+    )
+    logging.getLogger('geosquare').setLevel(logging.DEBUG)
+    app.logger.setLevel(logging.DEBUG)
 
     app.register_blueprint(main_bp)
     app.register_blueprint(profile_bp)
