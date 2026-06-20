@@ -315,16 +315,23 @@ def get_game_state_payload(user_id: int, session_id: int | None):
         if session is None:
             return {"error": "No game found for today."}, 404
 
+        load_t0 = time.perf_counter()
+        log_debug(f"{load_t0:.9f} get_game_state_payload: loading completed rounds start")
         completed = map_completed_rounds(
             get_completed_round_rows(cur, int(session.SessionId))
         )
-        log_debug(f"{time.perf_counter():.9f} get_game_state_payload: completed mapped")
+        log_debug(
+            f"{time.perf_counter():.9f} get_game_state_payload: loading completed rounds done count={len(completed)} elapsed_ms={(time.perf_counter() - load_t0) * 1000.0:.1f}"
+        )
 
         conn.commit()
         log_debug(f"{time.perf_counter():.9f} get_game_state_payload: commit")
 
+        map_t0 = time.perf_counter()
         result = map_game_state(session, completed, is_authenticated, username)
-        log_debug(f"{time.perf_counter():.9f} get_game_state_payload: result built")
+        log_debug(
+            f"{time.perf_counter():.9f} get_game_state_payload: result built elapsed_ms={(time.perf_counter() - map_t0) * 1000.0:.1f}"
+        )
 
         return result, 200
 

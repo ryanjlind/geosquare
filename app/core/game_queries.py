@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from app.helpers.date import get_effective_game_date
 from app.helpers.text import strip_accents
 
@@ -210,49 +212,97 @@ def get_completed_round_rows(cur, session_id: int):
             gsr.SquareId,
             gsr.RoundStatus,
             gsr.Score,
-            gr.ExpansionLevel,
-            gg.CityName,
-            gg.Population,
-            gg.GuessedAt,
-            ranked.CityId,
-            ranked.PopRank,
-            ranked.Latitude,
-            ranked.Longitude
+            gr.ExpansionLevel
         FROM dbo.GameSessionRounds gsr
         INNER JOIN dbo.GameSessions gs
             ON gs.SessionId = gsr.SessionId
         INNER JOIN dbo.GameRounds gr
             ON gr.GameId = gs.GameId
+            AND gr.RoundNumber = gsr.RoundNumber
             AND gr.SquareId = gsr.SquareId
-        LEFT JOIN dbo.GameGuesses gg
-            ON gg.SessionRoundId = gsr.SessionRoundId
-            AND gg.IsCorrect = 1
-        LEFT JOIN (
-            SELECT
-                gsc.SquareId,
-                gsc.CityId,
-                gsc.CityName,
-                gsc.Population,
-                gsc.Latitude,
-                gsc.Longitude,
-                ROW_NUMBER() OVER (
-                    PARTITION BY gsc.SquareId
-                    ORDER BY gsc.Population DESC, gsc.CityName ASC
-                ) AS PopRank
-            FROM dbo.GameSquareCities gsc
-            INNER JOIN dbo.GameSessionRounds gsr2
-                ON gsr2.SquareId = gsc.SquareId
-            WHERE gsr2.SessionId = ?
-        ) ranked
-            ON ranked.SquareId = gsr.SquareId
-            AND ranked.CityName = gg.CityName
-            AND ranked.Population = gg.Population
         WHERE gsr.SessionId = ?
-        AND gsr.RoundStatus IN ('Completed', 'Passed')
-        ORDER BY gsr.RoundNumber ASC, gg.GuessedAt ASC
-    """, session_id, session_id)
+          AND gsr.RoundStatus IN ('Completed', 'Passed')
+        ORDER BY gsr.RoundNumber ASC, gsr.SessionRoundId ASC
+    """, session_id)
 
-    return cur.fetchall()
+    completed_rounds = []
+
+    for round_row in cur.fetchall():
+        cur.execute("""
+            SELECT
+                gg.CityName,
+                gg.Population,
+                gg.GuessedAt
+            FROM dbo.GameGuesses gg
+            WHERE gg.SessionRoundId = ?
+              AND gg.IsCorrect = 1
+            ORDER BY gg.GuessedAt ASC
+        """, int(round_row.SessionRoundId))
+        guess_rows = cur.fetchall()
+
+        cur.execute("""
+            SELECT
+                c.CityId,
+                c.CityName,
+                c.Latitude,
+                c.Longitude,
+                c.Population
+            FROM dbo.GameSquareCities c
+            WHERE c.SquareId = ?
+            ORDER BY c.Population DESC, c.CityName ASC
+        """, int(round_row.SquareId))
+        ranked_city_rows = cur.fetchall()
+
+        rank_map = {
+            (row.CityName, int(row.Population)): {
+                'city_id': int(row.CityId),
+                'rank': index + 1,
+                'latitude': float(row.Latitude),
+                'longitude': float(row.Longitude),
+                'population': int(row.Population),
+            }
+            for index, row in enumerate(ranked_city_rows)
+        }
+
+        base_row = SimpleNamespace(
+            SessionRoundId=round_row.SessionRoundId,
+            RoundNumber=round_row.RoundNumber,
+            SquareId=round_row.SquareId,
+            RoundStatus=round_row.RoundStatus,
+            Score=round_row.Score,
+            ExpansionLevel=round_row.ExpansionLevel,
+            CityName=None,
+            CityId=None,
+            Population=None,
+            GuessedAt=None,
+            PopRank=None,
+            Latitude=None,
+            Longitude=None,
+        )
+        completed_rounds.append(base_row)
+
+        for guess_row in guess_rows:
+            matched = rank_map.get((guess_row.CityName, int(guess_row.Population)))
+            if not matched:
+                continue
+
+            completed_rounds.append(SimpleNamespace(
+                SessionRoundId=round_row.SessionRoundId,
+                RoundNumber=round_row.RoundNumber,
+                SquareId=round_row.SquareId,
+                RoundStatus=round_row.RoundStatus,
+                Score=round_row.Score,
+                ExpansionLevel=round_row.ExpansionLevel,
+                CityName=guess_row.CityName,
+                CityId=matched['city_id'],
+                Population=matched['population'],
+                GuessedAt=guess_row.GuessedAt,
+                PopRank=matched['rank'],
+                Latitude=matched['latitude'],
+                Longitude=matched['longitude'],
+            ))
+
+    return completed_rounds
 
 def get_completed_sessions_for_user(cur, user_id: int, through_game_date: str):
     cur.execute("""
