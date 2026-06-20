@@ -286,12 +286,12 @@ def submit_pass(payload: dict, user_id: int, session_id: int | None):
 
 def get_game_state_payload(user_id: int, session_id: int | None):
     import time
-    log_debug(f"{time.perf_counter():.9f} get_game_state_payload: ENTER")
+    print(f"{time.perf_counter():.9f} get_game_state_payload: ENTER", flush=True)
 
     with get_conn() as conn:
-        log_debug(f"{time.perf_counter():.9f} get_game_state_payload: got connection")
+        print(f"{time.perf_counter():.9f} get_game_state_payload: got connection", flush=True)
         cur = conn.cursor()
-        log_debug(f"{time.perf_counter():.9f} get_game_state_payload: got cursor")
+        print(f"{time.perf_counter():.9f} get_game_state_payload: got cursor", flush=True)
 
         cur.execute(
             """
@@ -301,36 +301,38 @@ def get_game_state_payload(user_id: int, session_id: int | None):
             """,
             (user_id,),
         )
-        log_debug(f"{time.perf_counter():.9f} get_game_state_payload: executed user query")
+        print(f"{time.perf_counter():.9f} get_game_state_payload: executed user query", flush=True)
 
         user_row = cur.fetchone()
-        log_debug(f"{time.perf_counter():.9f} get_game_state_payload: fetched user_row")
+        print(f"{time.perf_counter():.9f} get_game_state_payload: fetched user_row", flush=True)
 
         is_authenticated = bool(user_row and user_row.AuthProviderSubject)
         username = user_row.Username if user_row else None
 
         session = get_current_session(cur, user_id, session_id)
-        log_debug(f"{time.perf_counter():.9f} get_game_state_payload: got session")
+        print(f"{time.perf_counter():.9f} get_game_state_payload: got session", flush=True)
 
         if session is None:
             return {"error": "No game found for today."}, 404
 
         load_t0 = time.perf_counter()
-        log_debug(f"{load_t0:.9f} get_game_state_payload: loading completed rounds start")
+        print(f"{load_t0:.9f} get_game_state_payload: loading completed rounds start", flush=True)
         completed = map_completed_rounds(
             get_completed_round_rows(cur, int(session.SessionId))
         )
-        log_debug(
-            f"{time.perf_counter():.9f} get_game_state_payload: loading completed rounds done count={len(completed)} elapsed_ms={(time.perf_counter() - load_t0) * 1000.0:.1f}"
+        print(
+            f"{time.perf_counter():.9f} get_game_state_payload: loading completed rounds done count={len(completed)} elapsed_ms={(time.perf_counter() - load_t0) * 1000.0:.1f}",
+            flush=True,
         )
 
         conn.commit()
-        log_debug(f"{time.perf_counter():.9f} get_game_state_payload: commit")
+        print(f"{time.perf_counter():.9f} get_game_state_payload: commit", flush=True)
 
         map_t0 = time.perf_counter()
         result = map_game_state(session, completed, is_authenticated, username)
-        log_debug(
-            f"{time.perf_counter():.9f} get_game_state_payload: result built elapsed_ms={(time.perf_counter() - map_t0) * 1000.0:.1f}"
+        print(
+            f"{time.perf_counter():.9f} get_game_state_payload: result built elapsed_ms={(time.perf_counter() - map_t0) * 1000.0:.1f}",
+            flush=True,
         )
 
         return result, 200
