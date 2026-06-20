@@ -16,6 +16,8 @@ def create_app() -> Flask:
         level=logging.INFO,
         format='[%(levelname)s] %(asctime)s %(name)s: %(message)s',
     )
+    logging.getLogger('azure.core.pipeline.policies.http_logging_policy').setLevel(logging.WARNING)
+    logging.getLogger('azure.monitor.opentelemetry.exporter.export._base').setLevel(logging.WARNING)
     logging.getLogger('geosquare').setLevel(logging.INFO)
     app.logger.setLevel(logging.INFO)
 
