@@ -11,6 +11,9 @@ def compute_score(rows, guessed_population: int) -> int:
     if not populations:
         return 0
 
+    if guessed_population < 15000:
+        return 100
+
     if len(populations) == 1:
         return 100
 
