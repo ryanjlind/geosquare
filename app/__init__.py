@@ -25,7 +25,7 @@ def create_app() -> Flask:
     app.register_blueprint(profile_bp)
 
     if os.getenv('FLASK_ENV') == 'development':
-        from app.routes.admin import admin_bp
+        from app.admin.routes import admin_bp
         app.register_blueprint(admin_bp)
 
     return app

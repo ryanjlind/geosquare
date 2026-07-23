@@ -56,7 +56,7 @@ def client_log():
 
     log_record = {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-        "ip": request.headers.get("X-Forwarded-For", request.remote_addr),
+        "ip": request.headers.get("X-Forwarded-For") or request.remote_addr,
         "user_agent": request.headers.get("User-Agent"),
         "referer": request.headers.get("Referer"),
         "payload": payload,
@@ -192,16 +192,21 @@ def all_daily_squares_preview():
 
 @main_bp.route("/api/username-check")
 def username_check():
-    username = (request.args.get("username") or "").strip()
-    return jsonify({"available": is_username_available(username)})
+    username = request.args.get("username")
+    if not username:
+        return jsonify({"available": False})
+    return jsonify({"available": is_username_available(username.strip())})
 
 
 @main_bp.route("/api/set-username", methods=["POST"])
 def set_username_route():
     identity = _identity()
-    payload = request.get_json(silent=True) or {}
-
-    ok, error = set_username(identity["user_id"], payload.get("username", ""))
+    payload = request.get_json()
+    if not isinstance(payload, dict):
+        return jsonify({"ok": False, "error": "Invalid or missing JSON body"}), 400
+    if "username" not in payload:
+        return jsonify({"ok": False, "error": "username is required."}), 400
+    ok, error = set_username(identity["user_id"], payload["username"])
 
     if not ok:
         return jsonify({"ok": False, "error": error}), 400
@@ -280,15 +285,14 @@ def login():
 def auth_callback():
     if is_local_auth_bypass_enabled():
         user_info = {
-            "sub": request.args.get(
-                "dev_sub",
-                "local-test-user",
-            )
+            "sub": request.args.get("dev_sub") or "local-test-user",
         }
     else:
         client = get_lastlogin_client()
         token = client.authorize_access_token()
-        user_info = token.get("userinfo") or {}
+        user_info = token.get("userinfo")
+        if not user_info:
+            user_info = {}
 
     identity = _identity()
 
@@ -327,7 +331,7 @@ window.close();
             session_id,
         )
 
-    status = result.get("status")
+    status = result["status"]
 
     if status in (
         "linked_current_user",
@@ -365,7 +369,7 @@ window.close();
     return build_popup_response(
         {
             "type": "auth_error",
-            "message": result.get("message", "Login failed."),
+        "message": result["message"] if "message" in result else "Login failed.",
         },
         identity["user_id"],
         identity["session_id"],
@@ -374,10 +378,12 @@ window.close();
 
 @main_bp.route("/auth/resolve", methods=["POST"])
 def auth_resolve():
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json()
+    if not isinstance(payload, dict):
+        return jsonify({"ok": False, "error": "Invalid or missing JSON body"}), 400
 
     result = resolve_lastlogin_conflict(
-        payload.get("action")
+        payload["action"] if "action" in payload else None
     )
 
     if result["status"] == "resolved":

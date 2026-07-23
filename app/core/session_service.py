@@ -48,32 +48,14 @@ def get_current_session(cur, user_id: int, session_id: int | None):
     return create_session(cur, user_id, game_id)
 
 
-def resolve_identity(cur):
-    cookie_user_id = get_user_id_from_cookie()
-    cookie_session_id = get_session_id_from_cookie()
-
-    user = None
-    if cookie_user_id is not None:
-        user = get_user_by_id(cur, cookie_user_id)
-
-    if user is None:
-        user = create_user(cur)
-
-    user_id = int(user.UserId)
-    session = get_current_session(cur, user_id, cookie_session_id)
-
-    return {
-        "user_id": user_id,
-        "session_id": int(session.SessionId) if session else None,
-    }
-
 def resolve_request_identity(cur):
     cookie_user_id = get_user_id_from_cookie()
     cookie_session_id = get_session_id_from_cookie()
 
-    user = None
     if cookie_user_id is not None:
         user = get_user_by_id(cur, cookie_user_id)
+    else:
+        user = None
 
     if user is None:
         user = create_user(cur)

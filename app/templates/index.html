@@ -36,7 +36,7 @@
                     
                     <div id="guessButtons">
                         <button id="guessBtn" type="button">Submit</button>
-                        <button id="expandBtn" type="button" style="display:none;">Expand <br/><span id="penalty">(-20%)</span></button>
+                        <button id="expandBtn" type="button" class="hidden">Expand <br/><span id="penalty">(-20%)</span></button>
                         <button id="passBtn" type="button">Pass</button>
                     </div>
                 </div>
@@ -65,7 +65,7 @@
                 </tfoot>
             </table>
 
-            <button id="nextBtn" style="display:none;" type="button">Next</button>                       
+            <button id="nextBtn" class="hidden" type="button">Next</button>                       
                         
             <div class="sidebar-attribution">
                 <div class="sidebar-attribution-title">Credits</div>
@@ -108,7 +108,7 @@
                     >Tip Jar</a>
                 </div>
             </div>            
-            <div id="feedbackOverlay" class="feedback-overlay" style="display:none;">
+            <div id="feedbackOverlay" class="feedback-overlay hidden">
             <div class="feedback-backdrop"></div>
             <div class="feedback-modal">
                 <button id="feedbackCloseBtn" class="feedback-close-btn">×</button>
@@ -152,7 +152,7 @@
                 Allow email response
                 </label>
 
-                <label id="fbEmailWrap" style="display:none;">
+                <label id="fbEmailWrap" class="hidden">
                 Email
                 <input type="email" id="fbEmail">
                 </label>
@@ -163,7 +163,7 @@
         </div>
         <div id="cesiumContainer"></div>
     </div>
-    <div id="statsOverlay" class="stats-overlay" style="display:none;">
+    <div id="statsOverlay" class="stats-overlay hidden">
         <div class="stats-backdrop"></div>
         <div class="stats-modal">
             <button id="statsCloseBtn" class="stats-close-btn" type="button">×</button>

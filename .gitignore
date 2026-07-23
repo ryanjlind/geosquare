@@ -3,4 +3,5 @@ venv/**
 data/**
 ne_land/**
 scripts/**
+app/admin/**
 *.pyc

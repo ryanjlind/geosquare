@@ -252,40 +252,12 @@ export function zoomToSquare(bounds) {
     window.geoViewer.clock.shouldAnimate = false;
 }
 
-function spinGlobeOnce(durationMs = 1500) {
-    return new Promise((resolve) => {
-        const camera = window.geoViewer.camera;        
-        const startHeading = camera.heading;        
-        const startTime = performance.now();
-
-        function step(now) {
-            const elapsed = now - startTime;
-            const t = Math.min(elapsed / durationMs, 1);
-            const heading = startHeading - (Cesium.Math.TWO_PI * t);
-
-            const delta = -Cesium.Math.TWO_PI / 60;
-            camera.rotate(Cesium.Cartesian3.UNIT_Z, delta);
-
-            if (t < 1) {
-                window.requestAnimationFrame(step);
-                return;
-            }
-
-            resolve();
-        }
-
-        window.requestAnimationFrame(step);
-    });
-}
-
 export async function zoomToAllSquares(rounds) {
     const roundFive = rounds.find(round => round.round_number === 5);
 
     if (!roundFive) {
         throw new Error('Round 1 not found for end-game animation.');
     }
-
-    await spinGlobeOnce();
 
     zoomToSquare(roundFive.bounds);        
 }

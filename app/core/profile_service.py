@@ -5,10 +5,6 @@ from time import perf_counter
 from app.core.db import get_conn
 from app.helpers.logging import info as log_info
 
-
-def _log_profile_duration(label: str, start: float):
-    log_info(f'[profile] {label} took {perf_counter() - start:.3f}s')
-
 REGION_ORDER = [
     'Nordic Europe',
     'Mainland Europe',
@@ -29,6 +25,10 @@ REGION_ORDER = [
     'Oceania',
     'Other',
 ]
+
+
+def _log_profile_duration(label: str, start: float):
+    log_info(f'[profile] {label} took {perf_counter() - start:.3f}s')
 
 def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
     start = perf_counter()
@@ -76,7 +76,10 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
 
         history = []
         for session in sessions:
-            completed_rounds = completed_rounds_by_session.get(session['session_id'], [])
+            if session['session_id'] in completed_rounds_by_session:
+                completed_rounds = completed_rounds_by_session[session['session_id']]
+            else:
+                completed_rounds = []
             solved_count = sum(1 for round_data in completed_rounds if int(round_data['score']) > 0)
             is_perfect = len(completed_rounds) == 5 and all(int(round_data['score']) > 0 for round_data in completed_rounds)
             best_round = _get_best_round(completed_rounds)
@@ -239,7 +242,7 @@ def _build_completed_rounds_by_session(rows) -> dict[int, list[dict]]:
                 'session_round_id': int(row.SessionRoundId),
                 'round_number': round_number,
                 'square_id': int(row.SquareId),
-                'expansion_level': int(getattr(row, 'ExpansionLevel', 0) or 0),
+                'expansion_level': int(row.ExpansionLevel),
                 'score': int(row.Score),
                 'guesses': [],
             }
@@ -283,7 +286,7 @@ def _get_best_round(completed_rounds: list[dict]) -> dict | None:
     result = {
         'round_number': int(best_round['round_number']),
         'score': int(best_round['score']),
-        'expansion_level': int(best_round.get('expansion_level', 0) or 0),
+        'expansion_level': int(best_round['expansion_level']),
         'city_name': best_guess['city_name'] if best_guess else None,
         'population': int(best_guess['population']) if best_guess and best_guess['population'] is not None else None,
         'rank': int(best_guess['rank']) if best_guess and best_guess['rank'] is not None else None,
@@ -530,6 +533,7 @@ def _classify_region(min_lat: float, min_lon: float, max_lat: float, max_lon: fl
 
 def _get_region_performance(cur, user_id: int) -> tuple[list[dict], list[dict]]:
     start = perf_counter()
+    log_info(f'[profile] _get_region_performance user_id={user_id}')
     cur.execute(
         """
         SELECT
@@ -696,20 +700,14 @@ def _calculate_game_streak(history: list[dict]) -> int:
 
     ordered_dates.sort(reverse=True)
 
-    streak = 0
-    previous_date = None
+    streak = 1
+    previous_date = ordered_dates[0]
 
-    for game_date in ordered_dates:
-        if previous_date is None:
-            streak = 1
-            previous_date = game_date
-            continue
-
+    for game_date in ordered_dates[1:]:
         if game_date == previous_date - timedelta(days=1):
             streak += 1
             previous_date = game_date
             continue
-
         break
 
     _log_profile_duration('_calculate_game_streak', start)
@@ -721,25 +719,24 @@ def _calculate_perfect_streak(history: list[dict]) -> int:
         _log_profile_duration('_calculate_perfect_streak', start)
         return 0
 
-    streak = 0
-    previous_date = None
-
+    perfect_dates = []
     for game in history:
         if not game['is_perfect']:
             break
+        perfect_dates.append(date.fromisoformat(game['game_date']))
 
-        game_date = date.fromisoformat(game['game_date'])
+    if not perfect_dates:
+        _log_profile_duration('_calculate_perfect_streak', start)
+        return 0
 
-        if previous_date is None:
-            streak = 1
-            previous_date = game_date
-            continue
+    streak = 1
+    previous_date = perfect_dates[0]
 
+    for game_date in perfect_dates[1:]:
         if game_date == previous_date - timedelta(days=1):
             streak += 1
             previous_date = game_date
             continue
-
         break
 
     _log_profile_duration('_calculate_perfect_streak', start)

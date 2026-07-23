@@ -9,14 +9,14 @@ COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365 * 5
 def get_session_signer():
     return URLSafeSerializer(current_app.config['SECRET_KEY'], salt='geosquare-session')
 
-def get_identity_from_cookie() -> dict:
+def get_identity_from_cookie() -> dict | None:
     raw = request.cookies.get(COOKIE_NAME)
     if raw is None:
-        return {}
+        return None
 
     is_valid, data = get_session_signer().loads_unsafe(raw)
     if not is_valid or not isinstance(data, dict):
-        return {}
+        return None
 
     identity = {}
 
@@ -32,10 +32,16 @@ def get_identity_from_cookie() -> dict:
     return identity
 
 def get_user_id_from_cookie():
-    return get_identity_from_cookie().get('user_id')
+    identity = get_identity_from_cookie()
+    if identity is None:
+        return None
+    return identity.get('user_id')
 
 def get_session_id_from_cookie():
-    return get_identity_from_cookie().get('session_id')
+    identity = get_identity_from_cookie()
+    if identity is None:
+        return None
+    return identity.get('session_id')
 
 def attach_session_cookie(response, user_id: int, session_id: int | None):
     is_local = os.getenv('LOCAL_AUTH_BYPASS', '').lower() in ('1', 'true', 'yes')

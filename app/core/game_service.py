@@ -12,8 +12,8 @@ from app.core.game_queries import (
     get_session_total_score,
     get_square_cities,
     get_square_city_count,
-    get_square_for_round,
     get_square_id_for_round,
+    get_base_square_id_for_round,
     increment_session_total_score,
     insert_correct_guess,
     find_city_anywhere,
@@ -118,8 +118,12 @@ def get_daily_square_data(user_id: int, session_id: int | None, round_number: in
 def submit_guess(payload: dict, user_id: int, session_id: int | None):
     t0 = perf_counter()
 
-    guess_text = (payload.get("guess") or "").strip()
-    round_number = int(payload.get("round_number", 1))
+    if "guess" not in payload:
+        return {"error": "Guess is required."}, 400
+    guess_text = payload["guess"].strip()
+    if "round_number" not in payload:
+        return {"error": "round_number is required."}, 400
+    round_number = int(payload["round_number"])
     confirmed_city_id = payload.get("confirmed_city_id")
 
     if not guess_text:
@@ -171,7 +175,7 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None):
                 return {
                     "ok": True,
                     "requires_confirmation": True,
-                    "candidates": result.get("suggestions", []),
+                    "candidates": result["suggestions"],
                     "guess": guess_text,
                 }, 200
 
@@ -240,7 +244,9 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None):
 
 
 def submit_pass(payload: dict, user_id: int, session_id: int | None):
-    round_number = int(payload.get("round_number", 1))
+    if "round_number" not in payload:
+        return {"error": "round_number is required."}, 400
+    round_number = int(payload["round_number"])
 
     with get_conn() as conn:
         cur = conn.cursor()
@@ -487,6 +493,13 @@ def get_all_daily_square_data(user_id: int, session_id: int | None):
         t_map = time.perf_counter()
         print(f"build completed_by_round: {t_map - t_completed:.6f}s")
 
+        game_id = int(session.GameId)
+        base_square_ids = {}
+        for rn in range(1, 6):
+            sq_id = get_base_square_id_for_round(cur, game_id, rn)
+            if sq_id is not None:
+                base_square_ids[rn] = sq_id
+
     rounds = []
     t_after_db = time.perf_counter()
     print(f"db block total: {t_after_db - t0:.6f}s")
@@ -512,8 +525,9 @@ def get_all_daily_square_data(user_id: int, session_id: int | None):
                 "population": guess["population"],
             }
 
+        reveal_square_id = base_square_ids[round_number] if round_number in base_square_ids else base["square_id"]
         reveal_cities = get_reveal_cities_for_square(
-            base["square_id"],
+            reveal_square_id,
             excluded_city=excluded_city,
         )
         t_reveal = time.perf_counter()
@@ -523,7 +537,7 @@ def get_all_daily_square_data(user_id: int, session_id: int | None):
             **base,
             "levels": [{
                 "bounds": base["bounds"],
-                "expansion_level": base.get("expansion_level", 0),
+                "expansion_level": base["expansion_level"],
                 "seed": base["seed"],
             }],
             "player_guess": guess,
@@ -539,6 +553,7 @@ def get_all_daily_square_data(user_id: int, session_id: int | None):
     return {"rounds": rounds}, 200
 
 def get_all_daily_square_data_preview(game_date: str):
+    print(f'get_all_daily_square_data_preview: game_date={game_date}', flush=True)
     with get_conn() as conn:
         cur = conn.cursor()
 

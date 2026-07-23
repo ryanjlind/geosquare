@@ -1,7 +1,21 @@
+import logging
 from types import SimpleNamespace
 
 from app.helpers.date import get_effective_game_date
 from app.helpers.text import strip_accents
+
+_logger = logging.getLogger('geosquare')
+
+def get_base_square_id_for_round(cur, game_id: int, round_number: int):
+    cur.execute("""
+        SELECT TOP 1 SquareId
+        FROM dbo.GameRounds
+        WHERE GameId = ?
+          AND RoundNumber = ?
+          AND ExpansionLevel = 0
+    """, game_id, round_number)
+    row = cur.fetchone()
+    return int(row.SquareId) if row else None
 
 def get_today_game(cur):
     game_date = get_effective_game_date()    
@@ -10,19 +24,6 @@ def get_today_game(cur):
         FROM dbo.Games
         WHERE GameDate = ?
     """, game_date)
-
-    return cur.fetchone()
-
-def get_square_for_round(cur, game_id: int, round_number: int):
-    cur.execute(f"""
-        SELECT TOP 1 {_SQUARE_SELECT_COLUMNS}
-        FROM dbo.Games g
-        INNER JOIN dbo.GameRounds gr ON g.GameId = gr.GameId
-        INNER JOIN dbo.GameSquares gs ON gr.SquareId = gs.SquareId
-        INNER JOIN dbo.GameConfig c ON gs.ConfigId = c.ConfigId
-        WHERE g.GameId = ?
-          AND gr.RoundNumber = ?
-    """, game_id, round_number)
 
     return cur.fetchone()
 
@@ -44,38 +45,6 @@ def get_square_city_count(cur, square_id: int):
         WHERE SquareId = ?
     """, square_id)
     return cur.fetchone()
-
-
-def get_session_by_id(cur, session_id: int):
-    cur.execute("""
-        SELECT TOP 1
-            SessionId,
-            GameId,
-            UserId,
-            StartedAt,
-            CompletedAt,
-            TotalScore
-        FROM dbo.GameSessions
-        WHERE SessionId = ?
-    """, session_id)
-    return cur.fetchone()
-
-
-def get_latest_session_round(cur, session_id: int):
-    cur.execute("""
-        SELECT TOP 1
-            SessionRoundId,
-            SessionId,
-            RoundNumber,
-            SquareId,
-            Score,
-            RoundStatus
-        FROM dbo.GameSessionRounds
-        WHERE SessionId = ?
-        ORDER BY RoundNumber DESC, SessionRoundId DESC
-    """, session_id)
-    return cur.fetchone()
-
 
 
 def create_session(cur, user_id: int, game_id: int):
@@ -153,14 +122,6 @@ def insert_correct_guess(cur, session_round_id: int, city_name: str, population:
     """, session_round_id, city_name, population, score)
 
 
-def increment_session_round_score(cur, session_round_id: int, score: int):
-    cur.execute("""
-        UPDATE dbo.GameSessionRounds
-        SET Score = Score + ?
-        WHERE SessionRoundId = ?
-    """, score, session_round_id)
-
-
 def increment_session_total_score(cur, session_id: int, score: int):
     cur.execute("""
         UPDATE dbo.GameSessions
@@ -228,6 +189,7 @@ def get_completed_round_rows(cur, session_id: int):
     completed_rounds = []
 
     for round_row in cur.fetchall():
+        _logger.debug('get_completed_round_rows: processing session_round_id=%s', round_row.SessionRoundId)
         cur.execute("""
             SELECT
                 gg.CityName,
@@ -409,26 +371,6 @@ def has_next_expansion_level(cur, game_id: int, round_number: int, square_id: in
 
     return cur.fetchone() is not None
 
-def get_round_expansion_square(cur, game_id: int, round_number: int, expansion_level: int):
-    cur.execute("""
-        SELECT TOP 1
-            SquareId,
-            ExpansionLevel
-        FROM GeoSquare.dbo.GameRounds
-        WHERE GameId = ?
-          AND RoundNumber = ?
-          AND ExpansionLevel = ?
-    """, (game_id, round_number, expansion_level))
-    return cur.fetchone()
-
-def update_session_round_square(cur, session_id: int, round_number: int, square_id: int):
-    cur.execute("""
-        UPDATE GeoSquare.dbo.GameSessionRounds
-        SET SquareId = ?
-        WHERE SessionId = ?
-          AND RoundNumber = ?
-    """, (square_id, session_id, round_number))
-
 def get_active_session_square(cur, session_id: int, round_number: int):
     cur.execute("""
         SELECT TOP 1 gsr.SquareId, gr.ExpansionLevel
@@ -467,7 +409,7 @@ def get_next_expansion_square(cur, game_id: int, round_number: int, current_squa
 
     return cur.fetchone()
 
-# Shared square column selection for get_square_for_round and get_square_by_id
+# Shared square column selection for get_square_by_id
 _SQUARE_SELECT_COLUMNS = """
     gr.GameId,
     gr.RoundNumber,
@@ -479,18 +421,9 @@ _SQUARE_SELECT_COLUMNS = """
     gs.MinLon,
     gs.MaxLat,
     gs.MaxLon,
-    gs.TotalPopulation,
-    gs.QualifyingCityCount,
     gs.WidthDegrees,
     gs.HeightDegrees,
-    gs.GeneratedAt,
-    c.ConfigKey,
-    c.MinTotalPopulation,
-    c.MinCityCount,
-    c.MinCityPopulation,
-    c.MaxSquareWidthDegrees,
-    c.MaxSquareHeightDegrees,
-    c.StepDegrees
+    gs.GeneratedAt
 """
 
 def get_square_by_id(cur, square_id: int):
@@ -499,8 +432,6 @@ def get_square_by_id(cur, square_id: int):
         FROM dbo.GameRounds gr
         INNER JOIN dbo.GameSquares gs
             ON gs.SquareId = gr.SquareId
-        INNER JOIN dbo.GameConfig c
-            ON gs.ConfigId = c.ConfigId
         WHERE gs.SquareId = ?
         ORDER BY gr.RoundNumber DESC, gr.ExpansionLevel DESC
     """, square_id)

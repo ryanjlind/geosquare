@@ -67,12 +67,15 @@ def phonetic_key(text: str) -> str:
 def find_matching_city(rows, guess_text: str):
     guess_text = guess_text.strip()
 
-    precision_filter = None
     if ',' in guess_text:
         parts = [p.strip() for p in guess_text.split(',', 1)]
         if len(parts) == 2:
             guess_text, precision_part = parts
             precision_filter = precision_part.upper()
+        else:
+            precision_filter = None
+    else:
+        precision_filter = None
 
     guess_keys = build_match_keys(guess_text)
     normalized_guess = normalize_place_name(guess_text)
@@ -99,7 +102,7 @@ def find_matching_city(rows, guess_text: str):
         province_filtered_rows = []
 
         for r in rows:
-            province_codes_raw = getattr(r, 'ProvinceCodes', None) or ''
+            province_codes_raw = r.ProvinceCodes or ''
             province_codes = {
                 code.strip().upper()
                 for code in province_codes_raw.split(',')
@@ -122,15 +125,43 @@ def find_matching_city(rows, guess_text: str):
             print(f'Country code matches: {len(country_filtered_rows)}', flush=True)
             candidate_rows = country_filtered_rows
 
-    for row in candidate_rows:
-        city_keys = build_match_keys(row.CityName)
+    import time as _time
 
+    direct_match_row = None
+    direct_match_index = None
+    t0 = _time.perf_counter()
+    for idx, row in enumerate(candidate_rows):
+        city_keys = build_match_keys(row.CityName)
         if guess_keys & city_keys:
-            print(f'MATCH (direct): {row.CityName}', flush=True)
+            print(f'MATCH (direct): {row.CityName} idx={idx} elapsed_ms={((_time.perf_counter()-t0)*1000):.1f}', flush=True)
+            direct_match_row = row
+            direct_match_index = idx
+            break
+    print(f'direct pass: {(_time.perf_counter()-t0)*1000:.1f}ms checked={idx+1 if direct_match_row is not None else len(candidate_rows)}', flush=True)
+
+    if direct_match_row is not None:
+        alt_conflicts = []
+        t1 = _time.perf_counter()
+        for row in candidate_rows[:direct_match_index]:
+            raw = row.AlternateNames or ''
+            for alt in raw.split('|||'):
+                if normalize_place_name(alt) == normalized_guess:
+                    alt_conflicts.append(row)
+                    break
+        print(f'alt conflict scan: {(_time.perf_counter()-t1)*1000:.1f}ms cities_checked={direct_match_index} conflicts={len(alt_conflicts)}', flush=True)
+        if alt_conflicts:
+            print(f'DISAMBIGUATION (alt name conflict): {[r.CityName for r in alt_conflicts]}', flush=True)
             return {
-                "type": "match",
-                "row": row,
+                "type": "confirmation_required",
+                "suggestions": [
+                    {"city_id": int(r.CityId), "city": r.CityName, "country_code": r.CountryCode}
+                    for r in alt_conflicts + [direct_match_row]
+                ],
             }
+        return {
+            "type": "match",
+            "row": direct_match_row,
+        }
 
     print('No direct match. Trying exact phonetic...', flush=True)
 
@@ -141,7 +172,7 @@ def find_matching_city(rows, guess_text: str):
 
         direct_alt_match = False
 
-        if getattr(row, 'AlternateNames', None):
+        if row.AlternateNames:
             for alt_name in row.AlternateNames.split('|||'):
                 alt_keys = build_match_keys(alt_name)
 
