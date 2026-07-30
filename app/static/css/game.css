@@ -43,7 +43,8 @@
 #guessBtn,
 #passBtn,
 #nextBtn,
-#expandBtn {
+#expandBtn,
+#shareScoreBtn {
     padding: 8px;
     border: 1px solid #3a4658;
     background: #1d2633;
@@ -64,7 +65,8 @@
 #guessBtn:hover,
 #passBtn:hover,
 #nextBtn:hover,
-#expandBtn:hover {
+#expandBtn:hover,
+#shareScoreBtn:hover {
     background: #253244;
     border-color: #51627c;
 }
@@ -72,7 +74,8 @@
 #guessBtn:disabled,
 #passBtn:disabled,
 #nextBtn:disabled,
-#expandBtn:disabled {
+#expandBtn:disabled,
+#shareScoreBtn:disabled {
     opacity: 0.55;
     cursor: default;
 }
@@ -87,16 +90,36 @@
     display: none;
 }
 
-#nextBtn {
+#postGameActions {
     display: none;
     margin-top: 12px;
     align-self: flex-end;
+    align-items: center;
+    gap: 8px;
+}
+
+#nextBtn {
+    display: none;
+    margin-top: 0;
+    align-self: auto;
+}
+
+#shareScoreBtn {
+    display: none;
+    margin-top: 0;
+    align-self: auto;
+}
+
+#shareScoreStatus {
+    min-width: 64px;
+    font-size: 12px;
+    color: #b7c4d4;
 }
 
 #roundTable {
     width: 100%;
     border-collapse: collapse;
-    font-size: 14px;
+    font-size: 12px;
     table-layout: auto;
 }
 
@@ -116,9 +139,10 @@
 #roundTable th:nth-child(2),
 #roundTable td:nth-child(2) {
     width: 75px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+}
+
+#roundTable td:nth-child(2) {
+    max-width: 0;
 }
 
 #roundTable th:nth-child(3),

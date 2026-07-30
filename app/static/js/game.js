@@ -1,6 +1,6 @@
 import { gameState } from './state.js';
 import { postClientLog, escapeHtml, numberFmt, ordinal } from './utils.js';
-import { fetchGameState, fetchRound, fetchAllDailySquares, submitGuessRequest, submitPassRequest } from './api.js';
+import { fetchGameState, fetchRound, fetchAllDailySquares, submitGuessRequest, submitPassRequest, setDifficultyRequest } from './api.js';
 import { getSfxCtx, playSuccess, playFail, playComplete, playPerfect } from './audio.js';
 import {
     initCesium,
@@ -11,11 +11,14 @@ import {
     showGuessedCity,
     showIncorrectGuessedCity,
     handleExpand,
-    updateExpandButton
+    updateExpandButton,
+    renderDifficultyLayer,
+    clearDifficultyLayer,
 } from './map.js';
 import {
     setMetaError,
     renderSidebar,
+    setDifficultyVisible,
     restoreSavedState,
     setGuessBoxVisible,
     setGuessControlsEnabled,
@@ -27,13 +30,15 @@ import {
     focusGuessInput,
     addRoundRow,
     wireRoundTable,
+    wireShareScoreButton,
+    setShareButtonReady,
     setSelectedRoundRow,
     showAuthConflictModal,
     hideAuthConflictModal,
     wireAuthConflictModal,
     adjustPopulationDisplay
 } from './ui.js';
-import { wireStatsOverlay, showEndGameSummary } from './stats.js';
+import { wireStatsOverlay, showEndGameSummary, shareCurrentGameScore, hydrateShareFromState, recordShareRound, isShareReady } from './stats.js';
 import { initFeedback } from './feedback.js';
 import { initAuth, resolveAuthConflict } from './auth.js';
 import { expandSquareRequest } from './api.js';
@@ -41,10 +46,88 @@ import { drawSquare } from './map.js';
 
 let endGameRounds = [];
 
+const DIFFICULTY_KEY = 'geosquare_difficulty';
+const DIFFICULTY_SLIDER_ENABLED = Boolean(window.GEOSQUARE_FLAGS?.difficultySliderEnabled);
+let currentRoundData = null;
+let currentRoundDbLevel = 1;
+
+function getStoredDifficulty() {
+    return parseInt(localStorage.getItem(DIFFICULTY_KEY) || '5', 10);
+}
+
+function setStoredDifficulty(level) {
+    localStorage.setItem(DIFFICULTY_KEY, String(level));
+}
+
+// UI value 5 = rightmost = hardest = backend level 1
+function uiToBackendLevel(uiValue) {
+    return 6 - uiValue;
+}
+
+function updateSliderFill(slider) {
+    const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+    slider.style.background = [
+        `linear-gradient(to right, rgba(255,255,255,0.7) 0 ${pct}%, rgba(255,255,255,0.15) ${pct}% 100%)`,
+        'repeating-linear-gradient(to right, transparent 0 calc(20% - 1px), rgba(255,255,255,0.28) calc(20% - 1px) 20%)'
+    ].join(', ');
+}
+
+function wireDifficultySlider(roundData) {
+    if (!DIFFICULTY_SLIDER_ENABLED) {
+        clearDifficultyLayer();
+        return;
+    }
+
+    const row = document.getElementById('difficultyRow');
+    const slider = document.getElementById('difficultySlider');
+    const helpBtn = document.getElementById('difficultyHelpBtn');
+    const tooltipBox = document.getElementById('difficultyTooltipBox');
+    if (!slider || !row || row.classList.contains('hidden')) return;
+
+    const storedUi = getStoredDifficulty();
+    slider.value = String(storedUi);
+    updateSliderFill(slider);
+    const backendLevel = uiToBackendLevel(storedUi);
+
+    if (backendLevel > 1) {
+        setDifficultyRequest(roundData.round_number, backendLevel).catch(() => {});
+        currentRoundDbLevel = backendLevel;
+        renderDifficultyLayer(roundData, backendLevel);
+    } else {
+        currentRoundDbLevel = 1;
+        clearDifficultyLayer();
+    }
+
+    slider.oninput = async (e) => {
+        const uiValue = parseInt(e.target.value, 10);
+        setStoredDifficulty(uiValue);
+        updateSliderFill(slider);
+        const newBackendLevel = uiToBackendLevel(uiValue);
+        renderDifficultyLayer(roundData, newBackendLevel);
+
+        if (newBackendLevel > currentRoundDbLevel) {
+            currentRoundDbLevel = newBackendLevel;
+            await setDifficultyRequest(roundData.round_number, newBackendLevel).catch(() => {});
+        }
+    };
+
+    if (helpBtn && tooltipBox) {
+        helpBtn.onclick = (e) => {
+            e.stopPropagation();
+            tooltipBox.classList.toggle('visible');
+        };
+        document.addEventListener('click', () => tooltipBox.classList.remove('visible'), { once: false });
+    }
+}
+
 function renderRound(data) {
+    currentRoundData = data;
+    currentRoundDbLevel = 1;
+    setDifficultyVisible(DIFFICULTY_SLIDER_ENABLED && !gameState.gameCompleted);
     renderSidebar(data);
     renderRoundMap(data);
     updateExpandButton(data);
+    wireDifficultySlider(data);
 
     const guessInput = document.getElementById('guessInput');
 
@@ -71,6 +154,7 @@ function handleEndGameRoundSelect(roundNumber) {
 async function enterEndGameGlobe() {
     setGuessControlsEnabled(false);
     setGuessBoxVisible(false);
+    setShareButtonReady(isShareReady());
     showNextButton(5);
     await loadEndGameRounds();
     setSelectedRoundRow(5);
@@ -87,6 +171,7 @@ function wireGuessing() {
 function wireRoundButtons() {
     document.getElementById('nextBtn').onclick = handleNextRound;
     document.getElementById('passBtn').onclick = handlePass;
+    wireShareScoreButton(shareCurrentGameScore);
 }
 
 function wireExpandButton() {
@@ -156,6 +241,11 @@ export async function handlePass() {
         rank: '—',
         score: 0
     }, gameState.currentRound);
+    recordShareRound({
+        city: '—',
+        rank: '—',
+        score: 0
+    }, gameState.currentRound);
     adjustPopulationDisplay();
 
     drawCities([largestCity]);
@@ -215,6 +305,7 @@ export async function submitGuess() {
 
             showGuessedCity(data);
             addRoundRow(data, gameState.currentRound);
+            recordShareRound(data, gameState.currentRound);
             adjustPopulationDisplay();
             clearGuessInput();
             setGuessBoxVisible(false);
@@ -271,6 +362,12 @@ export async function initGame() {
     gameState.currentRound = data.round_number;
     gameState.isPerfect = state.is_perfect;
     gameState.roundLocked = false;
+    gameState.gameCompleted = Boolean(state.completed_at);
+    hydrateShareFromState(state);
+
+    if (state.completed_at) {
+        setDifficultyVisible(false);
+    }
 
     renderRound(data);
     restoreSavedState(state);

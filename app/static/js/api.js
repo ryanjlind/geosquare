@@ -58,3 +58,13 @@ export async function expandSquareRequest(roundNumber) {
 
     return { response, data };
 }
+
+export async function setDifficultyRequest(roundNumber, level) {
+    const { response, data } = await fetchJson('/api/difficulty', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ round_number: roundNumber, level }),
+    });
+
+    return { response, data };
+}

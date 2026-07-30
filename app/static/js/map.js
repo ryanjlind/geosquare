@@ -5,6 +5,12 @@ import { expandSquareRequest } from './api.js';
 let expansionEntity = null;
 let currentBounds = null;
 let baseSquareEntity = null;
+let difficultyEntities = [];
+
+const EASY_CITY_MIN_POPULATION = 1_000_000;
+const EASY_CITY_DOT_MIN_SIZE = 6;
+const EASY_CITY_DOT_MAX_SIZE = 10;
+const DEFAULT_GLOBE_ZOOM_HEIGHT = 10_000_000;
 
 export async function initCesium() {
     await postClientLog('init_cesium_started', {
@@ -54,12 +60,14 @@ export async function initCesium() {
         window.geoViewer.scene.screenSpaceCameraController.inertiaTranslate = 0;
         window.geoViewer.scene.screenSpaceCameraController.inertiaZoom = 0;
         window.geoViewer.scene.screenSpaceCameraController.minimumZoomDistance = 150000;
+        window.geoViewer.scene.screenSpaceCameraController.maximumZoomDistance = DEFAULT_GLOBE_ZOOM_HEIGHT;
 
         window.geoViewer.scene.renderError.addEventListener(function (scene, error) {
             postClientLog('cesium_render_error', {
                 message: error?.message || String(error),
                 stack: error?.stack || null
             });
+            window.geoViewer.useDefaultRenderLoop = true;
         });
     } catch (error) {
         await postClientLog('init_cesium_failed', {
@@ -101,6 +109,7 @@ export function drawSquare(data, options = {}) {
             name: `Round ${data.round_number || ''}`.trim(),
             rectangle: {
                 coordinates: rect,
+                height: 0,
                 material: Cesium.Color.YELLOW.withAlpha(0.2),
                 outline: true,
                 outlineColor: Cesium.Color.YELLOW,
@@ -242,7 +251,7 @@ export function zoomToSquare(bounds) {
     const centerLat = (bounds.min_lat + bounds.max_lat) / 2;
     const centerLon = (bounds.min_lon + bounds.max_lon) / 2;
 
-    const rectangle = Cesium.Cartesian3.fromDegrees(centerLon, centerLat, 10000000)    
+    const rectangle = Cesium.Cartesian3.fromDegrees(centerLon, centerLat, DEFAULT_GLOBE_ZOOM_HEIGHT)
     
     window.geoViewer.camera.flyTo({
         destination: rectangle,
@@ -423,6 +432,7 @@ function animateExpansion(from, to, duration = 900) {
                 from.max_lon,
                 from.max_lat
             ),
+            height: 0,
             material: Cesium.Color.YELLOW.withAlpha(0.35),
             outline: true,
             outlineColor: Cesium.Color.YELLOW,
@@ -458,6 +468,7 @@ function animateExpansion(from, to, duration = 900) {
                     to.max_lon,
                     to.max_lat
                 ),
+                height: 0,
                 material: Cesium.Color.YELLOW.withAlpha(0.2),
                 outline: true,
                 outlineColor: Cesium.Color.YELLOW,
@@ -514,5 +525,56 @@ export async function handleExpand() {
     } finally {
         btn.disabled = false;
         btn.classList.remove('pressed');
+    }
+}
+
+// ── Difficulty visual aids ─────────────────────────────────────────────────
+
+export function clearDifficultyLayer() {
+    difficultyEntities.forEach((e) => window.geoViewer.entities.remove(e));
+    difficultyEntities = [];
+}
+
+function _populationDotSize(population, minPopulation, maxPopulation) {
+    if (maxPopulation <= minPopulation) {
+        return Math.round((EASY_CITY_DOT_MIN_SIZE + EASY_CITY_DOT_MAX_SIZE) / 2);
+    }
+
+    const minLog = Math.log10(minPopulation);
+    const maxLog = Math.log10(maxPopulation);
+    const popLog = Math.log10(population);
+    const t = (popLog - minLog) / (maxLog - minLog);
+    return EASY_CITY_DOT_MIN_SIZE + (EASY_CITY_DOT_MAX_SIZE - EASY_CITY_DOT_MIN_SIZE) * t;
+}
+
+export async function renderDifficultyLayer(squareData, level) {
+    clearDifficultyLayer();
+
+    // First easy level: show large-city dots only.
+    if (level < 2 || !squareData || !squareData.cities || !squareData.cities.length) {
+        return;
+    }
+
+    const qualifying = squareData.cities.filter((city) => city.population >= EASY_CITY_MIN_POPULATION);
+    if (!qualifying.length) {
+        return;
+    }
+
+    const minPop = Math.min(...qualifying.map((c) => c.population));
+    const maxPop = Math.max(...qualifying.map((c) => c.population));
+
+    for (const city of qualifying) {
+        const dot = window.geoViewer.entities.add({
+            position: Cesium.Cartesian3.fromDegrees(city.longitude, city.latitude),
+            point: {
+                pixelSize: _populationDotSize(city.population, minPop, maxPop),
+                color: Cesium.Color.BLACK,
+                outlineColor: Cesium.Color.WHITE,
+                outlineWidth: 1,
+                disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            }
+        });
+
+        difficultyEntities.push(dot);
     }
 }

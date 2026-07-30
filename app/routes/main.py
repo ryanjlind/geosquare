@@ -21,6 +21,7 @@ from app.core.game_service import (
     get_player_stats_payload,
     submit_guess,
     submit_pass,
+    set_round_difficulty,
     get_all_daily_square_data,
     get_all_daily_square_data_preview,
     expand_square
@@ -37,6 +38,15 @@ main_bp = Blueprint("main", __name__)
 client_log_logger = logging.getLogger("geosquare.client")
 
 
+def _env_flag(name, default=False):
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+
+    value = raw.strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
 def _identity():
     with get_conn() as conn:
         cur = conn.cursor()
@@ -45,7 +55,11 @@ def _identity():
 
 @main_bp.route("/")
 def index():
-    return render_template("index.html", cesium_ion_token=os.getenv("CESIUM_ION_TOKEN", ""))
+    return render_template(
+        "index.html",
+        cesium_ion_token=os.getenv("CESIUM_ION_TOKEN", ""),
+        difficulty_slider_enabled=_env_flag("GEOSQUARE_ENABLE_DIFFICULTY_SLIDER", default=False),
+    )
 
 
 @main_bp.route("/api/client-log", methods=["POST"])
@@ -154,6 +168,18 @@ def player_stats():
 
     body, status = get_player_stats_payload(identity["user_id"])
 
+    resp = jsonify(body)
+    resp.status_code = status
+    return attach_session_cookie(resp, identity["user_id"], identity["session_id"])
+
+
+@main_bp.route("/api/difficulty", methods=["POST"])
+def difficulty():
+    identity = _identity()
+    payload = request.get_json()
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Invalid or missing JSON body"}), 400
+    body, status = set_round_difficulty(payload, identity["user_id"], identity["session_id"])
     resp = jsonify(body)
     resp.status_code = status
     return attach_session_cookie(resp, identity["user_id"], identity["session_id"])

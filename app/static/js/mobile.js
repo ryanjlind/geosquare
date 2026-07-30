@@ -69,7 +69,7 @@ import { gameState } from './state.js';
         closeBtn,
         guessBox,
         guessFeedback,
-        nextBtn,
+        postGameActions,
     }) {
         const scrim = document.createElement('div');
         scrim.className = 'mobile-drawer-scrim';
@@ -103,7 +103,7 @@ import { gameState } from './state.js';
 
         bottomTray.appendChild(guessBox);
         bottomTray.appendChild(guessFeedback);
-        bottomTray.appendChild(nextBtn);
+        bottomTray.appendChild(postGameActions);
 
         function syncMobileHeroStats() {
             const mobileRoundStat = document.getElementById('mobileRoundStat');
@@ -202,16 +202,16 @@ import { gameState } from './state.js';
 
         const guessBox = document.getElementById('guessBox');
         const guessFeedback = document.getElementById('guessFeedback');
-        const nextBtn = document.getElementById('nextBtn');
+        const postGameActions = document.getElementById('postGameActions');
 
-        if (!guessBox || !guessFeedback || !nextBtn) return;
+        if (!guessBox || !guessFeedback || !postGameActions) return;
 
         initGameMobile({
             sidebar,
             closeBtn,
             guessBox,
             guessFeedback,
-            nextBtn,
+            postGameActions,
         });
 
         document.body.dataset.mobileInit = 'true';

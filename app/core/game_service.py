@@ -1,5 +1,6 @@
 # core/game_service.py
 
+import math
 from time import perf_counter
 
 from app.core.db import get_conn
@@ -14,6 +15,8 @@ from app.core.game_queries import (
     get_square_city_count,
     get_square_id_for_round,
     get_base_square_id_for_round,
+    get_capital_city_in_bounds,
+    upsert_session_round_difficulty,
     increment_session_total_score,
     insert_correct_guess,
     find_city_anywhere,
@@ -113,7 +116,51 @@ def get_daily_square_data(user_id: int, session_id: int | None, round_number: in
 
         has_next = has_next_expansion_level(cur, game_id, round_number, square_id)
 
-        return map_square(row, cities_rows, city_count_row, has_next)
+        result = map_square(row, cities_rows, city_count_row, has_next)
+        result['capital_city'] = get_capital_city_in_bounds(
+            cur,
+            float(row.MinLat), float(row.MinLon),
+            float(row.MaxLat), float(row.MaxLon),
+        )
+        return result
+        result['capital_city'] = get_capital_city_in_bounds(
+            cur,
+            float(row.MinLat), float(row.MinLon),
+            float(row.MaxLat), float(row.MaxLon),
+        )
+        return result
+
+def set_round_difficulty(payload: dict, user_id: int, session_id: int | None):
+    if "round_number" not in payload:
+        return {"error": "round_number is required."}, 400
+    if "level" not in payload:
+        return {"error": "level is required."}, 400
+
+    round_number = int(payload["round_number"])
+    level = int(payload["level"])
+
+    if not 1 <= level <= 5:
+        return {"error": "level must be between 1 and 5."}, 400
+
+    with get_conn() as conn:
+        cur = conn.cursor()
+
+        session = get_current_session(cur, user_id, session_id)
+        if not session:
+            return {"error": "No game found for today."}, 404
+
+        session_id = int(session.SessionId)
+        game_id = int(session.GameId)
+
+        square_row = get_square_id_for_round(cur, game_id, round_number)
+        if not square_row:
+            return {"error": "Round not found."}, 404
+
+        upsert_session_round_difficulty(cur, session_id, round_number, int(square_row.SquareId), level)
+        conn.commit()
+
+    return {"ok": True, "stored_level": level}, 200
+
 
 def submit_guess(payload: dict, user_id: int, session_id: int | None):
     t0 = perf_counter()
@@ -202,9 +249,11 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None):
                 return {"error": "Invalid match result."}, 500
 
         population = int(matched.Population)
+        difficulty_level = int(existing_round.DifficultyLevel) if existing_round else 1
         score = compute_score(rows, population)
         expansion_level = int(expansion_level)
         score = int(score * (1 - (expansion_level * 0.2)))
+        score = math.ceil(score / (1 + (difficulty_level - 1) * 0.25))
 
         set_round_completed(cur, session_id, round_number, square_id, score)
 

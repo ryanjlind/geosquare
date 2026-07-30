@@ -2,6 +2,107 @@ import { fetchGameState, fetchPlayerStats, fetchJson } from './api.js';
 import { gameState } from './state.js';
 import { escapeHtml, numberFmt, parseFormattedInt } from './utils.js';
 
+let shareStatusTimerId = null;
+let shareSource = {
+    gameDate: '',
+    rounds: new Map(),
+    total: 0,
+};
+
+function toShareRound(result, roundNumber) {
+    const score = Number(result.score ?? result.points ?? 0) || 0;
+    const expansionLevel = Number(result.expansion_level ?? 0) || 0;
+    const expansionPenalty = expansionLevel > 0 ? `-${expansionLevel * 20}%` : '';
+
+    return {
+        round: Number(roundNumber) || 0,
+        city: result.city ?? result.city_name ?? '—',
+        rank: result.rank ?? '—',
+        points: score,
+        expansionPenalty,
+    };
+}
+
+function recomputeShareTotal() {
+    shareSource.total = Array.from(shareSource.rounds.values())
+        .reduce((sum, round) => sum + (round.points || 0), 0);
+}
+
+function getShareRoundsSorted() {
+    return Array.from(shareSource.rounds.values())
+        .sort((a, b) => a.round - b.round);
+}
+
+export function hydrateShareFromState(state) {
+    shareSource = {
+        gameDate: state?.game_date || '',
+        rounds: new Map(),
+        total: 0,
+    };
+
+    for (const round of (state?.completed_rounds || [])) {
+        const guess = round.guesses && round.guesses.length ? round.guesses[0] : null;
+
+        shareSource.rounds.set(
+            Number(round.round_number) || 0,
+            {
+                round: round.round_number ?? 0,
+                city: guess ? guess.city_name : '—',
+                rank: guess ? (guess.rank ?? '—') : '—',
+                points: round.score ?? 0,
+                expansionPenalty: (round.expansion_level ?? 0) > 0 ? `-${(round.expansion_level ?? 0) * 20}%` : '',
+            }
+        );
+    }
+
+    recomputeShareTotal();
+}
+
+export function recordShareRound(result, roundNumber) {
+    const shareRound = toShareRound(result, roundNumber);
+    shareSource.rounds.set(shareRound.round, shareRound);
+    recomputeShareTotal();
+}
+
+export function isShareReady() {
+    return shareSource.rounds.size > 0;
+}
+
+function buildShareSummaryText({ gameDate, total, solved, totalRounds, rounds, isPerfect }) {
+    const headline = isPerfect ? 'Perfect Game' : 'Game Complete';
+    const roundLines = (rounds || []).map((round) => {
+        const city = round.city && round.city !== '—' ? round.city : 'Pass';
+        const penalty = round.expansionPenalty ? ` ${round.expansionPenalty}` : '';
+        return `R${round.round}: ${city} | Rank ${round.rank} | ${numberFmt(round.points)} pts${penalty}`;
+    });
+
+    return [
+        `GeoSquare ${gameDate || ''}`.trim(),
+        `${headline} | ${solved}/${totalRounds} solved | ${numberFmt(total || 0)} points`,
+        ...roundLines
+    ].join('\n');
+}
+
+async function copyTextToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'absolute';
+    textarea.style.left = '-9999px';
+
+    document.body.appendChild(textarea);
+    textarea.select();
+
+    const copied = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return copied;
+}
+
 export function buildRoundsFromState(state) {
     return (state.completed_rounds || []).map((round) => {
         const guess = round.guesses && round.guesses.length ? round.guesses[0] : null;
@@ -188,6 +289,55 @@ export function wireStatsOverlay() {
 
 export function hideStatsOverlay() {
     document.getElementById('statsOverlay').style.display = 'none';
+}
+
+export async function shareCurrentGameScore() {
+    const shareStatus = document.getElementById('shareScoreStatus');
+
+    try {
+        const rounds = getShareRoundsSorted();
+
+        if (!rounds.length) {
+            if (shareStatus) {
+                shareStatus.textContent = 'Not ready';
+            }
+            return;
+        }
+
+        const totalRounds = rounds.length;
+        const solved = rounds.filter((round) => round.points > 0).length;
+        const total = shareSource.total || 0;
+        const isPerfect = totalRounds > 0 && solved === totalRounds;
+
+        const shareText = buildShareSummaryText({
+            gameDate: shareSource.gameDate || '',
+            total,
+            solved,
+            totalRounds,
+            rounds,
+            isPerfect,
+        });
+
+        await copyTextToClipboard(shareText);
+
+        if (shareStatus) {
+            shareStatus.textContent = 'Copied';
+        }
+    } catch (_error) {
+        if (shareStatus) {
+            shareStatus.textContent = 'Copy failed';
+        }
+    }
+
+    if (shareStatusTimerId) {
+        window.clearTimeout(shareStatusTimerId);
+    }
+
+    if (shareStatus) {
+        shareStatusTimerId = window.setTimeout(() => {
+            shareStatus.textContent = '';
+        }, 1800);
+    }
 }
 
 export function showStatsOverlay() {
@@ -394,13 +544,14 @@ export async function showEndGameSummary() {
     const lastGraphPoint = stats.graph_points?.length
         ? stats.graph_points[stats.graph_points.length - 1]
         : null;
+    const gameDate = lastGraphPoint ? lastGraphPoint.game_date : '—';
 
     renderStatsOverlay(stats, {
         total,
         solved,
         totalRounds,
         rounds,
-        gameDate: lastGraphPoint ? lastGraphPoint.game_date : '—',
+        gameDate,
         bestRound: bestRound && bestRound.points > 0 ? bestRound : null
     });
 

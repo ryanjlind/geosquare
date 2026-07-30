@@ -105,13 +105,48 @@ def get_session_round(cur, session_id: int, round_number: int):
             RoundNumber,
             SquareId,
             Score,
-            RoundStatus
+            RoundStatus,
+            ISNULL(DifficultyLevel, 1) AS DifficultyLevel
         FROM dbo.GameSessionRounds
         WHERE SessionId = ?
           AND RoundNumber = ?
         ORDER BY SessionRoundId DESC
     """, session_id, round_number)
     return cur.fetchone()
+
+
+def upsert_session_round_difficulty(cur, session_id: int, round_number: int, square_id: int, level: int) -> None:
+    cur.execute("""
+        MERGE dbo.GameSessionRounds AS target
+        USING (SELECT ? AS SessionId, ? AS RoundNumber) AS src
+        ON target.SessionId = src.SessionId AND target.RoundNumber = src.RoundNumber
+        WHEN MATCHED AND ISNULL(target.DifficultyLevel, 1) < ? THEN
+            UPDATE SET DifficultyLevel = ?
+        WHEN NOT MATCHED THEN
+            INSERT (SessionId, RoundNumber, SquareId, RoundStatus, Score, DifficultyLevel)
+            VALUES (src.SessionId, src.RoundNumber, ?, 'InProgress', 0, ?);
+    """, session_id, round_number, level, level, square_id, level)
+
+
+def get_capital_city_in_bounds(cur, min_lat: float, min_lon: float, max_lat: float, max_lon: float):
+    cur.execute("""
+        SELECT TOP 1 CityName, CountryCode, Latitude, Longitude
+        FROM dbo.GeoCities
+        WHERE FeatureCode = 'PPCL'
+          AND IsActive = 1
+          AND Latitude BETWEEN ? AND ?
+          AND Longitude BETWEEN ? AND ?
+    """, min_lat, max_lat, min_lon, max_lon)
+    row = cur.fetchone()
+    if not row:
+        return None
+    return {
+        'city_name': row.CityName,
+        'country_code': row.CountryCode,
+        'latitude': float(row.Latitude),
+        'longitude': float(row.Longitude),
+    }
+
 
 def insert_correct_guess(cur, session_round_id: int, city_name: str, population: int, score: int):
     cur.execute("""

@@ -22,9 +22,23 @@
             </div>
             <div class="sidebar-divider"></div>
             <h1>GeoSquare</h1>
-            <a href="/profile" class="sidebar-support-link-btn">My Stats</a>
-            <button id="loginBtn">Login to play across devices</button>
-            <button id="logoutBtn" class="hidden">Logout</button>
+            <div class="sidebar-stats-row">
+                <div class="sidebar-stats-links">
+                    <a href="/profile" class="sidebar-support-link-btn">My Stats</a>
+                    <button id="loginBtn">Login to play across devices</button>
+                    <button id="logoutBtn" class="hidden">Logout</button>
+                </div>
+                <div id="difficultyRow" class="hidden">
+                    <span class="difficulty-label-easy">Easy</span>
+                    <input type="range" id="difficultySlider" min="1" max="5" step="1" value="5" list="diffTicks">
+                    <datalist id="diffTicks">
+                        <option value="1"><option value="2"><option value="3"><option value="4"><option value="5">
+                    </datalist>
+                    <span class="difficulty-label-hard">Hard</span>
+                    <button class="difficulty-help-btn" id="difficultyHelpBtn" type="button" aria-label="Difficulty info">?</button>
+                    <div class="difficulty-tooltip-box" id="difficultyTooltipBox">Adjust the difficulty to see more labels on the globe for a point sacrifice. Warning — adjusting the difficulty will harm your score for this round even if you move it back after.</div>
+                </div>
+            </div>
             <div class="sidebar-divider"></div>
             <div id="meta"></div>
 
@@ -65,7 +79,11 @@
                 </tfoot>
             </table>
 
-            <button id="nextBtn" class="hidden" type="button">Next</button>                       
+            <div id="postGameActions">
+                <button id="nextBtn" class="hidden" type="button">Next</button>
+                <button id="shareScoreBtn" class="hidden" type="button">Share</button>
+                <span id="shareScoreStatus" aria-live="polite"></span>
+            </div>
                         
             <div class="sidebar-attribution">
                 <div class="sidebar-attribution-title">Credits</div>
@@ -301,6 +319,9 @@
     </div>
     <script>
         window.CESIUM_ION_TOKEN = {{ cesium_ion_token|tojson }};
+        window.GEOSQUARE_FLAGS = {
+            difficultySliderEnabled: {{ difficulty_slider_enabled|tojson }}
+        };
     </script>
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
     <script type="module" src="{{ url_for('static', filename='js/app.js') }}?v=2"></script>

@@ -35,6 +35,16 @@ export function renderSidebar(data) {
     clearGuessFeedback();
 }
 
+export function setDifficultyVisible(visible) {
+    const row = document.getElementById('difficultyRow');
+    if (!row) return;
+    if (visible) {
+        row.classList.remove('hidden');
+    } else {
+        row.classList.add('hidden');
+    }
+}
+
 export function clearRoundTable() {
     document.querySelector('#roundTable tbody').innerHTML = '';
     document.getElementById('totalPoints').textContent = '0';
@@ -75,13 +85,78 @@ function formatScoreWithPenalty(score, expansionLevel) {
 }
 
 export function hideNextButton() {
-    document.getElementById('nextBtn').style.display = 'none';
+    const actions = document.getElementById('postGameActions');
+    const nextBtn = document.getElementById('nextBtn');
+    const shareBtn = document.getElementById('shareScoreBtn');
+    const shareStatus = document.getElementById('shareScoreStatus');
+
+    if (actions) {
+        actions.style.display = 'none';
+    }
+
+    nextBtn.style.display = 'none';
+
+    if (shareBtn) {
+        shareBtn.style.display = 'none';
+        shareBtn.dataset.ready = '0';
+    }
+
+    if (shareStatus) {
+        shareStatus.textContent = '';
+    }
 }
 
 export function showNextButton(currentRound) {
+    const actions = document.getElementById('postGameActions');
     const btn = document.getElementById('nextBtn');
+    const shareBtn = document.getElementById('shareScoreBtn');
+    const shareStatus = document.getElementById('shareScoreStatus');
+
     btn.textContent = currentRound === 5 ? 'Show Summary' : 'Next Round';
+
+    if (actions) {
+        actions.style.display = 'flex';
+    }
+
     btn.style.display = 'inline-block';
+
+    if (shareBtn) {
+        const shareReady = shareBtn.dataset.ready === '1';
+        shareBtn.style.display = currentRound === 5 && shareReady ? 'inline-block' : 'none';
+    }
+
+    if (shareStatus) {
+        shareStatus.textContent = '';
+    }
+}
+
+export function setShareButtonReady(isReady) {
+    const shareBtn = document.getElementById('shareScoreBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    if (!shareBtn) {
+        return;
+    }
+
+    shareBtn.dataset.ready = isReady ? '1' : '0';
+
+    if (!isReady) {
+        shareBtn.style.display = 'none';
+        return;
+    }
+
+    const isSummaryVisible = nextBtn && nextBtn.style.display !== 'none' && nextBtn.textContent === 'Show Summary';
+    shareBtn.style.display = isSummaryVisible ? 'inline-block' : 'none';
+}
+
+export function wireShareScoreButton(onShareClick) {
+    const shareBtn = document.getElementById('shareScoreBtn');
+
+    if (!shareBtn) {
+        return;
+    }
+
+    shareBtn.onclick = onShareClick;
 }
 
 export function addRoundRow(result, roundNumber) {
