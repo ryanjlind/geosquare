@@ -503,6 +503,19 @@ export function renderStatsOverlay(stats, todaySummary) {
     renderStatsChart(stats);
 }
 
+export function renderEndGameFeedbackFromState(state) {
+    const rounds = buildRoundsFromState(state);
+    const solved = rounds.filter((round) => round.points > 0).length;
+    const totalRounds = rounds.length;
+    const total = rounds.reduce((sum, round) => sum + (round.points || 0), 0);
+    const isPerfect = totalRounds > 0 && solved === totalRounds;
+
+    const feedback = document.getElementById('guessFeedback');
+    feedback.innerHTML = isPerfect
+        ? `<div><b>Perfect Game!</b></div><div style="margin-top:8px;">You completed all ${totalRounds} squares and scored <b>${numberFmt(total)}</b> points.</div>`
+        : `<div><b>Game Complete</b></div><div style="margin-top:8px;">You completed <b>${solved} / ${totalRounds}</b> squares and scored <b>${numberFmt(total)}</b> points.</div>`;
+}
+
 export async function showEndGameSummary() {
     const { response, data: state } = await fetchGameState();
     if (!response.ok) {
@@ -535,10 +548,7 @@ export async function showEndGameSummary() {
     const totalRounds = rounds.length;
     const isPerfect = totalRounds > 0 && solved === totalRounds;
 
-    const feedback = document.getElementById('guessFeedback');
-    feedback.innerHTML = isPerfect
-        ? `<div><b>Perfect Game!</b></div><div style="margin-top:8px;">You completed all ${totalRounds} squares and scored <b>${numberFmt(total)}</b> points.</div>`
-        : `<div><b>Game Complete</b></div><div style="margin-top:8px;">You completed <b>${solved} / ${totalRounds}</b> squares and scored <b>${numberFmt(total)}</b> points.</div>`;
+    renderEndGameFeedbackFromState(state);
 
     const stats = await fetchPlayerStats();
     const lastGraphPoint = stats.graph_points?.length

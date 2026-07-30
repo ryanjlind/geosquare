@@ -38,7 +38,7 @@ import {
     wireAuthConflictModal,
     adjustPopulationDisplay
 } from './ui.js';
-import { wireStatsOverlay, showEndGameSummary, shareCurrentGameScore, hydrateShareFromState, recordShareRound, isShareReady } from './stats.js';
+import { wireStatsOverlay, showEndGameSummary, shareCurrentGameScore, hydrateShareFromState, recordShareRound, isShareReady, renderEndGameFeedbackFromState } from './stats.js';
 import { initFeedback } from './feedback.js';
 import { initAuth, resolveAuthConflict } from './auth.js';
 import { expandSquareRequest } from './api.js';
@@ -400,6 +400,7 @@ export async function initGame() {
     });
 
     if (state.completed_at) {
+        renderEndGameFeedbackFromState(state);
         await enterEndGameGlobe();
     }
 }
