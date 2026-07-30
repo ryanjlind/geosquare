@@ -342,6 +342,7 @@ def submit_pass(payload: dict, user_id: int, session_id: int | None):
 def get_game_state_payload(user_id: int, session_id: int | None):
     import time
     print(f"{time.perf_counter():.9f} get_game_state_payload: ENTER", flush=True)
+    game_date = get_effective_game_date()
 
     with get_conn() as conn:
         print(f"{time.perf_counter():.9f} get_game_state_payload: got connection", flush=True)
@@ -385,6 +386,7 @@ def get_game_state_payload(user_id: int, session_id: int | None):
 
         map_t0 = time.perf_counter()
         result = map_game_state(session, completed, is_authenticated, username)
+        result["game_date"] = game_date
         print(
             f"{time.perf_counter():.9f} get_game_state_payload: result built elapsed_ms={(time.perf_counter() - map_t0) * 1000.0:.1f}",
             flush=True,
