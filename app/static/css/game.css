@@ -93,8 +93,11 @@
 #postGameActions {
     display: none;
     margin-top: 12px;
-    align-self: flex-end;
+    margin-bottom: 8px;
+    align-self: stretch;
+    width: 100%;
     align-items: center;
+    justify-content: center;
     gap: 8px;
 }
 
@@ -111,9 +114,12 @@
 }
 
 #shareScoreStatus {
-    min-width: 64px;
     font-size: 12px;
     color: #b7c4d4;
+}
+
+#shareScoreStatus:empty {
+    display: none;
 }
 
 #roundTable {
