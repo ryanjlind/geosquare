@@ -73,7 +73,7 @@ function buildShareSummaryText({ gameDate, total, solved, totalRounds, rounds, i
     const roundLines = (rounds || []).map((round) => {
         const city = round.city && round.city !== '—' ? round.city : 'Pass';
         const penalty = round.expansionPenalty ? ` ${round.expansionPenalty}` : '';
-        return `R${round.round}: ${city} | Rank ${round.rank} | ${numberFmt(round.points)} pts${penalty}`;
+        return `R${round.round}: ${city} | ${numberFmt(round.points)} pts${penalty}`;
     });
 
     return [
