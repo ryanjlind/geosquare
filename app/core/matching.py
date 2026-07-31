@@ -19,16 +19,20 @@ NEARBY_NOTORIETY_SCALE = 10.0
 NAME_CONNECTOR_WORDS = {
     'a', 'aan', 'af', 'ai', 'al', 'ale', 'alla', 'alle', 'am', 'an',
     'and', 'ar', 'as', 'at', 'auf', 'au', 'aux', 'av', 'az', 'bajo',
-    'bei', 'bij', 'by', 'chez', 'con', 'contra', 'cu', 'd', 'da', 'dal',
+    'bay', 'beach', 'bei', 'bij', 'by', 'chez', 'city', 'con', 'contra',
+    'cu', 'd', 'da', 'dal',
     'dalla', 'das', 'de', 'dei', 'del', 'della', 'delle', 'dem', 'den',
     'der', 'des', 'di', 'die', 'din', 'do', 'dos', 'du', 'e', 'el',
     'em', 'en', 'entre', 'es', 'eta', 'et', 'for', 'from', 'het', 'i',
-    'im', 'in', 'kod', 'kraj', 'l', 'la', 'langa', 'las', 'le', 'les',
-    'lo', 'los', 'lui', 'na', 'nam', 'nan', 'nas', 'nad', 'near', 'nel',
+    'falls', 'fort', 'harbor', 'harbour', 'heights', 'im', 'in', 'island',
+    'isle', 'kod', 'kraj', 'l', 'la', 'lake', 'langa', 'las', 'le', 'les',
+    'lo', 'los', 'lui', 'mount', 'mountain', 'na', 'nam', 'nan', 'nas',
+    'nad', 'near', 'nel',
     'nella', 'no', 'nos', 'ob', 'of', 'og', 'on', 'onder', 'op', 'pa',
-    'pe', 'pod', 'pri', 'prie', 'przy', 'se', 'si', 'sob', 'sobre',
+    'pe', 'pod', 'port', 'pri', 'prie', 'przy', 'river', 'se', 'si',
+    'sob', 'sobre', 'springs',
     'sotto', 'sous', 'sul', 'sulla', 'sur', 'ta', 'te', 'ten', 'ter',
-    'the', 'til', 'till', 'to', 'tot', 'u', 'unter', 'upon', 'v', 'van',
+    'the', 'til', 'till', 'to', 'tot', 'u', 'unter', 'upon', 'v', 'valley', 'van',
     've', 'ved', 'vom', 'von', 'w', 'wa', 'with', 'y', 'ya', 'yn', 'yr',
     'z', 'za', 'ze', 'zu', 'zum', 'zur',
 }
@@ -112,8 +116,6 @@ def _token_similarity(guess_token: str, candidate_token: str) -> float:
 
 
 def _substantive_tokens(tokens: list[str]) -> list[str]:
-    if len(tokens) == 1:
-        return tokens
     return [token for token in tokens if token not in NAME_CONNECTOR_WORDS]
 
 
@@ -126,6 +128,9 @@ def _score_name_pair(guess_name: str, candidate_name: str) -> float:
 
     guess_substantive_tokens = _substantive_tokens(guess_tokens)
     candidate_substantive_tokens = _substantive_tokens(candidate_tokens)
+
+    if not guess_substantive_tokens or not candidate_substantive_tokens:
+        return 100.0 if guess_tokens == candidate_tokens else 0.0
 
     if (
         _token_similarity(
@@ -268,10 +273,6 @@ def find_matching_city(
 
     guess_keys = build_match_keys(guess_text)
     normalized_guess = normalize_place_name(guess_text)
-
-    if 'city' not in normalized_guess.split():
-        guess_keys.add(f'{normalized_guess} city')
-        guess_keys.add(f'{normalized_guess}city')
 
     summary_parts = []
 
