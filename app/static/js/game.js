@@ -278,11 +278,12 @@ export async function submitGuess() {
             window.pendingGuessConfirmation = {
                 guess,
                 round: gameState.currentRound,
-                candidates: data.candidates
+                candidates: data.candidates,
+                nearbyCity: data.nearby_city || null
             };
 
             if (typeof showGuessConfirmationModal === "function") {
-                showGuessConfirmationModal(data.candidates, guess);
+                showGuessConfirmationModal(data.candidates, data.nearby_city || null);
             }
 
             return;
@@ -405,7 +406,7 @@ export async function initGame() {
     }
 }
 
-export function showGuessConfirmationModal(candidates) {
+export function showGuessConfirmationModal(candidates, nearbyCity) {
     const modal = document.getElementById('guessConflictModal');
     const list = document.getElementById('guessConflictList');
 
@@ -451,13 +452,19 @@ export function showGuessConfirmationModal(candidates) {
     const noneBtn = document.createElement('button');
     noneBtn.type = 'button';
     noneBtn.className = 'modal-btn';
-    noneBtn.textContent = 'None of the above';
+    noneBtn.textContent = 'None of these';
 
-    noneBtn.onclick = async () => {
-        const modal = document.getElementById('guessConflictModal');
+    noneBtn.onclick = () => {
         modal.classList.add('hidden');
-
         window.pendingGuessConfirmation = null;
+        setGuessFeedback('<br>Not in the square or population < 15,000');
+
+        if (nearbyCity) {
+            showIncorrectGuessedCity(nearbyCity);
+        }
+
+        playFail();
+        focusGuessInput();
     };
 
     list.appendChild(noneBtn);

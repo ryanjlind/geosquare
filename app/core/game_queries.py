@@ -181,23 +181,59 @@ def complete_session(cur, session_id: int):
         WHERE SessionId = ?
     """, session_id)
 
-def find_city_anywhere(cur, guess_text: str):
-    normalized_guess = strip_accents(guess_text).lower().strip()
+def find_exact_city_in_expansions(
+    cur,
+    game_id: int,
+    round_number: int,
+    current_expansion_level: int,
+    guess_text: str,
+):
+    city_guess = guess_text.split(',', 1)[0]
+    normalized_guess = strip_accents(city_guess).lower().strip()
 
     cur.execute("""
         SELECT TOP 1
-            CityId,
-            CityName,
-            CountryCode,
-            Latitude,
-            Longitude,
-            Population
-        FROM dbo.GeoCities
-        WHERE IsActive = 1
-          AND CityNameLower = ?
-          AND FeatureCode <> 'PPLX'
-        ORDER BY Population DESC, CityId ASC
-    """, normalized_guess)
+            c.CityId,
+            c.CityName,
+            c.CountryCode,
+            c.Latitude,
+            c.Longitude,
+            c.Population,
+            gc.NotorietyScore,
+            gr.ExpansionLevel
+        FROM dbo.GameRounds gr
+        INNER JOIN dbo.GameSquareCities c
+            ON c.SquareId = gr.SquareId
+        INNER JOIN dbo.GeoCities gc
+            ON gc.CityId = c.CityId
+        WHERE gr.GameId = ?
+          AND gr.RoundNumber = ?
+          AND gr.ExpansionLevel > ?
+                    AND NOT EXISTS (
+                            SELECT 1
+                            FROM dbo.GameRounds current_gr
+                            INNER JOIN dbo.GameSquareCities current_c
+                                    ON current_c.SquareId = current_gr.SquareId
+                            WHERE current_gr.GameId = gr.GameId
+                                AND current_gr.RoundNumber = gr.RoundNumber
+                                AND current_gr.ExpansionLevel = ?
+                                AND current_c.CityId = c.CityId
+                    )
+          AND gc.IsActive = 1
+          AND gc.CityNameLower = ?
+          AND gc.FeatureCode <> 'PPLX'
+        ORDER BY
+            gr.ExpansionLevel ASC,
+            gc.NotorietyScore DESC,
+            c.Population DESC,
+            c.CityId ASC
+    """, (
+        game_id,
+        round_number,
+        current_expansion_level,
+        current_expansion_level,
+        normalized_guess,
+    ))
     return cur.fetchone()
 
 def get_completed_round_rows(cur, session_id: int):

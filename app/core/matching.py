@@ -1,4 +1,24 @@
+from functools import lru_cache
+import logging
+
+from rapidfuzz import fuzz
+
 from app.helpers.text import build_match_keys, normalize_place_name
+
+
+AUTO_ACCEPT_SCORE = 95.0
+FUZZY_LINE_SCORE = 80.0
+PHONETIC_TOKEN_SCORE = 92.0
+UNMATCHED_LEADING_TOKEN_PENALTY = 30.0
+UNMATCHED_INTERIOR_TOKEN_PENALTY = 20.0
+UNMATCHED_TRAILING_TOKEN_PENALTY = 5.0
+UNMATCHED_INPUT_TOKEN_PENALTY = 30.0
+NEARBY_FIRST_RING_PENALTY = 12.0
+NEARBY_RING_PENALTY_DECAY = 4.0
+NEARBY_NOTORIETY_SCALE = 10.0
+
+_logger = logging.getLogger('geosquare.matching')
+_logger.setLevel(logging.INFO)
 
 
 def phonetic_key(text: str) -> str:
@@ -64,7 +84,140 @@ def phonetic_key(text: str) -> str:
     return ''.join(collapsed)
 
 
-def find_matching_city(rows, guess_text: str):
+def _token_similarity(guess_token: str, candidate_token: str) -> float:
+    spelling_score = fuzz.ratio(guess_token, candidate_token)
+    guess_phonetic = phonetic_key(guess_token)
+    candidate_phonetic = phonetic_key(candidate_token)
+
+    if guess_phonetic and guess_phonetic == candidate_phonetic:
+        return max(spelling_score, PHONETIC_TOKEN_SCORE)
+
+    return spelling_score
+
+
+def _score_name_pair(guess_name: str, candidate_name: str) -> float:
+    guess_tokens = normalize_place_name(guess_name).split()
+    candidate_tokens = normalize_place_name(candidate_name).split()
+
+    if not guess_tokens or not candidate_tokens:
+        return 0.0
+
+    guess_token_count = len(guess_tokens)
+
+    @lru_cache(maxsize=None)
+    def align(
+        guess_index: int,
+        candidate_index: int,
+        match_started: bool,
+        pending_candidate_tokens: int,
+    ) -> float:
+        if guess_index == len(guess_tokens):
+            trailing_count = pending_candidate_tokens + len(candidate_tokens) - candidate_index
+            return -(trailing_count * UNMATCHED_TRAILING_TOKEN_PENALTY)
+
+        if candidate_index == len(candidate_tokens):
+            remaining_input_count = len(guess_tokens) - guess_index
+            return (
+                -(pending_candidate_tokens * UNMATCHED_TRAILING_TOKEN_PENALTY)
+                -(remaining_input_count * UNMATCHED_INPUT_TOKEN_PENALTY)
+            )
+
+        similarity = _token_similarity(
+            guess_tokens[guess_index],
+            candidate_tokens[candidate_index],
+        ) / guess_token_count
+
+        pending_penalty = (
+            pending_candidate_tokens * UNMATCHED_INTERIOR_TOKEN_PENALTY
+            if match_started
+            else pending_candidate_tokens * UNMATCHED_LEADING_TOKEN_PENALTY
+        )
+
+        match_score = (
+            similarity
+            - pending_penalty
+            + align(guess_index + 1, candidate_index + 1, True, 0)
+        )
+        skip_input_score = (
+            -UNMATCHED_INPUT_TOKEN_PENALTY
+            + align(guess_index + 1, candidate_index, match_started, pending_candidate_tokens)
+        )
+        skip_candidate_score = align(
+            guess_index,
+            candidate_index + 1,
+            match_started,
+            pending_candidate_tokens + 1,
+        )
+
+        return max(match_score, skip_input_score, skip_candidate_score)
+
+    return max(0.0, min(100.0, align(0, 0, False, 0)))
+
+
+def _candidate_name_options(row) -> list[tuple[str, str, str]]:
+    options = [
+        (key, 'canonical', row.CityName)
+        for key in build_match_keys(row.CityName)
+    ]
+
+    if row.AlternateNames:
+        for alternate_name in row.AlternateNames.split('|||'):
+            options.extend(
+                (key, 'alternate', alternate_name)
+                for key in build_match_keys(alternate_name)
+            )
+
+    return options
+
+
+def _score_candidate(guess_keys: set[str], row) -> tuple[float, str, str, str, str]:
+    scored_options = [
+        (
+            _score_name_pair(guess_key, candidate_key),
+            guess_key,
+            candidate_key,
+            source_type,
+            source_name,
+        )
+        for guess_key in guess_keys
+        for candidate_key, source_type, source_name in _candidate_name_options(row)
+    ]
+
+    return max(
+        scored_options,
+        key=lambda option: (
+            option[0],
+            option[3] == 'canonical',
+            option[2],
+        ),
+    )
+
+
+def _suggestion(row) -> dict:
+    return {
+        "city_id": int(row.CityId),
+        "city": row.CityName,
+        "country_code": row.CountryCode,
+    }
+
+
+def _nearby_intent_penalty(nearby_exact_match, current_expansion_level: int) -> float:
+    rings_away = int(nearby_exact_match.ExpansionLevel) - current_expansion_level
+    distance_penalty = max(
+        0.0,
+        NEARBY_FIRST_RING_PENALTY - ((rings_away - 1) * NEARBY_RING_PENALTY_DECAY),
+    )
+    notoriety_score = float(nearby_exact_match.NotorietyScore)
+    return distance_penalty * (notoriety_score / NEARBY_NOTORIETY_SCALE)
+
+
+def find_matching_city(
+    rows,
+    guess_text: str,
+    *,
+    nearby_exact_match,
+    current_expansion_level: int,
+):
     guess_text = guess_text.strip()
 
     if ',' in guess_text:
@@ -84,21 +237,23 @@ def find_matching_city(rows, guess_text: str):
         guess_keys.add(f'{normalized_guess} city')
         guess_keys.add(f'{normalized_guess}city')
 
-    guess_phonetic_keys = {
-        phonetic_key(key)
-        for key in guess_keys
-        if len(key.replace(' ', '')) >= 3
-    }
+    summary_parts = []
 
-    print(f'=== GUESS: {guess_text}', flush=True)
-    print(f'Precision filter: {precision_filter}', flush=True)
-    print(f'Normalized: {normalized_guess}', flush=True)
-    print(f'Keys: {guess_keys}', flush=True)
-    print(f'Phonetic keys: {guess_phonetic_keys}', flush=True)
+    if nearby_exact_match is not None:
+        nearby_penalty = _nearby_intent_penalty(
+            nearby_exact_match,
+            current_expansion_level,
+        )
+        rings_away = int(nearby_exact_match.ExpansionLevel) - current_expansion_level
+        summary_parts.append(
+            f'Nearby exact match {nearby_exact_match.CityName} is {rings_away} '
+            f'ring{"s" if rings_away != 1 else ""} away with notoriety '
+            f'{float(nearby_exact_match.NotorietyScore):.2f}, applying a '
+            f'{nearby_penalty:.1f} penalty to fuzzy candidates.'
+        )
 
     candidate_rows = rows
     if precision_filter:
-        print(f'Trying "{guess_text}, {precision_filter}" with province code filter...', flush=True)
         province_filtered_rows = []
 
         for r in rows:
@@ -112,123 +267,93 @@ def find_matching_city(rows, guess_text: str):
             if precision_filter in province_codes:
                 province_filtered_rows.append(r)
 
-        print(f'Province code matches: {len(province_filtered_rows)}', flush=True)
-
         if province_filtered_rows:
             candidate_rows = province_filtered_rows
+            summary_parts.append(
+                f'Province filter {precision_filter} reduced the field to '
+                f'{len(candidate_rows)} candidates.'
+            )
         else:
-            print(f'Trying "{guess_text}, {precision_filter}" with country code filter...', flush=True)
             country_filtered_rows = [
                 r for r in rows
                 if (r.CountryCode or '').upper() == precision_filter
             ]
-            print(f'Country code matches: {len(country_filtered_rows)}', flush=True)
             candidate_rows = country_filtered_rows
+            summary_parts.append(
+                f'Country filter {precision_filter} reduced the field to '
+                f'{len(candidate_rows)} candidates.'
+            )
 
-    import time as _time
-
-    direct_match_row = None
-    direct_match_index = None
-    t0 = _time.perf_counter()
-    for idx, row in enumerate(candidate_rows):
-        city_keys = build_match_keys(row.CityName)
-        if guess_keys & city_keys:
-            print(f'MATCH (direct): {row.CityName} idx={idx} elapsed_ms={((_time.perf_counter()-t0)*1000):.1f}', flush=True)
-            direct_match_row = row
-            direct_match_index = idx
-            break
-    print(f'direct pass: {(_time.perf_counter()-t0)*1000:.1f}ms checked={idx+1 if direct_match_row is not None else len(candidate_rows)}', flush=True)
-
-    if direct_match_row is not None:
-        alt_conflicts = []
-        t1 = _time.perf_counter()
-        for row in candidate_rows[:direct_match_index]:
-            raw = row.AlternateNames or ''
-            for alt in raw.split('|||'):
-                if normalize_place_name(alt) == normalized_guess:
-                    alt_conflicts.append(row)
-                    break
-        print(f'alt conflict scan: {(_time.perf_counter()-t1)*1000:.1f}ms cities_checked={direct_match_index} conflicts={len(alt_conflicts)}', flush=True)
-        if alt_conflicts:
-            print(f'DISAMBIGUATION (alt name conflict): {[r.CityName for r in alt_conflicts]}', flush=True)
-            return {
-                "type": "confirmation_required",
-                "suggestions": [
-                    {"city_id": int(r.CityId), "city": r.CityName, "country_code": r.CountryCode}
-                    for r in alt_conflicts + [direct_match_row]
-                ],
-            }
-        return {
-            "type": "match",
-            "row": direct_match_row,
-        }
-
-    print('No direct match. Trying exact phonetic...', flush=True)
-
-    confirmation_candidates = []
+    scored_candidates = []
 
     for row in candidate_rows:
-        city_keys = build_match_keys(row.CityName)
+        raw_score = _score_candidate(guess_keys, row)[0]
+        if raw_score == 100.0 or nearby_exact_match is None:
+            score = raw_score
+        else:
+            score = max(0.0, raw_score - nearby_penalty)
+        scored_candidates.append((score, row))
 
-        direct_alt_match = False
+    surviving_candidates = [
+        (score, row)
+        for score, row in scored_candidates
+        if score >= FUZZY_LINE_SCORE
+    ]
+    discarded_count = len(scored_candidates) - len(surviving_candidates)
 
-        if row.AlternateNames:
-            for alt_name in row.AlternateNames.split('|||'):
-                alt_keys = build_match_keys(alt_name)
+    if not surviving_candidates:
+        summary_parts.append(
+            f'All {discarded_count} candidates scored below {FUZZY_LINE_SCORE:.0f}, '
+            'so the guess was rejected.'
+        )
+        _logger.info('City match for %r: %s', guess_text, ' '.join(summary_parts))
+        result = {"type": "no_match"}
+        if nearby_exact_match is not None:
+            result["nearby_exact_match"] = nearby_exact_match
+        return result
 
-                if guess_keys & alt_keys:
-                    direct_alt_match = True
-
-                city_keys |= alt_keys
-
-        city_phonetic_keys = {
-            phonetic_key(key)
-            for key in city_keys
-            if len(key.replace(' ', '')) >= 3
-        }
-
-        if guess_phonetic_keys & city_phonetic_keys:
-
-            if direct_alt_match:
-                normalized_city = normalize_place_name(row.CityName)
-
-                first_differs = (
-                    normalized_guess
-                    and normalized_city
-                    and normalized_guess[0] != normalized_city[0]
-                )
-
-                last_differs = (
-                    normalized_guess
-                    and normalized_city
-                    and normalized_guess[-1] != normalized_city[-1]
-                )
-
-                if first_differs or last_differs:
-                    print(f'CONFIRMATION REQUIRED: {guess_text} -> {row.CityName}', flush=True)
-
-                    confirmation_candidates.append({
-                        "city_id": int(row.CityId),
-                        "city": row.CityName,
-                        "country_code": row.CountryCode,
-                    })
-
-                    continue
-
-            print(f'MATCH (phonetic): {row.CityName}', flush=True)
-
-            return {
-                "type": "match",
-                "row": row,
-            }
-
-    if confirmation_candidates:
+    if (
+        len(surviving_candidates) == 1
+        and surviving_candidates[0][0] >= AUTO_ACCEPT_SCORE
+    ):
+        score, row = surviving_candidates[0]
+        summary_parts.append(
+            f'{row.CityName}, {row.CountryCode} scored {score:.1f} and was '
+            f'automatically accepted. The other {discarded_count} candidates '
+            f'scored below {FUZZY_LINE_SCORE:.0f}.'
+        )
+        _logger.info('City match for %r: %s', guess_text, ' '.join(summary_parts))
         return {
-            "type": "confirmation_required",
-            "suggestions": confirmation_candidates,
+            "type": "match",
+            "row": row,
         }
 
-    print('REJECTED', flush=True)
-    return {
-        "type": "no_match",
+    surviving_candidates.sort(
+        key=lambda candidate: (
+            normalize_place_name(candidate[1].CityName),
+            (candidate[1].CountryCode or '').upper(),
+            int(candidate[1].CityId),
+        )
+    )
+
+    viable_candidates = ', '.join(
+        f'{row.CityName}, {row.CountryCode} ({score:.1f})'
+        for score, row in surviving_candidates
+    )
+    summary_parts.append(
+        f'Viable candidate{"s" if len(surviving_candidates) != 1 else ""}: '
+        f'{viable_candidates}. The other {discarded_count} candidates scored below '
+        f'{FUZZY_LINE_SCORE:.0f}, so confirmation is required.'
+    )
+    _logger.info('City match for %r: %s', guess_text, ' '.join(summary_parts))
+
+    result = {
+        "type": "confirmation_required",
+        "suggestions": [
+            _suggestion(row)
+            for _score, row in surviving_candidates
+        ],
     }
+    if nearby_exact_match is not None:
+        result["nearby_exact_match"] = nearby_exact_match
+    return result

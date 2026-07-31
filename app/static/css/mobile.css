@@ -199,7 +199,7 @@
     .mobile-bottomtray #postGameActions {
         margin: 8px 0 0 0;
         width: 100%;
-        justify-content: flex-start;
+        justify-content: center;
     }
 
     .mobile-bottomtray #nextBtn,

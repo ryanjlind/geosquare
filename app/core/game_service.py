@@ -19,7 +19,7 @@ from app.core.game_queries import (
     upsert_session_round_difficulty,
     increment_session_total_score,
     insert_correct_guess,
-    find_city_anywhere,
+    find_exact_city_in_expansions,
     get_best_guess_for_user,
     get_completed_sessions_for_user,
     get_round_stats_for_sessions,
@@ -97,6 +97,16 @@ def _resolve_square(cur, session_id, game_id, round_number):
         return None
 
     return int(row.SquareId), int(row.ExpansionLevel)
+
+
+def _map_nearby_city(row) -> dict:
+    return {
+        "city_name": row.CityName,
+        "country_code": row.CountryCode,
+        "latitude": float(row.Latitude),
+        "longitude": float(row.Longitude),
+        "population": int(row.Population),
+    }
 
 def get_daily_square_data(user_id: int, session_id: int | None, round_number: int) -> dict:
     with get_conn() as conn:
@@ -212,22 +222,38 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None):
 
             result_type = "match"
         else:
-            result = find_matching_city(rows, guess_text)
+            nearby_exact_match = find_exact_city_in_expansions(
+                cur,
+                game_id,
+                round_number,
+                expansion_level,
+                guess_text,
+            )
+            result = find_matching_city(
+                rows,
+                guess_text,
+                nearby_exact_match=nearby_exact_match,
+                current_expansion_level=expansion_level,
+            )
             result_type = result.get("type")
 
             if result_type == "match":
                 matched = result["row"]
 
             if result_type == "confirmation_required":
-                return {
+                response = {
                     "ok": True,
                     "requires_confirmation": True,
                     "candidates": result["suggestions"],
                     "guess": guess_text,
-                }, 200
+                }
+                if "nearby_exact_match" in result:
+                    response["nearby_city"] = _map_nearby_city(
+                        result["nearby_exact_match"]
+                    )
+                return response, 200
 
             if result_type == "no_match":
-                nearby = find_city_anywhere(cur, guess_text)
                 conn.commit()
 
                 return {
@@ -236,13 +262,8 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None):
                     "city": guess_text,
                     "score": 0,
                     "total_score": int(session.TotalScore),
-                    "matched_city": {
-                        "city_name": nearby.CityName,
-                        "country_code": nearby.CountryCode,
-                        "latitude": float(nearby.Latitude),
-                        "longitude": float(nearby.Longitude),
-                        "population": int(nearby.Population),
-                    } if nearby else None,
+                    "matched_city": _map_nearby_city(result["nearby_exact_match"])
+                    if "nearby_exact_match" in result else None,
                 }, 200
 
             if result_type != "match":
