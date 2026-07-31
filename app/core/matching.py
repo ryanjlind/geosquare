@@ -16,6 +16,22 @@ UNMATCHED_INPUT_TOKEN_PENALTY = 30.0
 NEARBY_FIRST_RING_PENALTY = 12.0
 NEARBY_RING_PENALTY_DECAY = 4.0
 NEARBY_NOTORIETY_SCALE = 10.0
+NAME_CONNECTOR_WORDS = {
+    'a', 'aan', 'af', 'ai', 'al', 'ale', 'alla', 'alle', 'am', 'an',
+    'and', 'ar', 'as', 'at', 'auf', 'au', 'aux', 'av', 'az', 'bajo',
+    'bei', 'bij', 'by', 'chez', 'con', 'contra', 'cu', 'd', 'da', 'dal',
+    'dalla', 'das', 'de', 'dei', 'del', 'della', 'delle', 'dem', 'den',
+    'der', 'des', 'di', 'die', 'din', 'do', 'dos', 'du', 'e', 'el',
+    'em', 'en', 'entre', 'es', 'eta', 'et', 'for', 'from', 'het', 'i',
+    'im', 'in', 'kod', 'kraj', 'l', 'la', 'langa', 'las', 'le', 'les',
+    'lo', 'los', 'lui', 'na', 'nam', 'nan', 'nas', 'nad', 'near', 'nel',
+    'nella', 'no', 'nos', 'ob', 'of', 'og', 'on', 'onder', 'op', 'pa',
+    'pe', 'pod', 'pri', 'prie', 'przy', 'se', 'si', 'sob', 'sobre',
+    'sotto', 'sous', 'sul', 'sulla', 'sur', 'ta', 'te', 'ten', 'ter',
+    'the', 'til', 'till', 'to', 'tot', 'u', 'unter', 'upon', 'v', 'van',
+    've', 'ved', 'vom', 'von', 'w', 'wa', 'with', 'y', 'ya', 'yn', 'yr',
+    'z', 'za', 'ze', 'zu', 'zum', 'zur',
+}
 
 _logger = logging.getLogger('geosquare.matching')
 _logger.setLevel(logging.INFO)
@@ -95,6 +111,12 @@ def _token_similarity(guess_token: str, candidate_token: str) -> float:
     return spelling_score
 
 
+def _substantive_tokens(tokens: list[str]) -> list[str]:
+    if len(tokens) == 1:
+        return tokens
+    return [token for token in tokens if token not in NAME_CONNECTOR_WORDS]
+
+
 def _score_name_pair(guess_name: str, candidate_name: str) -> float:
     guess_tokens = normalize_place_name(guess_name).split()
     candidate_tokens = normalize_place_name(candidate_name).split()
@@ -102,7 +124,18 @@ def _score_name_pair(guess_name: str, candidate_name: str) -> float:
     if not guess_tokens or not candidate_tokens:
         return 0.0
 
-    guess_token_count = len(guess_tokens)
+    guess_substantive_tokens = _substantive_tokens(guess_tokens)
+    candidate_substantive_tokens = _substantive_tokens(candidate_tokens)
+
+    if (
+        _token_similarity(
+            guess_substantive_tokens[0],
+            candidate_substantive_tokens[0],
+        ) < FUZZY_LINE_SCORE
+    ):
+        return 0.0
+
+    guess_token_count = len(guess_substantive_tokens)
 
     @lru_cache(maxsize=None)
     def align(
@@ -122,10 +155,13 @@ def _score_name_pair(guess_name: str, candidate_name: str) -> float:
                 -(remaining_input_count * UNMATCHED_INPUT_TOKEN_PENALTY)
             )
 
-        similarity = _token_similarity(
-            guess_tokens[guess_index],
-            candidate_tokens[candidate_index],
-        ) / guess_token_count
+        if guess_tokens[guess_index] in NAME_CONNECTOR_WORDS:
+            similarity = 0.0
+        else:
+            similarity = _token_similarity(
+                guess_tokens[guess_index],
+                candidate_tokens[candidate_index],
+            ) / guess_token_count
 
         pending_penalty = (
             pending_candidate_tokens * UNMATCHED_INTERIOR_TOKEN_PENALTY
