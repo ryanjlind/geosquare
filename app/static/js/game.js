@@ -164,7 +164,7 @@ function wireGuessing() {
     const input = document.getElementById('guessInput');
     const btn = document.getElementById('guessBtn');
 
-    btn.onclick = submitGuess;
+    btn.onclick = () => submitGuess();
     input.onkeydown = handleGuessKeyDown;
 }
 
