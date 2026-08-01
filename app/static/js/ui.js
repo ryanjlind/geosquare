@@ -26,7 +26,7 @@ export function renderSidebar(data) {
         <div class="value">
             Try to name a city in each square. It is perfectly acceptable to "Pass" a round if you don't know any!<br><br>
             The smaller the city you can name, the more points you will receive. <br><br>
-            Includes most (not all) cities ≥ 15,000 population.
+            Includes most (not all) cities ≥ 15,000 population, along with world capitals.
         </div>
     `;
 

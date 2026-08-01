@@ -3,7 +3,7 @@ import logging
 
 from rapidfuzz import fuzz
 
-from app.helpers.text import build_match_keys, normalize_place_name
+from app.helpers.text import normalize_place_name
 
 
 AUTO_ACCEPT_SCORE = 95.0
@@ -213,31 +213,28 @@ def _score_name_pair(guess_name: str, candidate_name: str) -> float:
 
 def _candidate_name_options(row) -> list[tuple[str, str, str]]:
     options = [
-        (key, 'canonical', row.CityName)
-        for key in build_match_keys(row.CityName)
+        (normalize_place_name(row.CityName), 'canonical', row.CityName)
     ]
 
     if row.AlternateNames:
         for alternate_name in row.AlternateNames.split('|||'):
-            options.extend(
-                (key, 'alternate', alternate_name)
-                for key in build_match_keys(alternate_name)
+            options.append(
+                (normalize_place_name(alternate_name), 'alternate', alternate_name)
             )
 
     return options
 
 
-def _score_candidate(guess_keys: set[str], row) -> tuple[float, str, str, str, str]:
+def _score_candidate(guess_name: str, row) -> tuple[float, str, str, str, str]:
     scored_options = [
         (
-            _score_name_pair(guess_key, candidate_key),
-            guess_key,
-            candidate_key,
+            _score_name_pair(guess_name, candidate_name),
+            guess_name,
+            candidate_name,
             source_type,
             source_name,
         )
-        for guess_key in guess_keys
-        for candidate_key, source_type, source_name in _candidate_name_options(row)
+        for candidate_name, source_type, source_name in _candidate_name_options(row)
     ]
 
     return max(
@@ -287,7 +284,6 @@ def find_matching_city(
     else:
         precision_filter = None
 
-    guess_keys = build_match_keys(guess_text)
     normalized_guess = normalize_place_name(guess_text)
 
     summary_parts = []
@@ -340,7 +336,7 @@ def find_matching_city(
     scored_candidates = []
 
     for row in candidate_rows:
-        raw_score = _score_candidate(guess_keys, row)[0]
+        raw_score = _score_candidate(normalized_guess, row)[0]
         if raw_score == 100.0 or nearby_exact_match is None:
             score = raw_score
         else:
