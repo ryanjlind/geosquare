@@ -262,7 +262,7 @@ export async function handlePass() {
     showNextButton(gameState.currentRound);
 }
 
-export async function submitGuess() {
+export async function submitGuess(confirmedCityId = null) {
     const guessBtn = document.getElementById('guessBtn');
     const guessInput = document.getElementById('guessInput');    
 
@@ -272,7 +272,11 @@ export async function submitGuess() {
     const guess = getGuessValue();
 
     try {
-        const { data } = await submitGuessRequest(guess, gameState.currentRound);
+        const { data } = await submitGuessRequest(
+            guess,
+            gameState.currentRound,
+            confirmedCityId,
+        );
 
         if (data.requires_confirmation) {
             window.pendingGuessConfirmation = {
@@ -437,7 +441,7 @@ export function showGuessConfirmationModal(candidates, nearbyCity) {
 
             try {
                 guessInput.value = `${c.city}, ${c.country_code}`;
-                await submitGuess();
+                await submitGuess(c.city_id);
                 window.pendingGuessConfirmation = null;
             } finally {
                 guessBtn.disabled = false;

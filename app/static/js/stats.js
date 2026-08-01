@@ -17,6 +17,7 @@ function toShareRound(result, roundNumber) {
     return {
         round: Number(roundNumber) || 0,
         city: result.city ?? result.city_name ?? '—',
+        population: result.population,
         rank: result.rank ?? '—',
         points: score,
         expansionPenalty,
@@ -48,6 +49,7 @@ export function hydrateShareFromState(state) {
             {
                 round: round.round_number ?? 0,
                 city: guess ? guess.city_name : '—',
+                population: guess ? guess.population : null,
                 rank: guess ? (guess.rank ?? '—') : '—',
                 points: round.score ?? 0,
                 expansionPenalty: (round.expansion_level ?? 0) > 0 ? `-${(round.expansion_level ?? 0) * 20}%` : '',
@@ -73,7 +75,7 @@ function buildShareSummaryText({ gameDate, total, solved, totalRounds, rounds, i
     const roundLines = (rounds || []).map((round) => {
         const city = round.city && round.city !== '—' ? round.city : 'Pass';
         const penalty = round.expansionPenalty ? ` ${round.expansionPenalty}` : '';
-        return `R${round.round}: ${city} | ${numberFmt(round.points)} pts${penalty}`;
+        return `R${round.round}: ${city} | pop. ${numberFmt(round.population)} | ${numberFmt(round.points)} pts${penalty}`;
     });
 
     return [

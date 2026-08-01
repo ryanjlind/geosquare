@@ -16,25 +16,28 @@ UNMATCHED_INPUT_TOKEN_PENALTY = 30.0
 NEARBY_FIRST_RING_PENALTY = 12.0
 NEARBY_RING_PENALTY_DECAY = 4.0
 NEARBY_NOTORIETY_SCALE = 10.0
+NAME_DESCRIPTOR_WEIGHT = 0.5
 NAME_CONNECTOR_WORDS = {
     'a', 'aan', 'af', 'ai', 'al', 'ale', 'alla', 'alle', 'am', 'an',
     'and', 'ar', 'as', 'at', 'auf', 'au', 'aux', 'av', 'az', 'bajo',
-    'bay', 'beach', 'bei', 'bij', 'by', 'chez', 'city', 'con', 'contra',
-    'cu', 'd', 'da', 'dal',
+    'bei', 'bij', 'by', 'chez', 'con', 'contra', 'cu', 'd', 'da', 'dal',
     'dalla', 'das', 'de', 'dei', 'del', 'della', 'delle', 'dem', 'den',
     'der', 'des', 'di', 'die', 'din', 'do', 'dos', 'du', 'e', 'el',
     'em', 'en', 'entre', 'es', 'eta', 'et', 'for', 'from', 'het', 'i',
-    'falls', 'fort', 'harbor', 'harbour', 'heights', 'im', 'in', 'island',
-    'isle', 'kod', 'kraj', 'l', 'la', 'lake', 'langa', 'las', 'le', 'les',
-    'lo', 'los', 'lui', 'mount', 'mountain', 'na', 'nam', 'nan', 'nas',
-    'nad', 'near', 'nel',
+    'im', 'in', 'kod', 'kraj', 'l', 'la', 'langa', 'las', 'le', 'les',
+    'lo', 'los', 'lui', 'na', 'nam', 'nan', 'nas', 'nad', 'near', 'nel',
     'nella', 'no', 'nos', 'ob', 'of', 'og', 'on', 'onder', 'op', 'pa',
-    'pe', 'pod', 'port', 'pri', 'prie', 'przy', 'river', 'se', 'si',
-    'sob', 'sobre', 'springs',
-    'sotto', 'sous', 'sul', 'sulla', 'sur', 'ta', 'te', 'ten', 'ter',
-    'the', 'til', 'till', 'to', 'tot', 'u', 'unter', 'upon', 'v', 'valley', 'van',
+    'pe', 'pod', 'pri', 'prie', 'przy', 'se', 'si', 'sob', 'sobre',
+    'sotto', 'sous', 'sulla', 'sur', 'ta', 'te', 'ten', 'ter', 'the',
+    'til', 'till', 'to', 'tot', 'u', 'unter', 'upon', 'v', 'van',
     've', 'ved', 'vom', 'von', 'w', 'wa', 'with', 'y', 'ya', 'yn', 'yr',
     'z', 'za', 'ze', 'zu', 'zum', 'zur',
+}
+NAME_DESCRIPTOR_WORDS = {
+    'bay', 'beach', 'city', 'falls', 'fort', 'harbor', 'harbour', 'heights',
+    'island', 'isle', 'lake', 'mount', 'mountain', 'port', 'river', 'san',
+    'sant', 'santa', 'sante', 'santi', 'santo', 'sao', 'saint', 'sainte',
+    'sankt', 'sankta', 'sint', 'springs', 'st', 'ste', 'sul', 'valley',
 }
 
 _logger = logging.getLogger('geosquare.matching')
@@ -116,7 +119,19 @@ def _token_similarity(guess_token: str, candidate_token: str) -> float:
 
 
 def _substantive_tokens(tokens: list[str]) -> list[str]:
-    return [token for token in tokens if token not in NAME_CONNECTOR_WORDS]
+    return [
+        token for token in tokens
+        if token not in NAME_CONNECTOR_WORDS
+        and token not in NAME_DESCRIPTOR_WORDS
+    ]
+
+
+def _token_weight(token: str) -> float:
+    if token in NAME_CONNECTOR_WORDS:
+        return 0.0
+    if token in NAME_DESCRIPTOR_WORDS:
+        return NAME_DESCRIPTOR_WEIGHT
+    return 1.0
 
 
 def _score_name_pair(guess_name: str, candidate_name: str) -> float:
@@ -140,7 +155,7 @@ def _score_name_pair(guess_name: str, candidate_name: str) -> float:
     ):
         return 0.0
 
-    guess_token_count = len(guess_substantive_tokens)
+    guess_token_weight = sum(_token_weight(token) for token in guess_tokens)
 
     @lru_cache(maxsize=None)
     def align(
@@ -160,13 +175,14 @@ def _score_name_pair(guess_name: str, candidate_name: str) -> float:
                 -(remaining_input_count * UNMATCHED_INPUT_TOKEN_PENALTY)
             )
 
-        if guess_tokens[guess_index] in NAME_CONNECTOR_WORDS:
-            similarity = 0.0
-        else:
-            similarity = _token_similarity(
+        similarity = (
+            _token_similarity(
                 guess_tokens[guess_index],
                 candidate_tokens[candidate_index],
-            ) / guess_token_count
+            )
+            * _token_weight(guess_tokens[guess_index])
+            / guess_token_weight
+        )
 
         pending_penalty = (
             pending_candidate_tokens * UNMATCHED_INTERIOR_TOKEN_PENALTY

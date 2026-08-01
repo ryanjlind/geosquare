@@ -24,11 +24,15 @@ export async function fetchAllDailySquares() {
     return data.rounds;
 }
 
-export async function submitGuessRequest(guess, roundNumber) {
+export async function submitGuessRequest(guess, roundNumber, confirmedCityId = null) {
     const { response, data } = await fetchJson('/api/guess', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guess, round_number: roundNumber }),
+        body: JSON.stringify({
+            guess,
+            round_number: roundNumber,
+            confirmed_city_id: confirmedCityId,
+        }),
     });
 
     return { response, data };
