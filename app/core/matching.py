@@ -35,12 +35,24 @@ NAME_CONNECTOR_WORDS = {
     'z', 'za', 'ze', 'zu', 'zum', 'zur',
 }
 NAME_DESCRIPTOR_WORDS = {
-    'bay', 'beach', 'city', 'falls', 'fort', 'harbor', 'harbour', 'heights',
-    'east', 'island', 'isle', 'lake', 'mount', 'mountain', 'north', 'port',
-    'river', 'san',
-    'sant', 'santa', 'sante', 'santi', 'santo', 'sao', 'saint', 'sainte',
-    'sankt', 'sankta', 'sint', 'south', 'springs', 'st', 'ste', 'sul',
-    'valley', 'west',
+    'alt', 'alta', 'alte', 'alto', 'ancient', 'bas', 'basse', 'bay', 'beach',
+    'beneden', 'big', 'boven', 'central', 'centrale', 'centre', 'centro',
+    'centrum', 'city', 'dolna', 'dolni', 'donja', 'donje', 'donji', 'east',
+    'eastern', 'eski', 'este', 'falls', 'fort', 'gammel', 'gamla', 'gorni',
+    'gornja', 'gornje', 'gornji', 'grand', 'grande', 'great', 'greater',
+    'groot', 'grote', 'harbor', 'harbour', 'haut', 'haute', 'heights', 'high',
+    'horni', 'inferior', 'inner', 'island', 'isle', 'klein', 'kleine', 'lake',
+    'lesser', 'little', 'low', 'lower', 'major', 'mala', 'male', 'mali',
+    'middle', 'minor', 'modern', 'mount', 'mountain', 'neu', 'neuf',
+    'neuve', 'new', 'nieuw', 'nieuwe', 'nord', 'norr', 'norra', 'norte',
+    'north', 'northern', 'nou', 'noua', 'nouveau', 'nouvel', 'nouvelle',
+    'nova', 'nove', 'novi', 'novo', 'novy', 'nueva', 'nuevo', 'nuova',
+    'nuovo', 'ny', 'nye', 'old', 'oude', 'outer', 'ouest', 'oost', 'ost',
+    'oeste', 'port', 'river', 'san', 'sant', 'santa', 'sante', 'santi',
+    'santo', 'sao', 'saint', 'sainte', 'sankt', 'sankta', 'sint', 'small',
+    'south', 'southern', 'springs', 'st', 'stara', 'stare', 'stari', 'stary',
+    'ste', 'sud', 'sul', 'superior', 'sur', 'upper', 'valley', 'veche',
+    'vechi', 'vest', 'west', 'western', 'wielka', 'wielki', 'yeni',
 }
 
 _logger = logging.getLogger('geosquare.matching')
