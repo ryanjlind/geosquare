@@ -9,6 +9,7 @@ from app.helpers.text import normalize_place_name
 AUTO_ACCEPT_SCORE = 95.0
 FUZZY_LINE_SCORE = 80.0
 PHONETIC_TOKEN_SCORE = 92.0
+FUZZY_ALTERNATE_NAME_PENALTY = 5.0
 UNMATCHED_LEADING_TOKEN_PENALTY = 30.0
 UNMATCHED_INTERIOR_TOKEN_PENALTY = 20.0
 UNMATCHED_TRAILING_TOKEN_PENALTY = 5.0
@@ -35,9 +36,11 @@ NAME_CONNECTOR_WORDS = {
 }
 NAME_DESCRIPTOR_WORDS = {
     'bay', 'beach', 'city', 'falls', 'fort', 'harbor', 'harbour', 'heights',
-    'island', 'isle', 'lake', 'mount', 'mountain', 'port', 'river', 'san',
+    'east', 'island', 'isle', 'lake', 'mount', 'mountain', 'north', 'port',
+    'river', 'san',
     'sant', 'santa', 'sante', 'santi', 'santo', 'sao', 'saint', 'sainte',
-    'sankt', 'sankta', 'sint', 'springs', 'st', 'ste', 'sul', 'valley',
+    'sankt', 'sankta', 'sint', 'south', 'springs', 'st', 'ste', 'sul',
+    'valley', 'west',
 }
 
 _logger = logging.getLogger('geosquare.matching')
@@ -228,13 +231,15 @@ def _candidate_name_options(row) -> list[tuple[str, str, str]]:
 def _score_candidate(guess_name: str, row) -> tuple[float, str, str, str, str]:
     scored_options = [
         (
-            _score_name_pair(guess_name, candidate_name),
+            score if source_type == 'canonical' or score == 100.0
+            else max(0.0, score - FUZZY_ALTERNATE_NAME_PENALTY),
             guess_name,
             candidate_name,
             source_type,
             source_name,
         )
         for candidate_name, source_type, source_name in _candidate_name_options(row)
+        for score in [_score_name_pair(guess_name, candidate_name)]
     ]
 
     return max(
