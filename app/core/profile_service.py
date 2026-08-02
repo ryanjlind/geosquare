@@ -1,4 +1,5 @@
 from collections import defaultdict
+from contextlib import contextmanager
 from datetime import date, timedelta
 from time import perf_counter
 
@@ -30,6 +31,38 @@ REGION_ORDER = [
 def _log_profile_duration(label: str, start: float):
     log_info(f'[profile] {label} took {perf_counter() - start:.3f}s')
 
+
+@contextmanager
+def _profile_stage(label: str):
+    start = perf_counter()
+    log_info(f'[profile] {label} started')
+    try:
+        yield
+    except Exception as error:
+        log_info(
+            f'[profile] {label} failed after {perf_counter() - start:.3f}s: '
+            f'{type(error).__name__}: {error}'
+        )
+        raise
+    log_info(f'[profile] {label} completed in {perf_counter() - start:.3f}s')
+
+
+def _fetchone_with_timing(cur, label: str):
+    start = perf_counter()
+    row = cur.fetchone()
+    log_info(f'[profile] {label}.fetchone completed in {perf_counter() - start:.3f}s')
+    return row
+
+
+def _fetchall_with_timing(cur, label: str):
+    start = perf_counter()
+    rows = cur.fetchall()
+    log_info(
+        f'[profile] {label}.fetchall completed in {perf_counter() - start:.3f}s '
+        f'row_count={len(rows)}'
+    )
+    return rows
+
 def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
     start = perf_counter()
     log_info(f"fetching profile for user_id={user_id}")
@@ -40,8 +73,16 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
             'message': 'No profile found.',
         }, 200
 
+    connection_start = perf_counter()
+    log_info('[profile] database connection started')
     with get_conn() as conn:
+        log_info(
+            f'[profile] database connection completed in '
+            f'{perf_counter() - connection_start:.3f}s'
+        )
+        cursor_start = perf_counter()
         cur = conn.cursor()
+        log_info(f'[profile] cursor creation completed in {perf_counter() - cursor_start:.3f}s')
 
         log_info(f'[profile] user_id={user_id}')
 
@@ -74,27 +115,29 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
         )
         completed_rounds_by_session = _build_completed_rounds_by_session(completed_round_rows)
 
-        history = []
-        for session in sessions:
-            if session['session_id'] in completed_rounds_by_session:
-                completed_rounds = completed_rounds_by_session[session['session_id']]
-            else:
-                completed_rounds = []
-            solved_count = sum(1 for round_data in completed_rounds if int(round_data['score']) > 0)
-            is_perfect = len(completed_rounds) == 5 and all(int(round_data['score']) > 0 for round_data in completed_rounds)
-            best_round = _get_best_round(completed_rounds)
+        with _profile_stage('build_history'):
+            history = []
+            for session in sessions:
+                if session['session_id'] in completed_rounds_by_session:
+                    completed_rounds = completed_rounds_by_session[session['session_id']]
+                else:
+                    completed_rounds = []
+                solved_count = sum(1 for round_data in completed_rounds if int(round_data['score']) > 0)
+                is_perfect = len(completed_rounds) == 5 and all(int(round_data['score']) > 0 for round_data in completed_rounds)
+                best_round = _get_best_round(completed_rounds)
 
-            history.append({
-                'session_id': int(session['session_id']),
-                'game_id': int(session['game_id']),
-                'game_date': session['game_date'].isoformat(),
-                'completed_at': session['completed_at'].isoformat() if session['completed_at'] else None,
-                'total_score': int(session['total_score']),
-                'solved_count': int(solved_count),
-                'is_perfect': bool(is_perfect),
-                'best_round': best_round,
-                'completed_rounds': completed_rounds,
-            })
+                history.append({
+                    'session_id': int(session['session_id']),
+                    'game_id': int(session['game_id']),
+                    'game_date': session['game_date'].isoformat(),
+                    'completed_at': session['completed_at'].isoformat() if session['completed_at'] else None,
+                    'total_score': int(session['total_score']),
+                    'solved_count': int(solved_count),
+                    'is_perfect': bool(is_perfect),
+                    'best_round': best_round,
+                    'completed_rounds': completed_rounds,
+                })
+            log_info(f'[profile] build_history session_count={len(history)}')
 
         most_obscure_city = _get_most_obscure_city(cur, user_id)
         most_used_city = _get_most_used_city(cur, user_id)
@@ -108,7 +151,10 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
             strongest_country,
         )
 
+        commit_start = perf_counter()
+        log_info('[profile] commit started')
         conn.commit()
+        log_info(f'[profile] commit completed in {perf_counter() - commit_start:.3f}s')
 
     _log_profile_duration('get_profile_payload', start)
     return {
@@ -125,49 +171,60 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
     }, 200
 
 def _get_user_row(cur, user_id: int):
-    start = perf_counter()
-    cur.execute(
-        """
-        SELECT UserId, AuthProviderSubject, Username
-        FROM dbo.Users
-        WHERE UserId = ?
-        """,
-        (user_id,),
-    )
-    row = cur.fetchone()
-    _log_profile_duration('_get_user_row', start)
-    return row
+    with _profile_stage('_get_user_row'):
+        execute_start = perf_counter()
+        cur.execute(
+            """
+            SELECT UserId, AuthProviderSubject, Username
+            FROM dbo.Users
+            WHERE UserId = ?
+            """,
+            (user_id,),
+        )
+        log_info(f'[profile] _get_user_row.execute completed in {perf_counter() - execute_start:.3f}s')
+        return _fetchone_with_timing(cur, '_get_user_row')
 
 def _get_completed_sessions(cur, user_id: int) -> list[dict]:
-    start = perf_counter()
-    cur.execute(
-        """
-        SELECT
-            gs.SessionId,
-            gs.GameId,
-            g.GameDate,
-            gs.CompletedAt,
-            gs.TotalScore
-        FROM dbo.GameSessions gs
-        INNER JOIN dbo.Games g
-            ON g.GameId = gs.GameId
-        WHERE gs.UserId = ?
-          AND gs.CompletedAt IS NOT NULL
-        ORDER BY g.GameDate DESC, gs.CompletedAt DESC, gs.SessionId DESC
-        """,
-        (user_id,),
-    )
-
-    return [
-        {
-            'session_id': int(row.SessionId),
-            'game_id': int(row.GameId),
-            'game_date': row.GameDate,
-            'completed_at': row.CompletedAt,
-            'total_score': int(row.TotalScore),
-        }
-        for row in cur.fetchall()
-    ]
+    with _profile_stage('_get_completed_sessions'):
+        execute_start = perf_counter()
+        cur.execute(
+            """
+            SELECT
+                gs.SessionId,
+                gs.GameId,
+                g.GameDate,
+                gs.CompletedAt,
+                gs.TotalScore
+            FROM dbo.GameSessions gs
+            INNER JOIN dbo.Games g
+                ON g.GameId = gs.GameId
+            WHERE gs.UserId = ?
+              AND gs.CompletedAt IS NOT NULL
+            ORDER BY g.GameDate DESC, gs.CompletedAt DESC, gs.SessionId DESC
+            """,
+            (user_id,),
+        )
+        log_info(
+            f'[profile] _get_completed_sessions.execute completed in '
+            f'{perf_counter() - execute_start:.3f}s'
+        )
+        rows = _fetchall_with_timing(cur, '_get_completed_sessions')
+        map_start = perf_counter()
+        result = [
+            {
+                'session_id': int(row.SessionId),
+                'game_id': int(row.GameId),
+                'game_date': row.GameDate,
+                'completed_at': row.CompletedAt,
+                'total_score': int(row.TotalScore),
+            }
+            for row in rows
+        ]
+        log_info(
+            f'[profile] _get_completed_sessions.map completed in '
+            f'{perf_counter() - map_start:.3f}s'
+        )
+        return result
 
 def _get_completed_round_rows_for_sessions(cur, session_ids: list[int]):
     start = perf_counter()
@@ -177,6 +234,11 @@ def _get_completed_round_rows_for_sessions(cur, session_ids: list[int]):
 
     placeholders = ', '.join('?' for _ in session_ids)
 
+    log_info(
+        f'[profile] _get_completed_round_rows_for_sessions.execute started '
+        f'session_count={len(session_ids)}'
+    )
+    execute_start = perf_counter()
     cur.execute(
         f"""
         SELECT
@@ -225,7 +287,11 @@ def _get_completed_round_rows_for_sessions(cur, session_ids: list[int]):
         session_ids,
     )
 
-    rows = cur.fetchall()
+    log_info(
+        f'[profile] _get_completed_round_rows_for_sessions.execute completed in '
+        f'{perf_counter() - execute_start:.3f}s'
+    )
+    rows = _fetchall_with_timing(cur, '_get_completed_round_rows_for_sessions')
     _log_profile_duration('_get_completed_round_rows_for_sessions', start)
     return rows
 
@@ -296,6 +362,8 @@ def _get_best_round(completed_rounds: list[dict]) -> dict | None:
 
 def _get_strongest_country(cur, user_id: int) -> dict | None:
     start = perf_counter()
+    log_info('[profile] _get_strongest_country.execute started')
+    execute_start = perf_counter()
     cur.execute(
         """
         WITH RankedGuesses AS (
@@ -334,7 +402,11 @@ def _get_strongest_country(cur, user_id: int) -> dict | None:
         """,
         (user_id,),
     )
-    row = cur.fetchone()
+    log_info(
+        f'[profile] _get_strongest_country.execute completed in '
+        f'{perf_counter() - execute_start:.3f}s'
+    )
+    row = _fetchone_with_timing(cur, '_get_strongest_country')
 
     if not row:
         _log_profile_duration('_get_strongest_country', start)
@@ -351,6 +423,8 @@ def _get_strongest_country(cur, user_id: int) -> dict | None:
 
 def _get_most_obscure_city(cur, user_id: int) -> dict | None:
     start = perf_counter()
+    log_info('[profile] _get_most_obscure_city.execute started')
+    execute_start = perf_counter()
     cur.execute(
         """
         WITH RankedGuesses AS (
@@ -394,7 +468,11 @@ def _get_most_obscure_city(cur, user_id: int) -> dict | None:
         """,
         (user_id,),
     )
-    row = cur.fetchone()
+    log_info(
+        f'[profile] _get_most_obscure_city.execute completed in '
+        f'{perf_counter() - execute_start:.3f}s'
+    )
+    row = _fetchone_with_timing(cur, '_get_most_obscure_city')
 
     if not row:
         _log_profile_duration('_get_most_obscure_city', start)
@@ -413,6 +491,8 @@ def _get_most_obscure_city(cur, user_id: int) -> dict | None:
 
 def _get_most_used_city(cur, user_id: int) -> dict | None:
     start = perf_counter()
+    log_info('[profile] _get_most_used_city.execute started')
+    execute_start = perf_counter()
     cur.execute(
         """
         WITH RankedGuesses AS (
@@ -452,7 +532,11 @@ def _get_most_used_city(cur, user_id: int) -> dict | None:
         """,
         (user_id,),
     )
-    row = cur.fetchone()
+    log_info(
+        f'[profile] _get_most_used_city.execute completed in '
+        f'{perf_counter() - execute_start:.3f}s'
+    )
+    row = _fetchone_with_timing(cur, '_get_most_used_city')
 
     if not row:
         _log_profile_duration('_get_most_used_city', start)
@@ -528,12 +612,14 @@ def _classify_region(min_lat: float, min_lon: float, max_lat: float, max_lon: fl
 
         return 'Other'
     finally:
-        _log_profile_duration('_classify_region', start)
+        pass
 
 
 def _get_region_performance(cur, user_id: int) -> tuple[list[dict], list[dict]]:
     start = perf_counter()
     log_info(f'[profile] _get_region_performance user_id={user_id}')
+    log_info('[profile] _get_region_performance.execute started')
+    execute_start = perf_counter()
     cur.execute(
         """
         SELECT
@@ -571,8 +657,13 @@ def _get_region_performance(cur, user_id: int) -> tuple[list[dict], list[dict]]:
         """,
         (user_id,),
     )
-    rows = cur.fetchall()
+    log_info(
+        f'[profile] _get_region_performance.execute completed in '
+        f'{perf_counter() - execute_start:.3f}s'
+    )
+    rows = _fetchall_with_timing(cur, '_get_region_performance')
 
+    process_start = perf_counter()
     buckets = {
         region: {
             'region': region,
@@ -634,6 +725,11 @@ def _get_region_performance(cur, user_id: int) -> tuple[list[dict], list[dict]]:
             'completion_rate': round((solved_count / square_count) * 100, 2) if square_count else 0.0,
             'average_points': round(total_points / square_count, 2) if square_count else 0.0,
         })
+
+    log_info(
+        f'[profile] _get_region_performance.process completed in '
+        f'{perf_counter() - process_start:.3f}s row_count={len(rows)}'
+    )
 
     _log_profile_duration('_get_region_performance', start)
     return summary, details
