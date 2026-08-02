@@ -1,5 +1,38 @@
 const { test, expect } = require('@playwright/test');
 
+const ROUND_CASES = {
+  1: {
+    guess: 'Tehran',
+    candidates: [
+      { city_id: 17727, city: 'Tehran', country_code: 'IR' },
+      { city_id: 17972, city: 'Tīrān', country_code: 'IR' },
+    ],
+    selectedCityId: 17727,
+  },
+  2: {
+    guess: 'Santa Cruz',
+    candidates: [
+      { city_id: 23613, city: 'Santa Cruz', country_code: 'PH' },
+      { city_id: 23614, city: 'Santa Cruz', country_code: 'PH' },
+      { city_id: 23615, city: 'Santa Cruz', country_code: 'PH' },
+    ],
+    selectedCityId: 23613,
+  },
+  3: {
+    guess: 'Phu Quoc',
+    candidates: [
+      { city_id: 32910, city: 'Phu Quoc', country_code: 'VN' },
+      { city_id: 32956, city: 'Phú Quốc', country_code: 'VN' },
+    ],
+    selectedCityId: 32910,
+  },
+  5: {
+    incorrectGuess: 'Moscow',
+    guess: 'Arkhangelsk',
+    expectedCity: 'Arkhangel’sk',
+  },
+};
+
 async function openControls(page) {
   const menuButton = page.locator('#mobileMenuBtn');
   if (await menuButton.isVisible()) {
@@ -8,22 +41,13 @@ async function openControls(page) {
   await expect(page.locator('#guessInput')).toBeVisible();
 }
 
-async function fetchRound(page, roundNumber) {
-  return page.evaluate(async (round) => {
-    const response = await fetch(`/api/daily-square?round=${round}`);
-    if (!response.ok) {
-      throw new Error(`Round ${round} request failed with ${response.status}`);
-    }
-    return response.json();
-  }, roundNumber);
+function progress(projectName, message) {
+  console.log(`[${new Date().toISOString()}] [${projectName}] ${message}`);
 }
 
-async function submitCity(page, roundNumber, method) {
-  const round = await fetchRound(page, roundNumber);
-  const cityName = round.cities[0].city_name;
-  await page.locator('#guessInput').fill(cityName);
-
-  const firstResponsePromise = page.waitForResponse((response) => (
+async function submitGuess(page, roundNumber, guess, method) {
+  await page.locator('#guessInput').fill(guess);
+  const responsePromise = page.waitForResponse((response) => (
     response.url().endsWith('/api/guess')
     && response.request().method() === 'POST'
   ));
@@ -34,44 +58,79 @@ async function submitCity(page, roundNumber, method) {
     await page.locator('#guessBtn').click();
   }
 
-  const firstResponse = await firstResponsePromise;
-  const firstRequestBody = firstResponse.request().postDataJSON();
-  const firstBody = await firstResponse.json();
-  expect(firstRequestBody).toEqual({
-    guess: cityName,
+  const response = await responsePromise;
+  expect(response.request().postDataJSON()).toEqual({
+    guess,
     round_number: roundNumber,
     confirmed_city_id: null,
   });
+  return response.json();
+}
+
+async function submitCity(page, roundNumber, method, projectName) {
+  const testCase = ROUND_CASES[roundNumber];
+
+  if (testCase.incorrectGuess) {
+    progress(projectName, `round ${roundNumber}: submitting incorrect guess`);
+    const incorrectResult = await submitGuess(
+      page,
+      roundNumber,
+      testCase.incorrectGuess,
+      method,
+    );
+    expect(incorrectResult.correct).toBe(false);
+    progress(projectName, `round ${roundNumber}: incorrect guess rejected`);
+  }
+
+  progress(projectName, `round ${roundNumber}: submitting ${testCase.guess}`);
+  const firstBody = await submitGuess(page, roundNumber, testCase.guess, method);
 
   let result = firstBody;
-  if (firstBody.requires_confirmation) {
+  if (testCase.candidates) {
+    progress(projectName, `round ${roundNumber}: checking disambiguation`);
+    expect(firstBody.requires_confirmation).toBe(true);
+    expect(firstBody.candidates).toEqual(testCase.candidates);
+
     const modal = page.locator('#guessConflictModal');
     await expect(modal).toBeVisible();
-    const candidate = modal.locator('.modal-btn').filter({ hasNotText: 'None of these' }).first();
+    const candidateButtons = modal.locator('.modal-btn').filter({ hasNotText: 'None of these' });
+    await expect(candidateButtons).toHaveCount(testCase.candidates.length);
+    const selectedIndex = testCase.candidates.findIndex(
+      (candidate) => candidate.city_id === testCase.selectedCityId,
+    );
     const confirmationResponsePromise = page.waitForResponse((response) => (
       response.url().endsWith('/api/guess')
       && response.request().method() === 'POST'
     ));
-    await candidate.click();
+    await candidateButtons.nth(selectedIndex).click();
     const confirmationResponse = await confirmationResponsePromise;
     const confirmationRequestBody = confirmationResponse.request().postDataJSON();
     result = await confirmationResponse.json();
-    expect(Number.isInteger(confirmationRequestBody.confirmed_city_id)).toBe(true);
+    expect(confirmationRequestBody.confirmed_city_id).toBe(testCase.selectedCityId);
     await expect(modal).toBeHidden();
+    progress(projectName, `round ${roundNumber}: disambiguation confirmed`);
+  } else {
+    expect(firstBody.requires_confirmation).toBeFalsy();
   }
 
   expect(result.correct).toBe(true);
+  if (testCase.expectedCity) {
+    expect(result.city).toBe(testCase.expectedCity);
+  }
   await expect(page.locator('#guessFeedback')).toContainText(result.city.toUpperCase());
+  progress(projectName, `round ${roundNumber}: guess completed`);
   return result;
 }
 
-async function advanceToNextRound(page, nextRoundNumber) {
+async function advanceToNextRound(page, nextRoundNumber, projectName) {
+  progress(projectName, `round ${nextRoundNumber}: loading`);
   const responsePromise = page.waitForResponse((response) => (
     response.url().includes(`/api/daily-square?round=${nextRoundNumber}`)
   ));
   await page.locator('#nextBtn').click();
   await responsePromise;
   await expect(page.locator('#meta')).toContainText(`${nextRoundNumber} / 5`);
+  progress(projectName, `round ${nextRoundNumber}: ready`);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -88,14 +147,18 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('completes and resumes a five-round game', async ({ page }) => {
+test('completes and resumes a five-round game', async ({ page }, testInfo) => {
+  const projectName = testInfo.project.name;
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
+  progress(projectName, 'opening game');
   await page.goto('/');
   await openControls(page);
   await expect(page.locator('#meta')).toContainText('1 / 5');
+  progress(projectName, 'round 1 ready');
 
+  progress(projectName, 'round 1: expanding square');
   const expansionResponsePromise = page.waitForResponse((response) => (
     response.url().endsWith('/api/expand')
     && response.request().method() === 'POST'
@@ -103,19 +166,23 @@ test('completes and resumes a five-round game', async ({ page }) => {
   await page.locator('#expandBtn').click();
   const expansionBody = await (await expansionResponsePromise).json();
   expect(expansionBody.expansion_level).toBe(1);
+  progress(projectName, 'round 1: expansion completed');
 
-  const roundOne = await submitCity(page, 1, 'click');
+  const roundOne = await submitCity(page, 1, 'click', projectName);
   expect(roundOne.expansion_level).toBe(1);
-  await advanceToNextRound(page, 2);
+  await advanceToNextRound(page, 2, projectName);
 
-  await submitCity(page, 2, 'enter');
+  await submitCity(page, 2, 'enter', projectName);
+  progress(projectName, 'reloading after round 2');
   await page.reload();
   await openControls(page);
   await expect(page.locator('#meta')).toContainText('3 / 5');
+  progress(projectName, 'round 3 resumed');
 
-  await submitCity(page, 3, 'click');
-  await advanceToNextRound(page, 4);
+  await submitCity(page, 3, 'click', projectName);
+  await advanceToNextRound(page, 4, projectName);
 
+  progress(projectName, 'round 4: passing');
   const passResponsePromise = page.waitForResponse((response) => (
     response.url().endsWith('/api/pass')
     && response.request().method() === 'POST'
@@ -124,9 +191,11 @@ test('completes and resumes a five-round game', async ({ page }) => {
   const passBody = await (await passResponsePromise).json();
   expect(passBody.passed).toBe(true);
   await expect(page.locator('#guessFeedback')).toContainText('No guess submitted');
-  await advanceToNextRound(page, 5);
+  progress(projectName, 'round 4: pass completed');
+  await advanceToNextRound(page, 5, projectName);
 
-  await submitCity(page, 5, 'enter');
+  await submitCity(page, 5, 'enter', projectName);
+  progress(projectName, 'checking share text');
   await expect(page.locator('#shareScoreBtn')).toBeVisible();
   await page.locator('#shareScoreBtn').click();
   const copiedText = await page.evaluate(() => window.__copiedText);
@@ -134,13 +203,18 @@ test('completes and resumes a five-round game', async ({ page }) => {
   expect(copiedText).toContain('R1:');
   expect(copiedText).toContain('R5:');
   expect(copiedText).toContain('pop.');
+  progress(projectName, 'share text verified');
 
+  progress(projectName, 'opening final summary');
   await page.locator('#nextBtn').click();
   await expect(page.locator('#statsOverlay')).toBeVisible();
+  progress(projectName, 'final summary visible');
 
+  progress(projectName, 'checking final game state');
   const state = await page.evaluate(async () => (await fetch('/api/game-state')).json());
   expect(state.state).toBe('completed');
   expect(state.completed_rounds).toHaveLength(5);
   expect(state.completed_rounds.filter((round) => round.round_status === 'Passed')).toHaveLength(1);
   expect(pageErrors).toEqual([]);
+  progress(projectName, 'test completed');
 });
