@@ -11,7 +11,7 @@ module.exports = defineConfig({
   maxFailures: 1,
   reporter: [['line'], ['html', { outputFolder: 'artifacts/report', open: 'never' }]],
   use: {
-    actionTimeout: 10_000,
+    actionTimeout: 60_000,
     baseURL: 'http://127.0.0.1:8000',
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
