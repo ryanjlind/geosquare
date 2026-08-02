@@ -36,7 +36,7 @@ const ROUND_CASES = {
 };
 
 async function openControls(page) {
-  await expect(page.locator('#guessInput')).toBeVisible();
+  await expect(page.locator('#guessInput')).toBeVisible({ timeout: 10_000 });
 }
 
 function progress(projectName, message) {
@@ -137,9 +137,17 @@ async function enterInfinity(page, projectName) {
     response.url().endsWith('/api/infinity-state')
     && response.request().method() === 'GET'
   ));
-  const entryButton = await page.locator('#statsOverlay').isVisible()
-    ? page.locator('#statsInfinityInviteBtn')
-    : page.locator('#infinityModeBtn');
+  const statsOverlay = page.locator('#statsOverlay');
+  let entryButton = page.locator('#statsInfinityInviteBtn');
+  if (!await statsOverlay.isVisible()) {
+    if (projectName === 'webkit-mobile') {
+      const mobileMenuButton = page.locator('#mobileMenuBtn');
+      await expect(mobileMenuButton).toBeVisible();
+      await mobileMenuButton.click();
+      await expect(page.locator('#sidebar')).toHaveClass(/mobile-open/);
+    }
+    entryButton = page.locator('#infinityModeBtn');
+  }
   await entryButton.click();
   const response = await responsePromise;
   expect(response.ok()).toBe(true);
@@ -316,11 +324,20 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
   progress(projectName, 'Infinity Pool duplicate left scores unchanged');
 
   progress(projectName, 'switching Daily to Infinity Pool and checking persistence');
+  const mobileMenuButton = page.locator('#mobileMenuBtn');
+  if (await mobileMenuButton.isVisible()) {
+    await mobileMenuButton.click();
+    await expect(page.locator('#sidebar')).toHaveClass(/mobile-open/);
+  }
+  const dailySquaresResponsePromise = page.waitForResponse(
+    (response) => response.url().endsWith('/api/all-daily-squares'),
+    { timeout: 90_000 },
+  );
   await Promise.all([
     page.waitForLoadState('load'),
+    dailySquaresResponsePromise,
     page.locator('#dailyModeBtn').click(),
   ]);
-  await openControls(page);
   const restoredState = await enterInfinity(page, projectName);
   expect(restoredState.current_round).toBe(2);
   expect(restoredState.total_score).toBe(infinityResult.total_score);

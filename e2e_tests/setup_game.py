@@ -184,7 +184,7 @@ def main() -> None:
     square_pool_id = int(required_environment_value('E2E_SQUARE_POOL_ID'))
     random_seed = int(required_environment_value('E2E_RANDOM_SEED'))
 
-    with get_conn() as conn:
+    with get_conn(e2e=True) as conn:
         cur = conn.cursor()
         print(f'Rebuilding E2E game for {game_date.isoformat()}...', flush=True)
         delete_existing_game(cur, game_date)

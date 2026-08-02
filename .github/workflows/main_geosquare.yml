@@ -77,10 +77,10 @@ jobs:
     permissions:
       contents: read
     env:
-      SQL_SERVER: ${{ secrets.E2E_SQL_SERVER }}
-      SQL_DATABASE: ${{ secrets.E2E_SQL_DATABASE }}
-      SQL_USERNAME: ${{ secrets.E2E_SQL_USERNAME }}
-      SQL_PASSWORD: ${{ secrets.E2E_SQL_PASSWORD }}
+      E2E_SQL_SERVER: ${{ secrets.E2E_SQL_SERVER }}
+      E2E_DATABASE: ${{ secrets.E2E_SQL_DATABASE }}
+      E2E_SQL_USERNAME: ${{ secrets.E2E_SQL_USERNAME }}
+      E2E_SQL_PASSWORD: ${{ secrets.E2E_SQL_PASSWORD }}
       SECRET_KEY: ${{ secrets.E2E_SECRET_KEY }}
       E2E_GAME_DATE: '2026-08-01'
       GAME_DATE_OVERRIDE: '2026-08-01'

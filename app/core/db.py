@@ -2,12 +2,27 @@ import os
 
 import pyodbc
 
+PRODUCTION_DATABASE_NAME = 'GeoSquare'
 
-def get_conn():
-    server = os.environ['SQL_SERVER']
-    database = os.environ['SQL_DATABASE']
-    username = os.environ['SQL_USERNAME']
-    password = os.environ['SQL_PASSWORD']
+
+def _required_environment_value(name: str) -> str:
+    value = os.environ[name].strip()
+    if not value:
+        raise RuntimeError(f'{name} must not be empty.')
+    return value
+
+
+def _e2e_database_name() -> str:
+    database = _required_environment_value('E2E_DATABASE')
+    if database.casefold() == PRODUCTION_DATABASE_NAME.casefold():
+        raise RuntimeError('E2E_DATABASE must not reference the production database.')
+    return database
+
+
+def _connect(database: str, *, environment_prefix: str = 'SQL'):
+    server = _required_environment_value(f'{environment_prefix}_SERVER')
+    username = _required_environment_value(f'{environment_prefix}_USERNAME')
+    password = _required_environment_value(f'{environment_prefix}_PASSWORD')
     driver = os.getenv('SQL_DRIVER', 'ODBC Driver 18 for SQL Server')
 
     conn_str = (
@@ -20,3 +35,9 @@ def get_conn():
         'TrustServerCertificate=yes;'
     )
     return pyodbc.connect(conn_str)
+
+
+def get_conn(*, e2e: bool = False):
+    if e2e or os.getenv('LOCAL_AUTH_BYPASS', '').lower() in ('1', 'true', 'yes'):
+        return _connect(_e2e_database_name(), environment_prefix='E2E_SQL')
+    return _connect(_required_environment_value('SQL_DATABASE'))
