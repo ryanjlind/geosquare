@@ -7,7 +7,8 @@ module.exports = defineConfig({
   timeout: 120_000,
   fullyParallel: false,
   workers: 1,
-  retries: 1,
+  retries: 0,
+  maxFailures: 1,
   reporter: [['line'], ['html', { outputFolder: 'artifacts/report', open: 'never' }]],
   use: {
     baseURL: 'http://127.0.0.1:8000',
