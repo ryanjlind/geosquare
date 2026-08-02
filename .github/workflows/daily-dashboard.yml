@@ -1,0 +1,42 @@
+name: 'Send daily GeoSquare dashboard'
+
+on:
+  schedule:
+    - cron: '0 14 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  send-dashboard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SQL_SERVER: ${{ secrets.SQL_SERVER }}
+      SQL_DATABASE: ${{ secrets.SQL_DATABASE }}
+      SQL_USERNAME: ${{ secrets.SQL_USERNAME }}
+      SQL_PASSWORD: ${{ secrets.SQL_PASSWORD }}
+      SQL_DRIVER: ODBC Driver 18 for SQL Server
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_RECIPIENT: ${{ secrets.EMAIL_RECIPIENT }}
+      EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Microsoft ODBC driver
+        run: |
+          curl https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
+          curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18 unixodbc-dev
+
+      - name: Install report dependencies
+        run: pip install pyodbc==5.1.0 requests
+
+      - name: Send dashboard
+        run: python -m daily_dashboard.send_daily_dashboard
