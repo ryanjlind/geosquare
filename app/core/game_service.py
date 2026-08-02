@@ -208,6 +208,20 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None):
         if square_id is None:
             return {"error": "No square found for that round."}, 404
 
+        if existing_round is None:
+            upsert_session_round_difficulty(
+                cur,
+                session_id,
+                round_number,
+                square_id,
+                1,
+            )
+            existing_round = get_session_round(cur, session_id, round_number)
+            if existing_round is None:
+                raise RuntimeError(
+                    f"Failed to initialize session {session_id} round {round_number}."
+                )
+
         rows = get_ranked_square_cities(cur, square_id)
 
         if confirmed_city_id is not None:
@@ -269,10 +283,6 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None):
                 return {"error": "Invalid match result."}, 500
 
         population = int(matched.Population)
-        if existing_round is None:
-            raise RuntimeError(
-                f"Session {session_id} round {round_number} has no stored difficulty level."
-            )
         difficulty_level = int(existing_round.DifficultyLevel)
         score = compute_score(rows, population)
         expansion_level = int(expansion_level)
