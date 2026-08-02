@@ -1,11 +1,9 @@
 import os
-import smtplib
 import json
 import logging
 import time
 
 from flask import Blueprint, jsonify, render_template, request, current_app, url_for, redirect, make_response
-from email.message import EmailMessage
 from datetime import datetime, timezone
 
 from app.core.auth import (
@@ -31,6 +29,7 @@ from app.core.session_service import resolve_request_identity
 from app.core.user import is_username_available, set_username
 from app.helpers.session import attach_session_cookie, COOKIE_NAME, get_user_id_from_cookie, get_session_id_from_cookie
 from app.core.db import get_conn
+from app.core.feedback_service import send_feedback_email
 from app.helpers.logging import debug as log_debug
 
 main_bp = Blueprint("main", __name__)
@@ -241,53 +240,10 @@ def set_username_route():
 
 @main_bp.route("/api/feedback", methods=["POST"])
 def feedback():
-    data = request.form
-
-    msg = EmailMessage()
-    msg["Subject"] = f"GeoSquare Feedback ({data.get('type')})"
-    msg["From"] = os.environ["SMTP_FROM"]
-    msg["To"] = os.environ["FEEDBACK_EMAIL"]
-
-    diagnostics = data.get("diagnostics")
-
-    body = f"""
-Type: {data.get('type')}
-Platform: {data.get('platform')}
-Include Diagnostics: {data.get('includeDiagnostics')}
-Allow Email: {data.get('allowEmail')}
-User Email: {data.get('email')}
-
-Description:
-{data.get('description')}
-"""
-
-    if data.get("includeDiagnostics") == "true" and diagnostics:
-        body += f"""
-
-Diagnostics:
-{diagnostics}
-"""
-
-    msg.set_content(body)
-
-    for file in request.files.getlist("screenshots"):
-        msg.add_attachment(
-            file.read(),
-            maintype="image",
-            subtype="png",
-            filename=file.filename,
-        )
-
-    with smtplib.SMTP(
-        os.environ["SMTP_HOST"],
-        int(os.environ["SMTP_PORT"]),
-    ) as s:
-        s.starttls()
-        s.login(
-            os.environ["SMTP_USER"],
-            os.environ["SMTP_PASS"],
-        )
-        s.send_message(msg)
+    send_feedback_email(
+        request.form,
+        request.files.getlist("screenshots"),
+    )
 
     return jsonify({"ok": True})
 
