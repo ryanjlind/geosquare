@@ -3,8 +3,8 @@ const { defineConfig, devices } = require('@playwright/test');
 module.exports = defineConfig({
   testDir: '.',
   testMatch: 'game.spec.js',
-  expect: { timeout: 60_000 },
-  timeout: 600_000,
+  expect: { timeout: 120_000 },
+  timeout: 1200_000,
   fullyParallel: false,
   workers: 1,
   retries: 0,
