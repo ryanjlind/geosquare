@@ -6,9 +6,8 @@ import os
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 
+import pyodbc
 import requests
-
-from app.core.db import get_conn
 
 
 REPORT_HOUR_UTC = 14
@@ -42,6 +41,24 @@ class DashboardData:
     previous_period: PeriodMetric
 
 
+def _get_conn():
+    driver = _required_environment_value('SQL_DRIVER')
+    server = _required_environment_value('SQL_SERVER')
+    database = _required_environment_value('SQL_DATABASE')
+    username = _required_environment_value('SQL_USERNAME')
+    password = _required_environment_value('SQL_PASSWORD')
+    connection_string = (
+        f'DRIVER={{{driver}}};'
+        f'SERVER={server};'
+        f'DATABASE={database};'
+        f'UID={username};'
+        f'PWD={password};'
+        'Encrypt=yes;'
+        'TrustServerCertificate=yes;'
+    )
+    return pyodbc.connect(connection_string)
+
+
 def _required_environment_value(name: str) -> str:
     value = os.environ[name].strip()
     if not value:
@@ -60,7 +77,7 @@ def _collect_dashboard_data(game_date: date) -> DashboardData:
     previous_start = game_date - timedelta(days=13)
     previous_end = game_date - timedelta(days=7)
 
-    with get_conn() as conn:
+    with _get_conn() as conn:
         cur = conn.cursor()
 
         cur.execute(
