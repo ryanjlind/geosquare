@@ -469,27 +469,24 @@ def _get_strongest_country(cur, user_id: int) -> dict | None:
     execute_start = perf_counter()
     cur.execute(
         """
-        WITH RankedGuesses AS (
+        WITH ResolvedGuesses AS (
             SELECT
-                gsr.SessionId,
-                gsr.SquareId,
-                gg.CityName,
-                gg.Population,
                 gg.Score AS GuessScore,
-                gsc.CountryCode,
-                ROW_NUMBER() OVER (
-                    PARTITION BY gsr.SessionId, gsr.SquareId, gg.CityName, gg.Population
-                    ORDER BY gsc.CityId ASC
-                ) AS rn
+                matched.CountryCode
             FROM dbo.GameSessions gs
             INNER JOIN dbo.GameSessionRounds gsr
                 ON gsr.SessionId = gs.SessionId
             INNER JOIN dbo.GameGuesses gg
                 ON gg.SessionRoundId = gsr.SessionRoundId
-            INNER JOIN dbo.GameSquareCities gsc
-                ON gsc.SquareId = gsr.SquareId
-                AND gsc.CityName = gg.CityName
-                AND gsc.Population = gg.Population
+            CROSS APPLY (
+                SELECT TOP 1
+                    gsc.CountryCode
+                FROM dbo.GameSquareCities gsc
+                WHERE gsc.SquareId = gsr.SquareId
+                  AND gsc.CityName = gg.CityName
+                  AND gsc.Population = gg.Population
+                ORDER BY gsc.CityId ASC
+            ) matched
             WHERE gs.UserId = ?
               AND gs.CompletedAt IS NOT NULL
         )
@@ -498,8 +495,7 @@ def _get_strongest_country(cur, user_id: int) -> dict | None:
             COUNT(*) AS GuessCount,
             AVG(CAST(GuessScore AS float)) AS AverageScore,
             SUM(GuessScore) AS TotalScore
-        FROM RankedGuesses
-        WHERE rn = 1
+        FROM ResolvedGuesses
         GROUP BY CountryCode
         ORDER BY AVG(CAST(GuessScore AS float)) DESC, COUNT(*) DESC, CountryCode ASC
         """,
@@ -530,44 +526,35 @@ def _get_most_obscure_city(cur, user_id: int) -> dict | None:
     execute_start = perf_counter()
     cur.execute(
         """
-        WITH RankedGuesses AS (
-            SELECT
-                gsr.SessionId,
-                gsr.SquareId,
-                gg.CityName,
-                gg.Population,
+        SELECT TOP 1
+            matched.CityId,
+            gg.CityName,
+            matched.CountryCode,
+            gg.Population,
+            matched.NotorietyScore
+        FROM dbo.GameSessions gs
+        INNER JOIN dbo.GameSessionRounds gsr
+            ON gsr.SessionId = gs.SessionId
+        INNER JOIN dbo.GameGuesses gg
+            ON gg.SessionRoundId = gsr.SessionRoundId
+        CROSS APPLY (
+            SELECT TOP 1
                 gsc.CityId,
                 gsc.CountryCode,
-                gc.NotorietyScore,
-                ROW_NUMBER() OVER (
-                    PARTITION BY gsr.SessionId, gsr.SquareId, gg.CityName, gg.Population
-                    ORDER BY gsc.CityId ASC
-                ) AS rn
-            FROM dbo.GameSessions gs
-            INNER JOIN dbo.GameSessionRounds gsr
-                ON gsr.SessionId = gs.SessionId
-            INNER JOIN dbo.GameGuesses gg
-                ON gg.SessionRoundId = gsr.SessionRoundId
-            INNER JOIN dbo.GameSquareCities gsc
-                ON gsc.SquareId = gsr.SquareId
-                AND gsc.CityName = gg.CityName
-                AND gsc.Population = gg.Population
+                gc.NotorietyScore
+            FROM dbo.GameSquareCities gsc
             INNER JOIN dbo.GeoCities gc
                 ON gc.CityId = gsc.CityId
-            WHERE gs.UserId = ?
-              AND gs.CompletedAt IS NOT NULL
+            WHERE gsc.SquareId = gsr.SquareId
+              AND gsc.CityName = gg.CityName
+              AND gsc.Population = gg.Population
               AND gc.NotorietyScore IS NOT NULL
               AND gc.FeatureCode <> 'PPLX'
-        )
-        SELECT TOP 1
-            CityId,
-            CityName,
-            CountryCode,
-            Population,
-            NotorietyScore
-        FROM RankedGuesses
-        WHERE rn = 1
-        ORDER BY NotorietyScore ASC, Population ASC, CityName ASC
+            ORDER BY gsc.CityId ASC
+        ) matched
+        WHERE gs.UserId = ?
+          AND gs.CompletedAt IS NOT NULL
+        ORDER BY matched.NotorietyScore ASC, gg.Population ASC, gg.CityName ASC
         """,
         (user_id,),
     )
@@ -598,27 +585,27 @@ def _get_most_used_city(cur, user_id: int) -> dict | None:
     execute_start = perf_counter()
     cur.execute(
         """
-        WITH RankedGuesses AS (
+        WITH ResolvedGuesses AS (
             SELECT
-                gsr.SessionId,
-                gsr.SquareId,
                 gg.CityName,
                 gg.Population,
-                gsc.CityId,
-                gsc.CountryCode,
-                ROW_NUMBER() OVER (
-                    PARTITION BY gsr.SessionId, gsr.SquareId, gg.CityName, gg.Population
-                    ORDER BY gsc.CityId ASC
-                ) AS rn
+                matched.CityId,
+                matched.CountryCode
             FROM dbo.GameSessions gs
             INNER JOIN dbo.GameSessionRounds gsr
                 ON gsr.SessionId = gs.SessionId
             INNER JOIN dbo.GameGuesses gg
                 ON gg.SessionRoundId = gsr.SessionRoundId
-            INNER JOIN dbo.GameSquareCities gsc
-                ON gsc.SquareId = gsr.SquareId
-                AND gsc.CityName = gg.CityName
-                AND gsc.Population = gg.Population
+            CROSS APPLY (
+                SELECT TOP 1
+                    gsc.CityId,
+                    gsc.CountryCode
+                FROM dbo.GameSquareCities gsc
+                WHERE gsc.SquareId = gsr.SquareId
+                  AND gsc.CityName = gg.CityName
+                  AND gsc.Population = gg.Population
+                ORDER BY gsc.CityId ASC
+            ) matched
             WHERE gs.UserId = ?
               AND gs.CompletedAt IS NOT NULL
         )
@@ -628,8 +615,7 @@ def _get_most_used_city(cur, user_id: int) -> dict | None:
             CountryCode,
             Population,
             COUNT(*) AS TimesUsed
-        FROM RankedGuesses
-        WHERE rn = 1
+        FROM ResolvedGuesses
         GROUP BY CityId, CityName, CountryCode, Population
         ORDER BY COUNT(*) DESC, Population ASC, CityName ASC
         """,
