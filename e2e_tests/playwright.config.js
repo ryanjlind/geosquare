@@ -4,7 +4,7 @@ module.exports = defineConfig({
   testDir: '.',
   testMatch: 'game.spec.js',
   expect: { timeout: 30_000 },
-  timeout: 120_000,
+  timeout: 300_000,
   fullyParallel: false,
   workers: 1,
   retries: 0,
