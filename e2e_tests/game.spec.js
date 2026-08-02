@@ -137,7 +137,9 @@ async function enterInfinity(page, projectName) {
     response.url().endsWith('/api/infinity-state')
     && response.request().method() === 'GET'
   ));
-  const entryButton = page.locator('#statsInfinityInviteBtn:visible, #infinityModeBtn:visible').first();
+  const entryButton = await page.locator('#statsOverlay').isVisible()
+    ? page.locator('#statsInfinityInviteBtn')
+    : page.locator('#infinityModeBtn');
   await entryButton.click();
   const response = await responsePromise;
   expect(response.ok()).toBe(true);
