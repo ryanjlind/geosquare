@@ -171,6 +171,17 @@ def test_alternate_name_uses_its_best_score():
     assert result['row'].CityName == 'Rostov-on-Don'
 
 
+def test_connector_does_not_consume_substantive_alternate_name_token():
+    result = find_matching_city(
+        [CityRow(1, 'Haikou', 'CN', AlternateNames='Hoi Hao')],
+        'Hoi An',
+        nearby_exact_match=None,
+        current_expansion_level=0,
+    )
+
+    assert result == {'type': 'no_match'}
+
+
 def test_fuzzy_alternate_name_receives_additional_penalty():
     result = find_matching_city(
         [
