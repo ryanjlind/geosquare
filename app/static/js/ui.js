@@ -112,7 +112,7 @@ export function showNextButton(currentRound) {
     const shareBtn = document.getElementById('shareScoreBtn');
     const shareStatus = document.getElementById('shareScoreStatus');
 
-    btn.textContent = currentRound === 5 ? 'Show Summary' : 'Next Round';
+    btn.textContent = currentRound === 5 ? 'Show Summary' : 'Next Square';
 
     if (actions) {
         actions.style.display = 'flex';

@@ -42,6 +42,7 @@
 
 #guessBtn,
 #passBtn,
+#previousBtn,
 #nextBtn,
 #expandBtn,
 #shareScoreBtn {
@@ -64,6 +65,7 @@
 
 #guessBtn:hover,
 #passBtn:hover,
+#previousBtn:hover,
 #nextBtn:hover,
 #expandBtn:hover,
 #shareScoreBtn:hover {
@@ -73,6 +75,7 @@
 
 #guessBtn:disabled,
 #passBtn:disabled,
+#previousBtn:disabled,
 #nextBtn:disabled,
 #expandBtn:disabled,
 #shareScoreBtn:disabled {

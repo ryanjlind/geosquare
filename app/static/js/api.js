@@ -72,3 +72,26 @@ export async function setDifficultyRequest(roundNumber, level) {
 
     return { response, data };
 }
+
+export async function fetchInfinityState() {
+    return fetchJson('/api/infinity-state');
+}
+
+export async function selectInfinityRoundRequest(roundNumber) {
+    return fetchJson('/api/infinity-round', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ round_number: roundNumber }),
+    });
+}
+
+export async function submitInfinityGuessRequest(guess, roundNumber) {
+    return fetchJson('/api/infinity-guess', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            guess,
+            round_number: roundNumber,
+        }),
+    });
+}

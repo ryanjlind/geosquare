@@ -43,6 +43,7 @@ import { initFeedback } from './feedback.js';
 import { initAuth, resolveAuthConflict } from './auth.js';
 import { expandSquareRequest } from './api.js';
 import { drawSquare } from './map.js';
+import { initInfinityMode, unlockInfinityMode } from './infinity.js';
 
 let endGameRounds = [];
 
@@ -152,6 +153,8 @@ function handleEndGameRoundSelect(roundNumber) {
 }
 
 async function enterEndGameGlobe() {
+    gameState.gameCompleted = true;
+    unlockInfinityMode();
     setGuessControlsEnabled(false);
     setGuessBoxVisible(false);
     setShareButtonReady(isShareReady());
@@ -385,6 +388,7 @@ export async function initGame() {
     });
     wireRoundTable(handleEndGameRoundSelect);
     initFeedback();
+    initInfinityMode(Boolean(state.completed_at));
 
     initAuth(state, {
         onAuthSuccess: async () => {

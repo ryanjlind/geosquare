@@ -24,6 +24,11 @@ from app.core.game_service import (
     get_all_daily_square_data_preview,
     expand_square
 )
+from app.core.infinity_service import (
+    get_infinity_state,
+    select_infinity_round,
+    submit_infinity_guess,
+)
 
 from app.core.session_service import resolve_request_identity
 from app.core.user import is_username_available, set_username
@@ -167,6 +172,49 @@ def player_stats():
 
     body, status = get_player_stats_payload(identity["user_id"])
 
+    resp = jsonify(body)
+    resp.status_code = status
+    return attach_session_cookie(resp, identity["user_id"], identity["session_id"])
+
+
+@main_bp.route("/api/infinity-state")
+def infinity_state():
+    identity = _identity()
+    body, status = get_infinity_state(identity["user_id"], identity["session_id"])
+    resp = jsonify(body)
+    resp.status_code = status
+    return attach_session_cookie(resp, identity["user_id"], identity["session_id"])
+
+
+@main_bp.route("/api/infinity-round", methods=["POST"])
+def infinity_round():
+    identity = _identity()
+    payload = request.get_json()
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Invalid or missing JSON body"}), 400
+    if "round_number" not in payload:
+        return jsonify({"error": "round_number is required."}), 400
+    body, status = select_infinity_round(
+        identity["user_id"],
+        identity["session_id"],
+        int(payload["round_number"]),
+    )
+    resp = jsonify(body)
+    resp.status_code = status
+    return attach_session_cookie(resp, identity["user_id"], identity["session_id"])
+
+
+@main_bp.route("/api/infinity-guess", methods=["POST"])
+def infinity_guess():
+    identity = _identity()
+    payload = request.get_json()
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Invalid or missing JSON body"}), 400
+    body, status = submit_infinity_guess(
+        payload,
+        identity["user_id"],
+        identity["session_id"],
+    )
     resp = jsonify(body)
     resp.status_code = status
     return attach_session_cookie(resp, identity["user_id"], identity["session_id"])

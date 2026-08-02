@@ -131,6 +131,62 @@ async function advanceToNextRound(page, nextRoundNumber, projectName) {
   progress(projectName, `round ${nextRoundNumber}: ready`);
 }
 
+async function enterInfinity(page, projectName) {
+  progress(projectName, 'entering Infinity Pool');
+  const responsePromise = page.waitForResponse((response) => (
+    response.url().endsWith('/api/infinity-state')
+    && response.request().method() === 'GET'
+  ));
+  const entryButton = page.locator('#statsInfinityInviteBtn:visible, #infinityModeBtn:visible').first();
+  await entryButton.click();
+  const response = await responsePromise;
+  expect(response.ok()).toBe(true);
+  const state = await response.json();
+  expect(state.unlocked).toBe(true);
+  await expect(page.locator('#infinityPanel')).toBeVisible();
+  await expect(page.locator('#guessInput')).toBeEnabled();
+  await expect(page.locator('#guessBtn')).toBeEnabled();
+  await expect(page.locator('#meta')).toContainText(`Square ${state.current_round} of 5`);
+  progress(projectName, `Infinity Pool square ${state.current_round} ready`);
+  return state;
+}
+
+async function selectInfinityRound(page, roundNumber, projectName) {
+  progress(projectName, `Infinity Pool square ${roundNumber}: loading`);
+  const responsePromise = page.waitForResponse((response) => (
+    response.url().endsWith('/api/infinity-round')
+    && response.request().method() === 'POST'
+  ));
+  await page.locator('#nextBtn').click();
+  const response = await responsePromise;
+  expect(response.request().postDataJSON()).toEqual({ round_number: roundNumber });
+  expect(response.ok()).toBe(true);
+  await expect(page.locator('#meta')).toContainText(`Square ${roundNumber} of 5`);
+  progress(projectName, `Infinity Pool square ${roundNumber}: ready`);
+}
+
+async function submitInfinityGuess(page, roundNumber, guess, method) {
+  await page.locator('#guessInput').fill(guess);
+  const responsePromise = page.waitForResponse((response) => (
+    response.url().endsWith('/api/infinity-guess')
+    && response.request().method() === 'POST'
+  ));
+
+  if (method === 'enter') {
+    await page.locator('#guessInput').press('Enter');
+  } else {
+    await page.locator('#guessBtn').click();
+  }
+
+  const response = await responsePromise;
+  expect(response.request().postDataJSON()).toEqual({
+    guess,
+    round_number: roundNumber,
+  });
+  expect(response.ok()).toBe(true);
+  return response.json();
+}
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     window.__copiedText = '';
@@ -213,6 +269,63 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
   expect(state.state).toBe('completed');
   expect(state.completed_rounds).toHaveLength(5);
   expect(state.completed_rounds.filter((round) => round.round_status === 'Passed')).toHaveLength(1);
+
+  await enterInfinity(page, projectName);
+  await selectInfinityRound(page, 2, projectName);
+
+  progress(projectName, 'Infinity Pool square 2: submitting Santa Cruz');
+  const infinityResult = await submitInfinityGuess(page, 2, 'Santa Cruz', 'click');
+  expect(infinityResult.correct).toBe(true);
+  expect(infinityResult.duplicate).toBe(false);
+  expect(infinityResult.guesses.map(({ city_id, city, country_code }) => ({
+    city_id,
+    city,
+    country_code,
+  }))).toEqual(ROUND_CASES[2].candidates);
+  expect(infinityResult.duplicates).toEqual([]);
+  const chips = page.locator('#infinityChips .infinity-chip');
+  await expect(chips).toHaveCount(ROUND_CASES[2].candidates.length);
+  await expect(page.locator('#infinityChips .infinity-chip-city')).toHaveText(
+    ROUND_CASES[2].candidates.map((candidate) => candidate.city).reverse(),
+  );
+  await expect(page.locator('#infinityRoundScore')).toHaveText(
+    infinityResult.round_score.toLocaleString('en-US'),
+  );
+  await expect(page.locator('#infinityTotalScore')).toHaveText(
+    infinityResult.total_score.toLocaleString('en-US'),
+  );
+  progress(projectName, 'Infinity Pool multi-city result verified');
+
+  progress(projectName, 'Infinity Pool square 2: checking duplicate submission');
+  const duplicateResult = await submitInfinityGuess(page, 2, 'Santa Cruz', 'enter');
+  expect(duplicateResult).toEqual({
+    correct: true,
+    duplicate: true,
+    duplicates: ROUND_CASES[2].candidates.map((candidate) => candidate.city),
+    ok: true,
+  });
+  await expect(chips).toHaveCount(ROUND_CASES[2].candidates.length);
+  await expect(page.locator('#infinityRoundScore')).toHaveText(
+    infinityResult.round_score.toLocaleString('en-US'),
+  );
+  await expect(page.locator('#infinityTotalScore')).toHaveText(
+    infinityResult.total_score.toLocaleString('en-US'),
+  );
+  progress(projectName, 'Infinity Pool duplicate left scores unchanged');
+
+  progress(projectName, 'switching Daily to Infinity Pool and checking persistence');
+  await Promise.all([
+    page.waitForLoadState('load'),
+    page.locator('#dailyModeBtn').click(),
+  ]);
+  await openControls(page);
+  const restoredState = await enterInfinity(page, projectName);
+  expect(restoredState.current_round).toBe(2);
+  expect(restoredState.total_score).toBe(infinityResult.total_score);
+  expect(restoredState.guesses).toHaveLength(ROUND_CASES[2].candidates.length);
+  await expect(page.locator('#infinityChips .infinity-chip')).toHaveCount(
+    ROUND_CASES[2].candidates.length,
+  );
   expect(pageErrors).toEqual([]);
   progress(projectName, 'test completed');
 });
