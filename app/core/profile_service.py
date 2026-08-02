@@ -335,25 +335,6 @@ def _get_completed_round_rows_for_sessions(cur, session_ids: list[int]):
                 ON gr.GameId = gs.GameId
                 AND gr.SquareId = gsr.SquareId
             WHERE gsr.SessionId IN ({placeholders})
-        ),
-        RankedCities AS (
-            SELECT
-                city.SquareId,
-                city.CityId,
-                city.CityName,
-                city.Population,
-                city.Latitude,
-                city.Longitude,
-                ROW_NUMBER() OVER (
-                    PARTITION BY city.SquareId
-                    ORDER BY city.Population DESC, city.CityName ASC
-                ) AS PopRank
-            FROM dbo.GameSquareCities city
-            INNER JOIN (
-                SELECT DISTINCT SquareId
-                FROM TargetRounds
-            ) target
-                ON target.SquareId = city.SquareId
         )
         SELECT
             gsr.SessionId,
@@ -366,17 +347,44 @@ def _get_completed_round_rows_for_sessions(cur, session_ids: list[int]):
             gg.Population,
             gg.Score AS GuessScore,
             gg.GuessedAt,
-            ranked.CityId,
-            ranked.PopRank,
-            ranked.Latitude,
-            ranked.Longitude
+            matched.CityId,
+            CASE
+                WHEN matched.CityId IS NULL THEN NULL
+                ELSE higher_ranked.CityCount + 1
+            END AS PopRank,
+            matched.Latitude,
+            matched.Longitude
         FROM TargetRounds gsr
         LEFT JOIN dbo.GameGuesses gg
             ON gg.SessionRoundId = gsr.SessionRoundId
-        LEFT JOIN RankedCities ranked
-            ON ranked.SquareId = gsr.SquareId
-            AND ranked.CityName = gg.CityName
-            AND ranked.Population = gg.Population
+        OUTER APPLY (
+            SELECT TOP 1
+                city.CityId,
+                city.Latitude,
+                city.Longitude
+            FROM dbo.GameSquareCities city
+            WHERE city.SquareId = gsr.SquareId
+              AND city.CityName = gg.CityName
+              AND city.Population = gg.Population
+            ORDER BY city.CityId ASC
+        ) matched
+        OUTER APPLY (
+            SELECT COUNT(*) AS CityCount
+            FROM dbo.GameSquareCities city
+            WHERE city.SquareId = gsr.SquareId
+              AND (
+                  city.Population > gg.Population
+                  OR (
+                      city.Population = gg.Population
+                      AND city.CityName < gg.CityName
+                  )
+                  OR (
+                      city.Population = gg.Population
+                      AND city.CityName = gg.CityName
+                      AND city.CityId < matched.CityId
+                  )
+              )
+        ) higher_ranked
         ORDER BY gsr.SessionId ASC, gsr.RoundNumber ASC, gg.GuessedAt ASC, gg.GuessId ASC
         """,
         session_ids,
