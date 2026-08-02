@@ -124,7 +124,7 @@ def test_multiple_substantive_trailing_alternate_name_tokens_fall_below_threshol
     assert result == {'type': 'no_match'}
 
 
-def test_weaker_trailing_name_expansion_requires_confirmation():
+def test_trailing_name_expansion_at_auto_accept_threshold_is_accepted():
     result = find_matching_city(
         [CityRow(1, 'Rostov-on-Don', 'RU')],
         'Rostov',
@@ -132,12 +132,8 @@ def test_weaker_trailing_name_expansion_requires_confirmation():
         current_expansion_level=0,
     )
 
-    assert result == {
-        'type': 'confirmation_required',
-        'suggestions': [
-            {'city_id': 1, 'city': 'Rostov-on-Don', 'country_code': 'RU'},
-        ],
-    }
+    assert result['type'] == 'match'
+    assert result['row'].CityName == 'Rostov-on-Don'
 
 
 def test_discarded_candidate_is_not_shown_with_a_viable_candidate():
