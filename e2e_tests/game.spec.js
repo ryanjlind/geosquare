@@ -12,6 +12,8 @@ const ROUND_CASES = {
   2: {
     guess: 'Santa Cruz',
     candidates: [
+      { city_id: 24027, city: 'Angat', country_code: 'PH' },
+      { city_id: 23668, city: 'Pulong Santa Cruz', country_code: 'PH' },
       { city_id: 23613, city: 'Santa Cruz', country_code: 'PH' },
       { city_id: 23614, city: 'Santa Cruz', country_code: 'PH' },
       { city_id: 23615, city: 'Santa Cruz', country_code: 'PH' },
@@ -34,10 +36,6 @@ const ROUND_CASES = {
 };
 
 async function openControls(page) {
-  const menuButton = page.locator('#mobileMenuBtn');
-  if (await menuButton.isVisible()) {
-    await menuButton.click();
-  }
   await expect(page.locator('#guessInput')).toBeVisible();
 }
 
