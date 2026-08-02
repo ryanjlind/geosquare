@@ -113,6 +113,17 @@ def test_trailing_name_expansion_can_be_auto_accepted():
     assert result['row'].CityName == 'Kailua-Kona'
 
 
+def test_multiple_substantive_trailing_alternate_name_tokens_fall_below_threshold():
+    result = find_matching_city(
+        [CityRow(1, 'Barnet', 'GB', AlternateNames='London Borough of Barnet')],
+        'London',
+        nearby_exact_match=None,
+        current_expansion_level=0,
+    )
+
+    assert result == {'type': 'no_match'}
+
+
 def test_weaker_trailing_name_expansion_requires_confirmation():
     result = find_matching_city(
         [CityRow(1, 'Rostov-on-Don', 'RU')],

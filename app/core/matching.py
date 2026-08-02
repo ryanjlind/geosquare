@@ -13,6 +13,7 @@ FUZZY_ALTERNATE_NAME_PENALTY = 5.0
 UNMATCHED_LEADING_TOKEN_PENALTY = 30.0
 UNMATCHED_INTERIOR_TOKEN_PENALTY = 20.0
 UNMATCHED_TRAILING_TOKEN_PENALTY = 5.0
+ADDITIONAL_UNMATCHED_TRAILING_TOKEN_PENALTY = 15.0
 UNMATCHED_INPUT_TOKEN_PENALTY = 30.0
 NEARBY_FIRST_RING_PENALTY = 12.0
 NEARBY_RING_PENALTY_DECAY = 4.0
@@ -149,6 +150,16 @@ def _token_weight(token: str) -> float:
     return 1.0
 
 
+def _trailing_token_penalty(tokens: list[str]) -> float:
+    substantive_count = sum(token not in NAME_CONNECTOR_WORDS for token in tokens)
+    if substantive_count == 0:
+        return 0.0
+    return (
+        UNMATCHED_TRAILING_TOKEN_PENALTY
+        + ((substantive_count - 1) * ADDITIONAL_UNMATCHED_TRAILING_TOKEN_PENALTY)
+    )
+
+
 def _score_name_pair(guess_name: str, candidate_name: str) -> float:
     guess_tokens = normalize_place_name(guess_name).split()
     candidate_tokens = normalize_place_name(candidate_name).split()
@@ -180,13 +191,18 @@ def _score_name_pair(guess_name: str, candidate_name: str) -> float:
         pending_candidate_tokens: int,
     ) -> float:
         if guess_index == len(guess_tokens):
-            trailing_count = pending_candidate_tokens + len(candidate_tokens) - candidate_index
-            return -(trailing_count * UNMATCHED_TRAILING_TOKEN_PENALTY)
+            trailing_tokens = candidate_tokens[
+                candidate_index - pending_candidate_tokens:
+            ]
+            return -_trailing_token_penalty(trailing_tokens)
 
         if candidate_index == len(candidate_tokens):
+            pending_tokens = candidate_tokens[
+                candidate_index - pending_candidate_tokens:
+            ]
             remaining_input_count = len(guess_tokens) - guess_index
             return (
-                -(pending_candidate_tokens * UNMATCHED_TRAILING_TOKEN_PENALTY)
+                -_trailing_token_penalty(pending_tokens)
                 -(remaining_input_count * UNMATCHED_INPUT_TOKEN_PENALTY)
             )
 
