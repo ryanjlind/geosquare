@@ -411,10 +411,10 @@ def auth_resolve():
     payload = request.get_json()
     if not isinstance(payload, dict):
         return jsonify({"ok": False, "error": "Invalid or missing JSON body"}), 400
+    if "action" not in payload:
+        return jsonify({"ok": False, "error": "action is required"}), 400
 
-    result = resolve_lastlogin_conflict(
-        payload["action"] if "action" in payload else None
-    )
+    result = resolve_lastlogin_conflict(payload["action"])
 
     if result["status"] == "resolved":
         response = jsonify({"ok": True})

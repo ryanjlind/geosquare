@@ -26,6 +26,7 @@ REGION_ORDER = [
     'Oceania',
     'Other',
 ]
+HISTORY_PAGE_SIZE = 20
 
 
 def _log_profile_duration(label: str, start: float):
@@ -92,11 +93,10 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
             f'username={user_row.Username if user_row else None}'
         )
 
-        sessions = _get_completed_sessions(cur, user_id)
+        lifetime_games = _get_lifetime_games(cur, user_id)
+        sessions = _get_completed_sessions(cur, user_id, offset=0)
         log_info(f'[profile] completed_session_count={len(sessions)}')
-        if sessions:
-            log_info(f'[profile] first_session={sessions[0]}')
-        if not sessions:
+        if not lifetime_games:
             _log_profile_duration('get_profile_payload', start)
             return {
                 'profile_found': False,
@@ -109,35 +109,7 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
                 'history': [],
             }, 200
 
-        completed_round_rows = _get_completed_round_rows_for_sessions(
-            cur,
-            [session['session_id'] for session in sessions],
-        )
-        completed_rounds_by_session = _build_completed_rounds_by_session(completed_round_rows)
-
-        with _profile_stage('build_history'):
-            history = []
-            for session in sessions:
-                if session['session_id'] in completed_rounds_by_session:
-                    completed_rounds = completed_rounds_by_session[session['session_id']]
-                else:
-                    completed_rounds = []
-                solved_count = sum(1 for round_data in completed_rounds if int(round_data['score']) > 0)
-                is_perfect = len(completed_rounds) == 5 and all(int(round_data['score']) > 0 for round_data in completed_rounds)
-                best_round = _get_best_round(completed_rounds)
-
-                history.append({
-                    'session_id': int(session['session_id']),
-                    'game_id': int(session['game_id']),
-                    'game_date': session['game_date'].isoformat(),
-                    'completed_at': session['completed_at'].isoformat() if session['completed_at'] else None,
-                    'total_score': int(session['total_score']),
-                    'solved_count': int(solved_count),
-                    'is_perfect': bool(is_perfect),
-                    'best_round': best_round,
-                    'completed_rounds': completed_rounds,
-                })
-            log_info(f'[profile] build_history session_count={len(history)}')
+        history = _load_history(cur, sessions[:HISTORY_PAGE_SIZE])
 
         most_obscure_city = _get_most_obscure_city(cur, user_id)
         most_used_city = _get_most_used_city(cur, user_id)
@@ -145,7 +117,7 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
         region_performance, region_classification_details = _get_region_performance(cur, user_id)
 
         summary = _build_summary(
-            history,
+            lifetime_games,
             most_obscure_city,
             most_used_city,
             strongest_country,
@@ -168,6 +140,39 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
         'region_performance': region_performance,
         'region_classification_details': region_classification_details,
         'history': history,
+        'history_pagination': {
+            'offset': 0,
+            'page_size': HISTORY_PAGE_SIZE,
+            'has_more': len(sessions) > HISTORY_PAGE_SIZE,
+        },
+    }, 200
+
+
+def get_profile_history_payload(user_id: int | None, offset: int) -> tuple[dict, int]:
+    if user_id is None:
+        return {'error': 'No profile found.'}, 404
+    if offset < 0:
+        return {'error': 'offset must be non-negative.'}, 400
+
+    with _profile_stage('get_profile_history_payload'):
+        connection_start = perf_counter()
+        log_info('[profile] history database connection started')
+        with get_conn() as conn:
+            log_info(
+                f'[profile] history database connection completed in '
+                f'{perf_counter() - connection_start:.3f}s'
+            )
+            cur = conn.cursor()
+            sessions = _get_completed_sessions(cur, user_id, offset=offset)
+            history = _load_history(cur, sessions[:HISTORY_PAGE_SIZE])
+
+    return {
+        'history': history,
+        'history_pagination': {
+            'offset': offset,
+            'page_size': HISTORY_PAGE_SIZE,
+            'has_more': len(sessions) > HISTORY_PAGE_SIZE,
+        },
     }, 200
 
 def _get_user_row(cur, user_id: int):
@@ -184,7 +189,47 @@ def _get_user_row(cur, user_id: int):
         log_info(f'[profile] _get_user_row.execute completed in {perf_counter() - execute_start:.3f}s')
         return _fetchone_with_timing(cur, '_get_user_row')
 
-def _get_completed_sessions(cur, user_id: int) -> list[dict]:
+def _get_lifetime_games(cur, user_id: int) -> list[dict]:
+    with _profile_stage('_get_lifetime_games'):
+        execute_start = perf_counter()
+        cur.execute(
+            """
+            SELECT
+                gs.SessionId,
+                g.GameDate,
+                gs.TotalScore,
+                COUNT(gsr.SessionRoundId) AS RoundCount,
+                SUM(CASE WHEN gsr.Score > 0 THEN 1 ELSE 0 END) AS SolvedCount
+            FROM dbo.GameSessions gs
+            INNER JOIN dbo.Games g
+                ON g.GameId = gs.GameId
+            LEFT JOIN dbo.GameSessionRounds gsr
+                ON gsr.SessionId = gs.SessionId
+                AND gsr.RoundStatus IN ('Completed', 'Passed')
+            WHERE gs.UserId = ?
+              AND gs.CompletedAt IS NOT NULL
+            GROUP BY gs.SessionId, g.GameDate, gs.TotalScore
+            ORDER BY g.GameDate DESC, gs.SessionId DESC
+            """,
+            (user_id,),
+        )
+        log_info(
+            f'[profile] _get_lifetime_games.execute completed in '
+            f'{perf_counter() - execute_start:.3f}s'
+        )
+        rows = _fetchall_with_timing(cur, '_get_lifetime_games')
+        return [
+            {
+                'game_date': row.GameDate.isoformat(),
+                'total_score': int(row.TotalScore),
+                'solved_count': int(row.SolvedCount),
+                'is_perfect': int(row.RoundCount) == 5 and int(row.SolvedCount) == 5,
+            }
+            for row in rows
+        ]
+
+
+def _get_completed_sessions(cur, user_id: int, offset: int) -> list[dict]:
     with _profile_stage('_get_completed_sessions'):
         execute_start = perf_counter()
         cur.execute(
@@ -201,8 +246,9 @@ def _get_completed_sessions(cur, user_id: int) -> list[dict]:
             WHERE gs.UserId = ?
               AND gs.CompletedAt IS NOT NULL
             ORDER BY g.GameDate DESC, gs.CompletedAt DESC, gs.SessionId DESC
+                        OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
             """,
-            (user_id,),
+                        (user_id, offset, HISTORY_PAGE_SIZE + 1),
         )
         log_info(
             f'[profile] _get_completed_sessions.execute completed in '
@@ -226,6 +272,39 @@ def _get_completed_sessions(cur, user_id: int) -> list[dict]:
         )
         return result
 
+
+def _load_history(cur, sessions: list[dict]) -> list[dict]:
+    completed_round_rows = _get_completed_round_rows_for_sessions(
+        cur,
+        [session['session_id'] for session in sessions],
+    )
+    completed_rounds_by_session = _build_completed_rounds_by_session(completed_round_rows)
+
+    with _profile_stage('build_history'):
+        history = []
+        for session in sessions:
+            session_id = session['session_id']
+            if session_id not in completed_rounds_by_session:
+                raise RuntimeError(f'Completed session {session_id} has no completed round data.')
+            completed_rounds = completed_rounds_by_session[session_id]
+            solved_count = sum(1 for round_data in completed_rounds if int(round_data['score']) > 0)
+            is_perfect = len(completed_rounds) == 5 and all(
+                int(round_data['score']) > 0 for round_data in completed_rounds
+            )
+            history.append({
+                'session_id': int(session['session_id']),
+                'game_id': int(session['game_id']),
+                'game_date': session['game_date'].isoformat(),
+                'completed_at': session['completed_at'].isoformat() if session['completed_at'] else None,
+                'total_score': int(session['total_score']),
+                'solved_count': int(solved_count),
+                'is_perfect': bool(is_perfect),
+                'best_round': _get_best_round(completed_rounds),
+                'completed_rounds': completed_rounds,
+            })
+        log_info(f'[profile] build_history session_count={len(history)}')
+        return history
+
 def _get_completed_round_rows_for_sessions(cur, session_ids: list[int]):
     start = perf_counter()
     if not session_ids:
@@ -241,13 +320,48 @@ def _get_completed_round_rows_for_sessions(cur, session_ids: list[int]):
     execute_start = perf_counter()
     cur.execute(
         f"""
+        WITH TargetRounds AS (
+            SELECT
+                gsr.SessionId,
+                gsr.SessionRoundId,
+                gsr.RoundNumber,
+                gsr.SquareId,
+                gsr.Score,
+                gr.ExpansionLevel
+            FROM dbo.GameSessionRounds gsr
+            INNER JOIN dbo.GameSessions gs
+                ON gs.SessionId = gsr.SessionId
+            INNER JOIN dbo.GameRounds gr
+                ON gr.GameId = gs.GameId
+                AND gr.SquareId = gsr.SquareId
+            WHERE gsr.SessionId IN ({placeholders})
+        ),
+        RankedCities AS (
+            SELECT
+                city.SquareId,
+                city.CityId,
+                city.CityName,
+                city.Population,
+                city.Latitude,
+                city.Longitude,
+                ROW_NUMBER() OVER (
+                    PARTITION BY city.SquareId
+                    ORDER BY city.Population DESC, city.CityName ASC
+                ) AS PopRank
+            FROM dbo.GameSquareCities city
+            INNER JOIN (
+                SELECT DISTINCT SquareId
+                FROM TargetRounds
+            ) target
+                ON target.SquareId = city.SquareId
+        )
         SELECT
             gsr.SessionId,
             gsr.SessionRoundId,
             gsr.RoundNumber,
             gsr.SquareId,
             gsr.Score,
-            gr.ExpansionLevel,
+            gsr.ExpansionLevel,
             gg.CityName,
             gg.Population,
             gg.Score AS GuessScore,
@@ -256,32 +370,13 @@ def _get_completed_round_rows_for_sessions(cur, session_ids: list[int]):
             ranked.PopRank,
             ranked.Latitude,
             ranked.Longitude
-        FROM dbo.GameSessionRounds gsr
-        INNER JOIN dbo.GameSessions gs
-            ON gs.SessionId = gsr.SessionId
-        INNER JOIN dbo.GameRounds gr
-            ON gr.GameId = gs.GameId
-            AND gr.SquareId = gsr.SquareId
+        FROM TargetRounds gsr
         LEFT JOIN dbo.GameGuesses gg
             ON gg.SessionRoundId = gsr.SessionRoundId
-        LEFT JOIN (
-            SELECT
-                SquareId,
-                CityId,
-                CityName,
-                Population,
-                Latitude,
-                Longitude,
-                ROW_NUMBER() OVER (
-                    PARTITION BY SquareId
-                    ORDER BY Population DESC, CityName ASC
-                ) AS PopRank
-            FROM dbo.GameSquareCities
-        ) ranked
+        LEFT JOIN RankedCities ranked
             ON ranked.SquareId = gsr.SquareId
             AND ranked.CityName = gg.CityName
             AND ranked.Population = gg.Population
-        WHERE gsr.SessionId IN ({placeholders})
         ORDER BY gsr.SessionId ASC, gsr.RoundNumber ASC, gg.GuessedAt ASC, gg.GuessId ASC
         """,
         session_ids,

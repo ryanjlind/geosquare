@@ -87,6 +87,23 @@
     gap: 14px;
 }
 
+.profile-history-load-more {
+    align-self: center;
+    min-width: 140px;
+    padding: 10px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 4px;
+    background: #1d2633;
+    color: #eef4fc;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.profile-history-load-more:disabled {
+    cursor: wait;
+    opacity: 0.6;
+}
+
 .profile-history-card {
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 16px;

@@ -1,8 +1,8 @@
 from time import perf_counter
 
-from flask import Blueprint, jsonify, render_template
+from flask import Blueprint, jsonify, render_template, request
 
-from app.core.profile_service import get_profile_payload
+from app.core.profile_service import get_profile_history_payload, get_profile_payload
 from app.helpers.logging import info as log_info
 from app.helpers.session import get_user_id_from_cookie
 
@@ -35,6 +35,29 @@ def profile_data():
     response.status_code = status_code
     log_info(
         f'[profile] /api/profile completed in '
+        f'{perf_counter() - request_start:.3f}s status={status_code}'
+    )
+    return response
+
+
+@profile_bp.route('/api/profile/history')
+def profile_history():
+    request_start = perf_counter()
+    log_info('[profile] /api/profile/history started')
+    if 'offset' not in request.args:
+        return jsonify({'error': 'offset is required.'}), 400
+
+    try:
+        offset = int(request.args['offset'])
+    except ValueError:
+        return jsonify({'error': 'offset must be an integer.'}), 400
+
+    user_id = get_user_id_from_cookie()
+    response_body, status_code = get_profile_history_payload(user_id, offset)
+    response = jsonify(response_body)
+    response.status_code = status_code
+    log_info(
+        f'[profile] /api/profile/history completed in '
         f'{perf_counter() - request_start:.3f}s status={status_code}'
     )
     return response

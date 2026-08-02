@@ -1,6 +1,9 @@
 import { numberFmt, abbreviateNumber, abbreviatePopulationForDisplay, escapeHtml } from './utils.js';
 import { fetchJson } from './api.js';
 
+let historyOffset = 0;
+let historyHasMore = false;
+
 function setText(id, value) {
     const el = document.getElementById(id);
     if (el) {
@@ -217,16 +220,18 @@ function buildHistoryRoundsTable(completedRounds) {
     `;
 }
 
-function renderHistory(history) {
+function renderHistory(history, append = false) {
     const container = document.getElementById('profileHistoryList');
 
     if (!history || history.length === 0) {
-        container.innerHTML = '<div class="profile-message">No history found.</div>';
+        if (!append) {
+            container.innerHTML = '<div class="profile-message">No history found.</div>';
+        }
         return;
     }
 
-    container.innerHTML = history.map((game, index) => `
-        <section class="profile-history-card${index === 0 ? ' is-open' : ''}">
+    const markup = history.map((game, index) => `
+        <section class="profile-history-card${!append && index === 0 ? ' is-open' : ''}">
             <button class="profile-history-summary" type="button">
                 <div class="profile-history-col">
                     <div class="profile-history-topline">${formatDate(game.game_date)}</div>
@@ -261,8 +266,37 @@ function renderHistory(history) {
         </section>
     `).join('');
 
+    if (append) {
+        container.insertAdjacentHTML('beforeend', markup);
+    } else {
+        container.innerHTML = markup;
+    }
+
     wireHistoryCards();
     adjustProfilePopulationDisplay();
+}
+
+function updateHistoryPagination(pagination, returnedCount) {
+    historyOffset = Number(pagination?.offset || 0) + returnedCount;
+    historyHasMore = Boolean(pagination?.has_more);
+    document.getElementById('profileHistoryLoadMore').classList.toggle('hidden', !historyHasMore);
+}
+
+async function loadMoreHistory() {
+    const button = document.getElementById('profileHistoryLoadMore');
+    button.disabled = true;
+
+    try {
+        const { response, data } = await fetchJson(`/api/profile/history?offset=${historyOffset}`);
+        if (!response.ok) {
+            return;
+        }
+        const history = data.history || [];
+        renderHistory(history, true);
+        updateHistoryPagination(data.history_pagination, history.length);
+    } finally {
+        button.disabled = false;
+    }
 }
 
 function adjustProfilePopulationDisplay() {
@@ -316,7 +350,10 @@ function renderProfile(payload) {
         payload.region_classification_details || []
     );
     wireRegionDetailsToggle();
-    renderHistory(payload.history || []);
+    const history = payload.history || [];
+    renderHistory(history);
+    updateHistoryPagination(payload.history_pagination, history.length);
+    document.getElementById('profileHistoryLoadMore').onclick = loadMoreHistory;
     wireAuthButtons(payload.user);
 }
 

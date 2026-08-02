@@ -262,15 +262,18 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None):
                     "city": guess_text,
                     "score": 0,
                     "total_score": int(session.TotalScore),
-                    "matched_city": _map_nearby_city(result["nearby_exact_match"])
-                    if "nearby_exact_match" in result else None,
+                    "matched_city": _map_nearby_city(result["nearby_exact_match"]),
                 }, 200
 
             if result_type != "match":
                 return {"error": "Invalid match result."}, 500
 
         population = int(matched.Population)
-        difficulty_level = int(existing_round.DifficultyLevel) if existing_round else 1
+        if existing_round is None:
+            raise RuntimeError(
+                f"Session {session_id} round {round_number} has no stored difficulty level."
+            )
+        difficulty_level = int(existing_round.DifficultyLevel)
         score = compute_score(rows, population)
         expansion_level = int(expansion_level)
         score = int(score * (1 - (expansion_level * 0.2)))
