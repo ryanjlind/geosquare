@@ -205,10 +205,18 @@ def _score_name_pair(guess_name: str, candidate_name: str) -> float:
             else pending_candidate_tokens * UNMATCHED_LEADING_TOKEN_PENALTY
         )
 
+        connector_consumes_substantive = (
+            _token_weight(guess_tokens[guess_index]) == 0.0
+            and candidate_tokens[candidate_index] in candidate_substantive_tokens
+        )
         match_score = (
-            similarity
-            - pending_penalty
-            + align(guess_index + 1, candidate_index + 1, True, 0)
+            float('-inf')
+            if connector_consumes_substantive
+            else (
+                similarity
+                - pending_penalty
+                + align(guess_index + 1, candidate_index + 1, True, 0)
+            )
         )
         skip_input_score = (
             -UNMATCHED_INPUT_TOKEN_PENALTY
