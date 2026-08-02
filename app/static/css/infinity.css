@@ -38,6 +38,7 @@
 .infinity-panel {
     display: flex;
     flex-direction: column;
+    flex-shrink: 0;
     gap: 14px;
     min-height: 0;
 }
@@ -45,6 +46,19 @@
 .infinity-panel.hidden,
 .infinity-invite.hidden {
     display: none;
+}
+
+.infinity-mode #postGameActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 18px 0 12px;
+}
+
+.infinity-mode #previousBtn,
+.infinity-mode #nextBtn {
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
 }
 
 .infinity-scoreboard {
