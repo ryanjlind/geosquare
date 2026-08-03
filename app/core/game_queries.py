@@ -28,37 +28,6 @@ def get_today_game(cur):
     return cur.fetchone()
 
 
-def find_unambiguous_exact_city(cur, guess_text: str):
-    parts = [part.strip() for part in guess_text.split(',', 1)]
-    normalized_name = strip_accents(parts[0]).lower()
-    precision = parts[1].upper() if len(parts) == 2 and parts[1] else None
-
-    cur.execute("""
-        SELECT TOP 2
-            CityId,
-            CityName,
-            CountryCode,
-            Latitude,
-            Longitude,
-            Population
-        FROM dbo.GeoCities
-        WHERE IsActive = 1
-          AND CityNameLower = ?
-          AND FeatureCode <> 'PPLX'
-          AND FeatureCode <> 'PPLQ'
-          AND FeatureCode <> 'PPLH'
-          AND (
-              ? IS NULL
-              OR UPPER(CountryCode) = ?
-              OR ',' + REPLACE(UPPER(ISNULL(ProvinceCodes, '')), ' ', '') + ','
-                  LIKE '%,' + ? + ',%'
-          )
-        ORDER BY NotorietyScore DESC, Population DESC, CityId ASC
-    """, normalized_name, precision, precision, precision)
-    rows = cur.fetchall()
-    return rows[0] if len(rows) == 1 else None
-
-
 def get_square_cities(cur, square_id: int):
     cur.execute("""
         SELECT

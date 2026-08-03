@@ -5,7 +5,7 @@ from time import perf_counter
 from app.core.db import get_conn
 from app.core.game_mappers import map_square
 from app.core.game_queries import (
-    find_unambiguous_exact_city,
+    find_exact_city_in_expansions,
     get_base_square_id_for_round,
     get_ranked_square_cities,
     get_square_by_id,
@@ -298,6 +298,19 @@ def submit_infinity_guess(
 
         with _logged_step(
             operation,
+            'load_nearby_exact_match',
+            game_id=game_id,
+            round_number=round_number,
+        ):
+            nearby_exact_match = find_exact_city_in_expansions(
+                cur,
+                game_id,
+                round_number,
+                0,
+                guess_text,
+            )
+        with _logged_step(
+            operation,
             'match_guess',
             infinity_session_id=infinity_session_id,
             round_number=round_number,
@@ -305,16 +318,17 @@ def submit_infinity_guess(
             result = find_matching_city(
                 ranked_cities,
                 guess_text,
-                nearby_exact_match=None,
+                nearby_exact_match=nearby_exact_match,
                 current_expansion_level=0,
             )
             details['result_type'] = result.get('type')
         result_type = result.get('type')
         if result_type == 'no_match':
             response = {'ok': True, 'correct': False, 'score': 0}
-            incorrect_city = find_unambiguous_exact_city(cur, guess_text)
-            if incorrect_city is not None:
-                response['matched_city'] = _map_incorrect_city(incorrect_city)
+            if 'nearby_exact_match' in result:
+                response['matched_city'] = _map_incorrect_city(
+                    result['nearby_exact_match']
+                )
             return response, 200
         if result_type == 'match':
             matched_rows = [result['row']]
