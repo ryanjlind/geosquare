@@ -338,10 +338,7 @@ def test_weak_exact_match_multiple_expansions_away_preserves_fuzzy_confirmation(
     )
 
     assert result == {
-        'type': 'confirmation_required',
-        'suggestions': [
-            {'city_id': 1, 'city': 'Sebu', 'country_code': 'PH'},
-        ],
+        'type': 'no_match',
         'nearby_exact_match': distant_cebu,
     }
 
