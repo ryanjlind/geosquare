@@ -5,6 +5,7 @@ from time import perf_counter
 from app.core.db import get_conn
 from app.core.game_mappers import map_square
 from app.core.game_queries import (
+    find_unambiguous_exact_city,
     get_base_square_id_for_round,
     get_ranked_square_cities,
     get_square_by_id,
@@ -93,6 +94,16 @@ def _map_guess(row) -> dict:
         'score': int(row.Score),
         'latitude': float(row.Latitude),
         'longitude': float(row.Longitude),
+    }
+
+
+def _map_incorrect_city(row) -> dict:
+    return {
+        'city_name': row.CityName,
+        'country_code': row.CountryCode,
+        'latitude': float(row.Latitude),
+        'longitude': float(row.Longitude),
+        'population': int(row.Population),
     }
 
 
@@ -300,7 +311,11 @@ def submit_infinity_guess(
             details['result_type'] = result.get('type')
         result_type = result.get('type')
         if result_type == 'no_match':
-            return {'ok': True, 'correct': False, 'score': 0}, 200
+            response = {'ok': True, 'correct': False, 'score': 0}
+            incorrect_city = find_unambiguous_exact_city(cur, guess_text)
+            if incorrect_city is not None:
+                response['matched_city'] = _map_incorrect_city(incorrect_city)
+            return response, 200
         if result_type == 'match':
             matched_rows = [result['row']]
         elif result_type == 'confirmation_required':

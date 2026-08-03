@@ -4,7 +4,7 @@ import {
     submitInfinityGuessRequest,
 } from './api.js';
 import { playFail, playSuccess } from './audio.js';
-import { drawCities, renderRoundMap } from './map.js';
+import { drawCities, renderRoundMap, showIncorrectGuessedCity } from './map.js';
 import { escapeHtml, numberFmt } from './utils.js';
 
 
@@ -142,6 +142,12 @@ function validateSubmitResponse(data) {
     requireBoolean(data.correct, 'guess.correct');
     if (!data.correct) {
         requireInteger(data.score, 'guess.score');
+        if ('matched_city' in data) {
+            requireObject(data.matched_city, 'guess.matched_city');
+            requireString(data.matched_city.city_name, 'guess.matched_city.city_name');
+            requireNumber(data.matched_city.latitude, 'guess.matched_city.latitude');
+            requireNumber(data.matched_city.longitude, 'guess.matched_city.longitude');
+        }
         return;
     }
 
@@ -194,6 +200,20 @@ function progressForCurrentRound() {
 }
 
 
+function largestUnnamedPopulation() {
+    const foundIds = new Set(guessesForCurrentRound().map(guess => guess.city_id));
+    const unnamedCities = infinityState.square.cities.filter(
+        city => !foundIds.has(city.city_id)
+    );
+
+    if (unnamedCities.length === 0) {
+        return null;
+    }
+
+    return Math.max(...unnamedCities.map(city => city.population));
+}
+
+
 function renderProgressItems(progress) {
     return progress.map(item => `
         <div class="infinity-progress-item">
@@ -232,6 +252,10 @@ function renderInfinityMeta() {
     const currentGuesses = guessesForCurrentRound();
     const progress = progressForCurrentRound();
     const progressItems = renderProgressItems(progress);
+    const largestPopulation = largestUnnamedPopulation();
+    const largestUnnamedText = largestPopulation === null
+        ? 'All cities named'
+        : `Largest unnamed city: ${numberFmt(largestPopulation)}`;
     document.getElementById('meta').innerHTML = `
         <div class="infinity-round-heading">
             <span>Square ${infinityState.currentRound} of ${infinityState.roundCount}</span>
@@ -242,11 +266,16 @@ function renderInfinityMeta() {
         <div class="desktop-meta-only infinity-progress-board">
             ${progressItems}
         </div>
+        <div class="desktop-meta-only infinity-largest-unnamed">${largestUnnamedText}</div>
         <span class="hidden" data-mobile-cities-value>${currentGuesses.length}</span>
     `;
     const mobileProgress = document.getElementById('mobileInfinityProgress');
     if (mobileProgress) {
         mobileProgress.innerHTML = progressItems;
+    }
+    const mobileLargestUnnamed = document.getElementById('mobileInfinityLargestUnnamed');
+    if (mobileLargestUnnamed) {
+        mobileLargestUnnamed.textContent = largestUnnamedText;
     }
     const mobileRound = document.getElementById('mobileRoundStat');
     const mobileCities = document.getElementById('mobileCitiesStat');
@@ -383,6 +412,9 @@ async function submitGuess() {
         validateSubmitResponse(data);
         if (!data.correct) {
             document.getElementById('guessFeedback').textContent = 'Not in this square.';
+            if ('matched_city' in data) {
+                showIncorrectGuessedCity(data.matched_city);
+            }
             playFail();
             return;
         }
