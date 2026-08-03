@@ -199,6 +199,7 @@ async function submitInfinityGuess(page, roundNumber, guess, method) {
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
+    window.__E2E_REQUEST_RENDER_MODE = true;
     window.__copiedText = '';
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,

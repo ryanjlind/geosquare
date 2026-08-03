@@ -129,7 +129,23 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
-    table-layout: auto;
+    table-layout: fixed;
+}
+
+#roundTable .round-column-number {
+    width: 32px;
+}
+
+#roundTable .round-column-population {
+    width: 76px;
+}
+
+#roundTable .round-column-rank {
+    width: 48px;
+}
+
+#roundTable .round-column-points {
+    width: 72px;
 }
 
 #roundTable th,
@@ -141,13 +157,7 @@
 
 #roundTable th:nth-child(1),
 #roundTable td:nth-child(1) {
-    width: 15px;
     text-align: center;
-}
-
-#roundTable th:nth-child(2),
-#roundTable td:nth-child(2) {
-    width: 75px;
 }
 
 #roundTable td:nth-child(2) {
@@ -156,7 +166,6 @@
 
 #roundTable th:nth-child(3),
 #roundTable td:nth-child(3) {
-    width: 60px;
     text-align: right;
     white-space: nowrap;
     overflow: hidden;

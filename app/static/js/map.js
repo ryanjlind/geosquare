@@ -43,7 +43,7 @@ export async function initCesium() {
         window.geoViewer = new Cesium.Viewer('cesiumContainer', {
             animation: false,
             timeline: false,
-            requestRenderMode: true,
+            requestRenderMode: window.__E2E_REQUEST_RENDER_MODE === true,
             sceneModePicker: false,
             baseLayerPicker: false,
             geocoder: false,
