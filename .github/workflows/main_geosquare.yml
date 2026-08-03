@@ -87,6 +87,7 @@ jobs:
       E2E_SQUARE_POOL_ID: ${{ vars.E2E_SQUARE_POOL_ID }}
       E2E_RANDOM_SEED: '20260801'
       LOCAL_AUTH_BYPASS: 'true'
+      DATABASE_TARGET: 'e2e'
 
     steps:
       - uses: actions/checkout@v4

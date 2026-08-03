@@ -38,6 +38,9 @@ def _connect(database: str, *, environment_prefix: str = 'SQL'):
 
 
 def get_conn(*, e2e: bool = False):
-    if e2e:
+    database_target = os.getenv('DATABASE_TARGET')
+    if e2e or database_target == 'e2e':
         return _connect(_e2e_database_name(), environment_prefix='E2E_SQL')
+    if database_target not in (None, 'sql'):
+        raise RuntimeError("DATABASE_TARGET must be 'sql' or 'e2e'.")
     return _connect(_required_environment_value('SQL_DATABASE'))
