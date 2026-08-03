@@ -2,7 +2,7 @@ name: 'Send daily GeoSquare dashboard'
 
 on:
   schedule:
-    - cron: '0 14 * * *'
+    - cron: '18 14 * * *'
   workflow_dispatch: {}
 
 jobs:
