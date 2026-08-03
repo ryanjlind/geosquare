@@ -184,6 +184,8 @@
 }
 
 .infinity-largest-unnamed {
+    display: block;
+    width: 100%;
     padding: 7px 8px;
     border: 1px solid #3a4658;
     border-top: 0;
@@ -191,6 +193,16 @@
     color: #b7c4d4;
     font-size: 10px;
     text-align: center;
+}
+
+.infinity-largest-unnamed.can-reveal {
+    cursor: pointer;
+}
+
+.infinity-largest-unnamed.can-reveal:hover,
+.infinity-largest-unnamed.can-reveal:focus-visible {
+    background: #1d2633;
+    color: #e9eef5;
 }
 
 .mobile-infinity-largest-unnamed {

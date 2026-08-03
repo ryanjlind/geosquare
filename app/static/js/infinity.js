@@ -74,6 +74,10 @@ function validateSquare(square, path) {
         const cityPath = `${path}.cities[${index}]`;
         requireObject(city, cityPath);
         requireInteger(city.city_id, `${cityPath}.city_id`);
+        requireString(city.city_name, `${cityPath}.city_name`);
+        requireString(city.country_code, `${cityPath}.country_code`);
+        requireNumber(city.latitude, `${cityPath}.latitude`);
+        requireNumber(city.longitude, `${cityPath}.longitude`);
         requireInteger(city.population, `${cityPath}.population`);
         requireBoolean(city.is_capital, `${cityPath}.is_capital`);
     });
@@ -200,7 +204,7 @@ function progressForCurrentRound() {
 }
 
 
-function largestUnnamedPopulation() {
+function largestUnnamedCity() {
     const foundIds = new Set(guessesForCurrentRound().map(guess => guess.city_id));
     const unnamedCities = infinityState.square.cities.filter(
         city => !foundIds.has(city.city_id)
@@ -210,7 +214,9 @@ function largestUnnamedPopulation() {
         return null;
     }
 
-    return Math.max(...unnamedCities.map(city => city.population));
+    return unnamedCities.reduce((largest, city) => (
+        city.population > largest.population ? city : largest
+    ));
 }
 
 
@@ -252,10 +258,13 @@ function renderInfinityMeta() {
     const currentGuesses = guessesForCurrentRound();
     const progress = progressForCurrentRound();
     const progressItems = renderProgressItems(progress);
-    const largestPopulation = largestUnnamedPopulation();
-    const largestUnnamedText = largestPopulation === null
+    const largestCity = largestUnnamedCity();
+    const largestUnnamedText = largestCity === null
         ? 'All cities named'
-        : `Largest unnamed city: ${numberFmt(largestPopulation)}`;
+        : `Largest unnamed city: ${numberFmt(largestCity.population)}`;
+    const largestUnnamedMarkup = largestCity === null
+        ? `<div class="desktop-meta-only infinity-largest-unnamed">${largestUnnamedText}</div>`
+        : `<button id="infinityLargestUnnamed" class="desktop-meta-only infinity-largest-unnamed can-reveal" type="button" title="click to reveal, no points will be added.">${largestUnnamedText}</button>`;
     document.getElementById('meta').innerHTML = `
         <div class="infinity-round-heading">
             <span>Square ${infinityState.currentRound} of ${infinityState.roundCount}</span>
@@ -266,7 +275,7 @@ function renderInfinityMeta() {
         <div class="desktop-meta-only infinity-progress-board">
             ${progressItems}
         </div>
-        <div class="desktop-meta-only infinity-largest-unnamed">${largestUnnamedText}</div>
+        ${largestUnnamedMarkup}
         <span class="hidden" data-mobile-cities-value>${currentGuesses.length}</span>
     `;
     const mobileProgress = document.getElementById('mobileInfinityProgress');
@@ -276,6 +285,27 @@ function renderInfinityMeta() {
     const mobileLargestUnnamed = document.getElementById('mobileInfinityLargestUnnamed');
     if (mobileLargestUnnamed) {
         mobileLargestUnnamed.textContent = largestUnnamedText;
+    }
+    const revealControls = [
+        document.getElementById('infinityLargestUnnamed'),
+        mobileLargestUnnamed,
+    ].filter(Boolean);
+    for (const control of revealControls) {
+        control.classList.toggle('can-reveal', largestCity !== null);
+        control.title = largestCity === null
+            ? ''
+            : 'click to reveal, no points will be added.';
+        control.onclick = largestCity === null ? null : () => submitGuess(largestCity);
+        control.onkeydown = largestCity === null ? null : event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                submitGuess(largestCity);
+            }
+        };
+        if (control !== document.getElementById('infinityLargestUnnamed')) {
+            control.tabIndex = largestCity === null ? -1 : 0;
+            control.setAttribute('role', largestCity === null ? 'status' : 'button');
+        }
     }
     const mobileRound = document.getElementById('mobileRoundStat');
     const mobileCities = document.getElementById('mobileCitiesStat');
@@ -300,7 +330,7 @@ function renderChips(newCityIds = []) {
     chipList.innerHTML = guesses.map(guess => `
         <div class="infinity-chip${newCityIdSet.has(guess.city_id) ? ' newly-scored' : ''}">
             <span class="infinity-chip-city">${escapeHtml(guess.city_name)}</span>
-            <span class="infinity-chip-score">+${numberFmt(guess.score)}</span>
+            <span class="infinity-chip-score">${numberFmt(guess.score)}</span>
         </div>
     `).join('');
 }
@@ -356,7 +386,7 @@ function renderMarkers() {
             latitude: guess.latitude,
             longitude: guess.longitude,
             pixel_size: 8,
-            color: Cesium.Color.LIME,
+            color: guess.score === 0 ? Cesium.Color.WHITE : Cesium.Color.LIME,
             outline_color: Cesium.Color.BLACK,
             outline_width: 2,
         }))
@@ -391,11 +421,12 @@ async function selectRound(roundNumber) {
 }
 
 
-async function submitGuess() {
+async function submitGuess(revealedCity = null) {
     const input = document.getElementById('guessInput');
     const button = document.getElementById('guessBtn');
-    const guess = input.value.trim();
-    if (!guess) {
+    const isReveal = revealedCity !== null;
+    const guess = isReveal ? '' : input.value.trim();
+    if (!guess && !isReveal) {
         return;
     }
 
@@ -405,6 +436,7 @@ async function submitGuess() {
         const { response, data } = await submitInfinityGuessRequest(
             guess,
             infinityState.currentRound,
+            isReveal ? revealedCity.city_id : null,
         );
         if (!response.ok) {
             throw new Error(data.error);
@@ -444,7 +476,7 @@ async function submitGuess() {
             latitude: acceptedGuess.latitude,
             longitude: acceptedGuess.longitude,
             pixel_size: 8,
-            color: Cesium.Color.LIME,
+            color: acceptedGuess.score === 0 ? Cesium.Color.WHITE : Cesium.Color.LIME,
             outline_color: Cesium.Color.BLACK,
             outline_width: 2,
         })));
@@ -459,12 +491,19 @@ async function submitGuess() {
         const duplicateText = data.duplicates.length
             ? `<br>${escapeHtml(data.duplicates.join(', '))} already in your pool.`
             : '';
-        document.getElementById('guessFeedback').innerHTML = `<b>${escapeHtml(acceptedNames)}</b> +${numberFmt(awardedScore)}${duplicateText}`;
-        input.value = '';
-        playSuccess();
+        document.getElementById('guessFeedback').innerHTML = isReveal
+            ? `<b>${escapeHtml(acceptedNames)}</b> revealed`
+            : `<b>${escapeHtml(acceptedNames)}</b> +${numberFmt(awardedScore)}${duplicateText}`;
+        if (!isReveal) {
+            input.value = '';
+            playSuccess();
+        }
     } finally {
         input.disabled = false;
         button.disabled = false;
+        if (isReveal) {
+            renderInfinityMeta();
+        }
         input.focus();
     }
 }

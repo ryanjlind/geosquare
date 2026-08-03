@@ -250,15 +250,19 @@ def submit_infinity_guess(
     session_id: int | None,
 ) -> tuple[dict, int]:
     operation = 'submit_infinity_guess'
-    if 'guess' not in payload:
-        return {'error': 'Guess is required.'}, 400
+    is_reveal = 'reveal_city_id' in payload
     if 'round_number' not in payload:
         return {'error': 'round_number is required.'}, 400
 
-    guess_text = payload['guess'].strip()
+    if is_reveal:
+        guess_text = None
+    else:
+        if 'guess' not in payload:
+            return {'error': 'Guess is required.'}, 400
+        guess_text = payload['guess'].strip()
+        if not guess_text:
+            return {'error': 'Guess is required.'}, 400
     round_number = int(payload['round_number'])
-    if not guess_text:
-        return {'error': 'Guess is required.'}, 400
     try:
         _require_round_number(round_number)
     except ValueError as error:
@@ -296,53 +300,74 @@ def submit_infinity_guess(
             ranked_cities = get_ranked_square_cities(cur, square_id)
             details['city_count'] = len(ranked_cities)
 
-        with _logged_step(
-            operation,
-            'load_nearby_exact_match',
-            game_id=game_id,
-            round_number=round_number,
-        ):
-            nearby_exact_match = find_exact_city_in_expansions(
-                cur,
-                game_id,
-                round_number,
-                0,
-                guess_text,
-            )
-        with _logged_step(
-            operation,
-            'match_guess',
-            infinity_session_id=infinity_session_id,
-            round_number=round_number,
-        ) as details:
-            result = find_matching_city(
-                ranked_cities,
-                guess_text,
-                nearby_exact_match=nearby_exact_match,
-                current_expansion_level=0,
-            )
-            details['result_type'] = result.get('type')
-        result_type = result.get('type')
-        if result_type == 'no_match':
-            response = {'ok': True, 'correct': False, 'score': 0}
-            if 'nearby_exact_match' in result:
-                response['matched_city'] = _map_incorrect_city(
-                    result['nearby_exact_match']
-                )
-            return response, 200
-        if result_type == 'match':
-            matched_rows = [result['row']]
-        elif result_type == 'confirmation_required':
-            rows_by_city_id = {
-                int(row.CityId): row
-                for row in ranked_cities
+        if is_reveal:
+            reveal_city_id = int(payload['reveal_city_id'])
+            guessed_city_ids = {
+                int(guess.CityId)
+                for guess in get_infinity_guesses(cur, infinity_session_id)
+                if int(guess.RoundNumber) == round_number
             }
-            matched_rows = [
-                rows_by_city_id[int(suggestion['city_id'])]
-                for suggestion in result['suggestions']
+            unnamed_cities = [
+                city for city in ranked_cities
+                if int(city.CityId) not in guessed_city_ids
             ]
+            matched_rows = [
+                city for city in unnamed_cities
+                if int(city.CityId) == reveal_city_id
+            ]
+            if (
+                not matched_rows
+                or int(matched_rows[0].Population) != int(unnamed_cities[0].Population)
+            ):
+                return {'error': 'Reveal city must be the largest unnamed city.'}, 409
         else:
-            return {'error': 'Invalid match result.'}, 500
+            with _logged_step(
+                operation,
+                'load_nearby_exact_match',
+                game_id=game_id,
+                round_number=round_number,
+            ):
+                nearby_exact_match = find_exact_city_in_expansions(
+                    cur,
+                    game_id,
+                    round_number,
+                    0,
+                    guess_text,
+                )
+            with _logged_step(
+                operation,
+                'match_guess',
+                infinity_session_id=infinity_session_id,
+                round_number=round_number,
+            ) as details:
+                result = find_matching_city(
+                    ranked_cities,
+                    guess_text,
+                    nearby_exact_match=nearby_exact_match,
+                    current_expansion_level=0,
+                )
+                details['result_type'] = result.get('type')
+            result_type = result.get('type')
+            if result_type == 'no_match':
+                response = {'ok': True, 'correct': False, 'score': 0}
+                if 'nearby_exact_match' in result:
+                    response['matched_city'] = _map_incorrect_city(
+                        result['nearby_exact_match']
+                    )
+                return response, 200
+            if result_type == 'match':
+                matched_rows = [result['row']]
+            elif result_type == 'confirmation_required':
+                rows_by_city_id = {
+                    int(row.CityId): row
+                    for row in ranked_cities
+                }
+                matched_rows = [
+                    rows_by_city_id[int(suggestion['city_id'])]
+                    for suggestion in result['suggestions']
+                ]
+            else:
+                return {'error': 'Invalid match result.'}, 500
         _logger.info(
             '%s: accepting candidates candidate_count=%s infinity_session_id=%s round_number=%s',
             operation,
@@ -372,7 +397,10 @@ def submit_infinity_guess(
                 duplicate_cities.append(matched.CityName)
                 continue
 
-            score = compute_score(ranked_cities, int(matched.Population))
+            score = 0 if is_reveal else compute_score(
+                ranked_cities,
+                int(matched.Population),
+            )
             with _logged_step(
                 operation,
                 'insert_guess',

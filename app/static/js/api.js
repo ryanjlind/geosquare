@@ -85,13 +85,18 @@ export async function selectInfinityRoundRequest(roundNumber) {
     });
 }
 
-export async function submitInfinityGuessRequest(guess, roundNumber) {
+export async function submitInfinityGuessRequest(guess, roundNumber, revealCityId = null) {
+    const payload = {
+        guess,
+        round_number: roundNumber,
+    };
+    if (revealCityId !== null) {
+        payload.reveal_city_id = revealCityId;
+    }
+
     return fetchJson('/api/infinity-guess', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            guess,
-            round_number: roundNumber,
-        }),
+        body: JSON.stringify(payload),
     });
 }
