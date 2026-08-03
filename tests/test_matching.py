@@ -83,6 +83,17 @@ def test_single_phonetic_spelling_requires_confirmation():
     }
 
 
+def test_fuzzy_match_cannot_delete_the_opening_sound():
+    result = find_matching_city(
+        [CityRow(1, 'Edmonds', ProvinceCodes='WA')],
+        'Redmond, WA',
+        nearby_exact_match=None,
+        current_expansion_level=0,
+    )
+
+    assert result == {'type': 'no_match'}
+
+
 @pytest.mark.parametrize(
     ('guess', 'candidate'),
     [

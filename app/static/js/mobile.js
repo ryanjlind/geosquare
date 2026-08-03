@@ -101,6 +101,10 @@ import { gameState } from './state.js';
         bottomTray.className = 'mobile-bottomtray';
         document.body.appendChild(bottomTray);
 
+        const infinityProgress = document.createElement('div');
+        infinityProgress.id = 'mobileInfinityProgress';
+        infinityProgress.className = 'infinity-progress-board mobile-infinity-progress';
+        bottomTray.appendChild(infinityProgress);
         bottomTray.appendChild(guessBox);
         bottomTray.appendChild(guessFeedback);
         bottomTray.appendChild(postGameActions);

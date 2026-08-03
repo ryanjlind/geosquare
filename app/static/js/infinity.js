@@ -194,6 +194,16 @@ function progressForCurrentRound() {
 }
 
 
+function renderProgressItems(progress) {
+    return progress.map(item => `
+        <div class="infinity-progress-item">
+            <span>${item.label}</span>
+            <strong>${item.found} / ${item.total}</strong>
+        </div>
+    `).join('');
+}
+
+
 function setModeButtons() {
     document.getElementById('dailyModeBtn').classList.toggle('active', !infinityState.active);
     document.getElementById('infinityModeBtn').classList.toggle('active', infinityState.active);
@@ -221,6 +231,7 @@ function setInfinityLayout() {
 function renderInfinityMeta() {
     const currentGuesses = guessesForCurrentRound();
     const progress = progressForCurrentRound();
+    const progressItems = renderProgressItems(progress);
     document.getElementById('meta').innerHTML = `
         <div class="infinity-round-heading">
             <span>Square ${infinityState.currentRound} of ${infinityState.roundCount}</span>
@@ -229,15 +240,14 @@ function renderInfinityMeta() {
             Name as many cities as you can. You can move back and forth between squares to add as many cities as you want. See how high you can reach!
         </div>
         <div class="desktop-meta-only infinity-progress-board">
-            ${progress.map(item => `
-                <div class="infinity-progress-item">
-                    <span>${item.label}</span>
-                    <strong>${item.found} / ${item.total}</strong>
-                </div>
-            `).join('')}
+            ${progressItems}
         </div>
         <span class="hidden" data-mobile-cities-value>${currentGuesses.length}</span>
     `;
+    const mobileProgress = document.getElementById('mobileInfinityProgress');
+    if (mobileProgress) {
+        mobileProgress.innerHTML = progressItems;
+    }
     const mobileRound = document.getElementById('mobileRoundStat');
     const mobileCities = document.getElementById('mobileCitiesStat');
     if (mobileRound) {

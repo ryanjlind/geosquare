@@ -124,9 +124,19 @@ def phonetic_key(text: str) -> str:
 
 
 def _token_similarity(guess_token: str, candidate_token: str) -> float:
-    spelling_score = fuzz.ratio(guess_token, candidate_token)
     guess_phonetic = phonetic_key(guess_token)
     candidate_phonetic = phonetic_key(candidate_token)
+    same_written_opening = guess_token[0] == candidate_token[0]
+    same_phonetic_opening = (
+        bool(guess_phonetic)
+        and bool(candidate_phonetic)
+        and guess_phonetic[0] == candidate_phonetic[0]
+    )
+
+    if not same_written_opening and not same_phonetic_opening:
+        return 0.0
+
+    spelling_score = fuzz.ratio(guess_token, candidate_token)
 
     if guess_phonetic and guess_phonetic == candidate_phonetic:
         return max(spelling_score, PHONETIC_TOKEN_SCORE)
