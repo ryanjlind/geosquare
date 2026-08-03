@@ -270,14 +270,18 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None):
             if result_type == "no_match":
                 conn.commit()
 
-                return {
+                response = {
                     "ok": True,
                     "correct": False,
                     "city": guess_text,
                     "score": 0,
                     "total_score": int(session.TotalScore),
-                    "matched_city": _map_nearby_city(result["nearby_exact_match"]),
-                }, 200
+                }
+                if "nearby_exact_match" in result:
+                    response["matched_city"] = _map_nearby_city(
+                        result["nearby_exact_match"]
+                    )
+                return response, 200
 
             if result_type != "match":
                 return {"error": "Invalid match result."}, 500

@@ -35,11 +35,13 @@ def map_completed_rounds(rows):
 def map_square(row, cities_rows, city_count_row, has_next_expansion):
     cities = [
         {
+            "city_id": int(c.CityId),
             "city_name": c.CityName,
             "country_code": c.CountryCode,
             "latitude": float(c.Latitude),
             "longitude": float(c.Longitude),
             "population": int(c.Population),
+            "is_capital": bool(c.IsCapital),
         }
         for c in cities_rows
     ]

@@ -87,7 +87,9 @@ def _get_or_create_infinity_session(cur, user_id: int, game_id: int):
 def _map_guess(row) -> dict:
     return {
         'round_number': int(row.RoundNumber),
+        'city_id': int(row.CityId),
         'city_name': row.CityName,
+        'population': int(row.Population),
         'score': int(row.Score),
         'latitude': float(row.Latitude),
         'longitude': float(row.Longitude),

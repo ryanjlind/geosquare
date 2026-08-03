@@ -69,13 +69,23 @@ function validateSquare(square, path) {
     requireNumber(square.bounds.min_lon, `${path}.bounds.min_lon`);
     requireNumber(square.bounds.max_lat, `${path}.bounds.max_lat`);
     requireNumber(square.bounds.max_lon, `${path}.bounds.max_lon`);
+    requireArray(square.cities, `${path}.cities`);
+    square.cities.forEach((city, index) => {
+        const cityPath = `${path}.cities[${index}]`;
+        requireObject(city, cityPath);
+        requireInteger(city.city_id, `${cityPath}.city_id`);
+        requireInteger(city.population, `${cityPath}.population`);
+        requireBoolean(city.is_capital, `${cityPath}.is_capital`);
+    });
 }
 
 
 function validateRestoredGuess(guess, path) {
     requireObject(guess, path);
     requireInteger(guess.round_number, `${path}.round_number`);
+    requireInteger(guess.city_id, `${path}.city_id`);
     requireString(guess.city_name, `${path}.city_name`);
+    requireInteger(guess.population, `${path}.population`);
     requireInteger(guess.score, `${path}.score`);
     requireNumber(guess.latitude, `${path}.latitude`);
     requireNumber(guess.longitude, `${path}.longitude`);
@@ -163,6 +173,27 @@ function guessesForCurrentRound() {
 }
 
 
+function progressForCurrentRound() {
+    const cities = infinityState.square.cities;
+    const foundIds = new Set(guessesForCurrentRound().map(guess => guess.city_id));
+    const categories = [
+        ['Cities', city => true],
+        ['1M+', city => city.population >= 1_000_000],
+        ['500K+', city => city.population >= 500_000],
+        ['Capitals', city => city.is_capital],
+    ];
+
+    return categories.map(([label, matches]) => {
+        const matchingCities = cities.filter(matches);
+        return {
+            label,
+            found: matchingCities.filter(city => foundIds.has(city.city_id)).length,
+            total: matchingCities.length,
+        };
+    });
+}
+
+
 function setModeButtons() {
     document.getElementById('dailyModeBtn').classList.toggle('active', !infinityState.active);
     document.getElementById('infinityModeBtn').classList.toggle('active', infinityState.active);
@@ -189,13 +220,21 @@ function setInfinityLayout() {
 
 function renderInfinityMeta() {
     const currentGuesses = guessesForCurrentRound();
+    const progress = progressForCurrentRound();
     document.getElementById('meta').innerHTML = `
         <div class="infinity-round-heading">
             <span>Square ${infinityState.currentRound} of ${infinityState.roundCount}</span>
-            <strong>${currentGuesses.length} cities</strong>
         </div>
         <div class="desktop-meta-only infinity-gameplay-copy">
             Name as many cities as you can. You can move back and forth between squares to add as many cities as you want. See how high you can reach!
+        </div>
+        <div class="desktop-meta-only infinity-progress-board">
+            ${progress.map(item => `
+                <div class="infinity-progress-item">
+                    <span>${item.label}</span>
+                    <strong>${item.found} / ${item.total}</strong>
+                </div>
+            `).join('')}
         </div>
         <span class="hidden" data-mobile-cities-value>${currentGuesses.length}</span>
     `;
@@ -406,6 +445,11 @@ export async function enterInfinityMode() {
     document.getElementById('guessInput').disabled = false;
     document.getElementById('guessBtn').disabled = false;
     renderRound();
+}
+
+
+export function isInfinityModeActive() {
+    return infinityState.active;
 }
 
 

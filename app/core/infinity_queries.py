@@ -58,7 +58,9 @@ def get_infinity_guesses(cur, infinity_session_id: int):
         """
         SELECT
             guess.RoundNumber,
+            guess.CityId,
             guess.CityName,
+            guess.Population,
             guess.Score,
             city.Latitude,
             city.Longitude

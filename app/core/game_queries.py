@@ -30,10 +30,19 @@ def get_today_game(cur):
 
 def get_square_cities(cur, square_id: int):
     cur.execute("""
-        SELECT CityName, CountryCode, Latitude, Longitude, Population
-        FROM dbo.GameSquareCities
-        WHERE SquareId = ?
-        ORDER BY Population DESC, CityName ASC
+        SELECT
+            city.CityId,
+            city.CityName,
+            city.CountryCode,
+            city.Latitude,
+            city.Longitude,
+            city.Population,
+            CASE WHEN geo.FeatureCode = 'PPLC' THEN 1 ELSE 0 END AS IsCapital
+        FROM dbo.GameSquareCities city
+        LEFT JOIN dbo.GeoCities geo
+            ON geo.CityId = city.CityId
+        WHERE city.SquareId = ?
+        ORDER BY city.Population DESC, city.CityName ASC
     """, square_id)
     return cur.fetchall()
 

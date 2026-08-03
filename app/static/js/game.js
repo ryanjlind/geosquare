@@ -43,7 +43,7 @@ import { initFeedback } from './feedback.js';
 import { initAuth, resolveAuthConflict } from './auth.js';
 import { expandSquareRequest } from './api.js';
 import { drawSquare } from './map.js';
-import { initInfinityMode, unlockInfinityMode } from './infinity.js';
+import { initInfinityMode, isInfinityModeActive, unlockInfinityMode } from './infinity.js';
 
 let endGameRounds = [];
 
@@ -140,6 +140,9 @@ function renderRound(data) {
 
 async function loadEndGameRounds() {
     endGameRounds = await fetchAllDailySquares();
+    if (isInfinityModeActive()) {
+        return;
+    }
     await renderAllSquares(endGameRounds);
 }
 

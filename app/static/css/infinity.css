@@ -146,15 +146,45 @@
 }
 
 .infinity-round-heading {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
     color: #e9eef5;
     font-size: 14px;
 }
 
-.infinity-round-heading strong {
-    color: #b7c4d4;
+.infinity-progress-board {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-top: 12px;
+    border: 1px solid #3a4658;
+    background: #111824;
+}
+
+.infinity-progress-item {
+    min-width: 0;
+    padding: 8px 4px;
+    text-align: center;
+}
+
+.infinity-progress-item + .infinity-progress-item {
+    border-left: 1px solid #3a4658;
+}
+
+.infinity-progress-item span,
+.infinity-progress-item strong {
+    display: block;
+}
+
+.infinity-progress-item span {
+    overflow: hidden;
+    color: #8e9db1;
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.infinity-progress-item strong {
+    margin-top: 4px;
+    color: #e9eef5;
+    font-size: 12px;
 }
 
 .infinity-gameplay-copy {

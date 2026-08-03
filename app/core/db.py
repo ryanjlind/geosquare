@@ -38,6 +38,6 @@ def _connect(database: str, *, environment_prefix: str = 'SQL'):
 
 
 def get_conn(*, e2e: bool = False):
-    if e2e or os.getenv('LOCAL_AUTH_BYPASS', '').lower() in ('1', 'true', 'yes'):
+    if e2e:
         return _connect(_e2e_database_name(), environment_prefix='E2E_SQL')
     return _connect(_required_environment_value('SQL_DATABASE'))
