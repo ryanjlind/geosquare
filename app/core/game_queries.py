@@ -39,9 +39,10 @@ def get_square_cities(cur, square_id: int):
             city.Population,
             CASE WHEN geo.FeatureCode = 'PPLC' THEN 1 ELSE 0 END AS IsCapital
         FROM dbo.GameSquareCities city
-        LEFT JOIN dbo.GeoCities geo
+                INNER JOIN dbo.GeoCities geo
             ON geo.CityId = city.CityId
         WHERE city.SquareId = ?
+                    AND geo.IsActive = 1
         ORDER BY city.Population DESC, city.CityName ASC
     """, square_id)
     return cur.fetchall()
@@ -50,8 +51,11 @@ def get_square_cities(cur, square_id: int):
 def get_square_city_count(cur, square_id: int):
     cur.execute("""
         SELECT COUNT(*) AS TotalCityCount
-        FROM dbo.GameSquareCities
-        WHERE SquareId = ?
+        FROM dbo.GameSquareCities city
+        INNER JOIN dbo.GeoCities geo
+            ON geo.CityId = city.CityId
+        WHERE city.SquareId = ?
+          AND geo.IsActive = 1
     """, square_id)
     return cur.fetchone()
 
@@ -101,6 +105,7 @@ def get_ranked_square_cities(cur, square_id: int):
         LEFT JOIN dbo.GeoCities gc
             ON gc.CityId = c.CityId
         WHERE c.SquareId = ?
+            AND gc.IsActive = 1
             AND gc.FeatureCode <> 'PPLX'
         ORDER BY c.Population DESC
     """, square_id)
