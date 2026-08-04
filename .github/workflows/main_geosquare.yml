@@ -120,6 +120,9 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium webkit
 
+      - name: Wait for E2E database
+        run: python -m e2e_tests.wait_for_database
+
       - name: Create E2E game
         run: python -m e2e_tests.setup_game
 
