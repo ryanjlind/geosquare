@@ -161,7 +161,7 @@ async function enterInfinity(page, projectName) {
   return state;
 }
 
-async function selectInfinityRound(page, roundNumber, projectName) {
+async function selectInfinityRound(page, roundNumber, infinityPoolSessionId, projectName) {
   progress(projectName, `Infinity Pool square ${roundNumber}: loading`);
   const responsePromise = page.waitForResponse((response) => (
     response.url().endsWith('/api/infinity-round')
@@ -169,13 +169,16 @@ async function selectInfinityRound(page, roundNumber, projectName) {
   ));
   await page.locator('#nextBtn').click();
   const response = await responsePromise;
-  expect(response.request().postDataJSON()).toEqual({ round_number: roundNumber });
+  expect(response.request().postDataJSON()).toEqual({
+    round_number: roundNumber,
+    infinity_pool_session_id: infinityPoolSessionId,
+  });
   expect(response.ok()).toBe(true);
   await expect(page.locator('#meta')).toContainText(`Square ${roundNumber} of 5`);
   progress(projectName, `Infinity Pool square ${roundNumber}: ready`);
 }
 
-async function submitInfinityGuess(page, roundNumber, guess, method) {
+async function submitInfinityGuess(page, roundNumber, infinityPoolSessionId, guess, method) {
   await page.locator('#guessInput').fill(guess);
   const responsePromise = page.waitForResponse((response) => (
     response.url().endsWith('/api/infinity-guess')
@@ -192,6 +195,7 @@ async function submitInfinityGuess(page, roundNumber, guess, method) {
   expect(response.request().postDataJSON()).toEqual({
     guess,
     round_number: roundNumber,
+    infinity_pool_session_id: infinityPoolSessionId,
   });
   expect(response.ok()).toBe(true);
   return response.json();
@@ -281,11 +285,22 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
   expect(state.completed_rounds).toHaveLength(5);
   expect(state.completed_rounds.filter((round) => round.round_status === 'Passed')).toHaveLength(1);
 
-  await enterInfinity(page, projectName);
-  await selectInfinityRound(page, 2, projectName);
+  const infinityState = await enterInfinity(page, projectName);
+  await selectInfinityRound(
+    page,
+    2,
+    infinityState.infinity_pool_session_id,
+    projectName,
+  );
 
   progress(projectName, 'Infinity Pool square 2: submitting Santa Cruz');
-  const infinityResult = await submitInfinityGuess(page, 2, 'Santa Cruz', 'click');
+  const infinityResult = await submitInfinityGuess(
+    page,
+    2,
+    infinityState.infinity_pool_session_id,
+    'Santa Cruz',
+    'click',
+  );
   expect(infinityResult.correct).toBe(true);
   expect(infinityResult.duplicate).toBe(false);
   expect(infinityResult.guesses.map(({ city_id, city, country_code }) => ({
@@ -308,7 +323,13 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
   progress(projectName, 'Infinity Pool multi-city result verified');
 
   progress(projectName, 'Infinity Pool square 2: checking duplicate submission');
-  const duplicateResult = await submitInfinityGuess(page, 2, 'Santa Cruz', 'enter');
+  const duplicateResult = await submitInfinityGuess(
+    page,
+    2,
+    infinityState.infinity_pool_session_id,
+    'Santa Cruz',
+    'enter',
+  );
   expect(duplicateResult).toEqual({
     correct: true,
     duplicate: true,
