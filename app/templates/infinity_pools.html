@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en" class="profile-page">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GeoSquare Infinity Pools</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/stats.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/infinity_pools.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body class="profile-page infinity-pools-page">
+    <div class="layout profile-layout">
+        <aside class="sidebar profile-sidebar" id="sidebar">
+            <div class="sidebar-mobile-header">
+                <div class="sidebar-mobile-header-title">Menu</div>
+                <button id="mobileDrawerCloseBtn" class="mobile-drawer-close-btn" type="button">Close</button>
+            </div>
+
+            <div class="sidebar-divider"></div>
+
+            <h1>GeoSquare</h1>
+            <a href="/" class="sidebar-support-link-btn">Back to Game</a>
+            <a href="/profile" class="sidebar-support-link-btn">Back to Profile</a>
+        </aside>
+
+        <main class="profile-main infinity-pools-main">
+            <header class="infinity-pools-header">
+                <div class="stats-section-title">Infinity Pools</div>
+                <h2>Continue exploring</h2>
+            </header>
+            <div id="infinityPoolsList" class="infinity-pools-list hidden"></div>
+            <div id="infinityPoolsStatus" class="profile-message">Loading Infinity Pools...</div>
+        </main>
+    </div>
+
+    <script type="module" src="{{ url_for('static', filename='js/infinity_pools.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/mobile.js') }}"></script>
+</body>
+</html>

@@ -10,6 +10,7 @@ import { escapeHtml, numberFmt } from './utils.js';
 
 const infinityState = {
     active: false,
+    poolSessionId: null,
     currentRound: 1,
     roundCount: 5,
     roundScores: {},
@@ -118,6 +119,7 @@ function validateStringArray(values, path) {
 function validateInfinityStateResponse(data) {
     requireObject(data, 'state');
     requireBoolean(data.unlocked, 'state.unlocked');
+    requireInteger(data.infinity_pool_session_id, 'state.infinity_pool_session_id');
     requireInteger(data.current_round, 'state.current_round');
     requireInteger(data.round_count, 'state.round_count');
     requireObject(data.round_scores, 'state.round_scores');
@@ -135,6 +137,7 @@ function validateInfinityStateResponse(data) {
 
 function validateRoundResponse(data) {
     requireObject(data, 'round');
+    requireInteger(data.infinity_pool_session_id, 'round.infinity_pool_session_id');
     requireInteger(data.current_round, 'round.current_round');
     validateSquare(data.square, 'round.square');
 }
@@ -410,7 +413,10 @@ function renderRound() {
 
 
 async function selectRound(roundNumber) {
-    const { response, data } = await selectInfinityRoundRequest(roundNumber);
+    const { response, data } = await selectInfinityRoundRequest(
+        roundNumber,
+        infinityState.poolSessionId,
+    );
     if (!response.ok) {
         throw new Error(data.error);
     }
@@ -437,6 +443,7 @@ async function submitGuess(revealedCity = null) {
             guess,
             infinityState.currentRound,
             isReveal ? revealedCity.city_id : null,
+            infinityState.poolSessionId,
         );
         if (!response.ok) {
             throw new Error(data.error);
@@ -509,14 +516,15 @@ async function submitGuess(revealedCity = null) {
 }
 
 
-export async function enterInfinityMode() {
-    const { response, data } = await fetchInfinityState();
+export async function enterInfinityMode(poolSessionId = null, requestedRound = null) {
+    const { response, data } = await fetchInfinityState(poolSessionId);
     if (!response.ok) {
         throw new Error(data.error);
     }
     validateInfinityStateResponse(data);
     document.getElementById('statsOverlay').style.display = 'none';
     setInfinityLayout();
+    infinityState.poolSessionId = data.infinity_pool_session_id;
     infinityState.currentRound = data.current_round;
     infinityState.roundCount = data.round_count;
     infinityState.roundScores = data.round_scores;
@@ -525,7 +533,11 @@ export async function enterInfinityMode() {
     infinityState.square = data.square;
     document.getElementById('guessInput').disabled = false;
     document.getElementById('guessBtn').disabled = false;
-    renderRound();
+    if (requestedRound !== null && requestedRound !== infinityState.currentRound) {
+        await selectRound(requestedRound);
+    } else {
+        renderRound();
+    }
 }
 
 
@@ -560,7 +572,9 @@ export function initInfinityMode(dailyCompleted) {
         infinityButton.title = 'Complete the Daily game to unlock Infinity Pool';
     }
 
-    document.getElementById('dailyModeBtn').onclick = () => window.location.reload();
+    document.getElementById('dailyModeBtn').onclick = () => {
+        window.location.href = '/';
+    };
     infinityButton.onclick = handleEnterInfinityClick;
     document.getElementById('infinityInviteBtn').onclick = handleEnterInfinityClick;
     document.getElementById('statsInfinityInviteBtn').onclick = handleEnterInfinityClick;
@@ -592,4 +606,17 @@ export function initInfinityMode(dailyCompleted) {
         unlockInfinityMode();
     }
     setModeButtons();
+
+    const params = new URLSearchParams(window.location.search);
+    const poolSessionId = Number.parseInt(params.get('infinity_pool_session_id'), 10);
+    const requestedRound = Number.parseInt(params.get('round'), 10);
+    if (Number.isInteger(poolSessionId) && poolSessionId > 0) {
+        unlockInfinityMode();
+        enterInfinityMode(
+            poolSessionId,
+            Number.isInteger(requestedRound) ? requestedRound : null,
+        ).catch(error => {
+            console.error('Infinity mode failed:', error);
+        });
+    }
 }

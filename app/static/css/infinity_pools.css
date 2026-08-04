@@ -1,0 +1,138 @@
+.infinity-pools-main {
+    max-width: 1120px;
+}
+
+.infinity-pools-header {
+    margin-bottom: 24px;
+}
+
+.infinity-pools-header h2 {
+    margin: 8px 0 0;
+    color: #f3f7fd;
+    font-size: 30px;
+    letter-spacing: 0;
+}
+
+.infinity-pools-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.infinity-pool-item {
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(20, 25, 34, 0.88);
+}
+
+.infinity-pool-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.infinity-pool-header h3 {
+    margin: 0;
+    color: #f2f6fc;
+    font-size: 20px;
+    letter-spacing: 0;
+}
+
+.infinity-pool-updated {
+    margin-top: 5px;
+    color: #9dacbf;
+    font-size: 13px;
+}
+
+.infinity-pool-total {
+    flex: 0 0 auto;
+    color: #f2f6fc;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.infinity-pool-squares {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.infinity-pool-square {
+    display: flex;
+    min-width: 0;
+    min-height: 92px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    padding: 14px 16px;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    color: #aebbcf;
+    text-decoration: none;
+}
+
+.infinity-pool-square:last-child {
+    border-right: 0;
+}
+
+.infinity-pool-square strong {
+    color: #f2f6fc;
+    font-size: 16px;
+}
+
+.infinity-pool-square span {
+    font-size: 13px;
+}
+
+.infinity-pool-square:hover,
+.infinity-pool-square:focus-visible {
+    background: rgba(110, 168, 255, 0.1);
+}
+
+.infinity-pool-square:focus-visible {
+    outline: 2px solid #6ea8ff;
+    outline-offset: -2px;
+}
+
+.infinity-pool-square.is-current {
+    box-shadow: inset 0 3px #6ea8ff;
+}
+
+@media (max-width: 900px) {
+    .infinity-pool-squares {
+        grid-template-columns: 1fr;
+    }
+
+    .infinity-pool-square {
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        align-items: center;
+        border-right: 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .infinity-pool-square:last-child {
+        border-bottom: 0;
+    }
+
+    .infinity-pool-square.is-current {
+        box-shadow: inset 3px 0 #6ea8ff;
+    }
+}
+
+@media (max-width: 560px) {
+    .infinity-pool-header {
+        align-items: flex-start;
+    }
+
+    .infinity-pool-square {
+        grid-template-columns: 1fr auto;
+    }
+
+    .infinity-pool-square span:first-of-type {
+        display: none;
+    }
+}

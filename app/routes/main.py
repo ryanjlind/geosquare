@@ -180,7 +180,12 @@ def player_stats():
 @main_bp.route("/api/infinity-state")
 def infinity_state():
     identity = _identity()
-    body, status = get_infinity_state(identity["user_id"], identity["session_id"])
+    infinity_pool_session_id = request.args.get('infinity_pool_session_id', type=int)
+    body, status = get_infinity_state(
+        identity["user_id"],
+        identity["session_id"],
+        infinity_pool_session_id,
+    )
     resp = jsonify(body)
     resp.status_code = status
     return attach_session_cookie(resp, identity["user_id"], identity["session_id"])
@@ -198,6 +203,9 @@ def infinity_round():
         identity["user_id"],
         identity["session_id"],
         int(payload["round_number"]),
+        int(payload["infinity_pool_session_id"])
+        if payload.get("infinity_pool_session_id") is not None
+        else None,
     )
     resp = jsonify(body)
     resp.status_code = status

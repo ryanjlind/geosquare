@@ -73,25 +73,42 @@ export async function setDifficultyRequest(roundNumber, level) {
     return { response, data };
 }
 
-export async function fetchInfinityState() {
-    return fetchJson('/api/infinity-state');
+export async function fetchInfinityState(infinityPoolSessionId = null) {
+    const params = new URLSearchParams();
+    if (infinityPoolSessionId !== null) {
+        params.set('infinity_pool_session_id', infinityPoolSessionId);
+    }
+    const query = params.toString();
+    return fetchJson(`/api/infinity-state${query ? `?${query}` : ''}`);
 }
 
-export async function selectInfinityRoundRequest(roundNumber) {
+export async function selectInfinityRoundRequest(roundNumber, infinityPoolSessionId = null) {
+    const payload = { round_number: roundNumber };
+    if (infinityPoolSessionId !== null) {
+        payload.infinity_pool_session_id = infinityPoolSessionId;
+    }
     return fetchJson('/api/infinity-round', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ round_number: roundNumber }),
+        body: JSON.stringify(payload),
     });
 }
 
-export async function submitInfinityGuessRequest(guess, roundNumber, revealCityId = null) {
+export async function submitInfinityGuessRequest(
+    guess,
+    roundNumber,
+    revealCityId = null,
+    infinityPoolSessionId = null,
+) {
     const payload = {
         guess,
         round_number: roundNumber,
     };
     if (revealCityId !== null) {
         payload.reveal_city_id = revealCityId;
+    }
+    if (infinityPoolSessionId !== null) {
+        payload.infinity_pool_session_id = infinityPoolSessionId;
     }
 
     return fetchJson('/api/infinity-guess', {

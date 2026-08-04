@@ -17,6 +17,7 @@ from app.core.infinity_queries import (
     get_infinity_guesses,
     get_infinity_scores,
     get_infinity_session,
+    get_infinity_session_by_id,
     infinity_guess_exists,
     insert_infinity_guess,
     update_current_round,
@@ -85,6 +86,26 @@ def _get_or_create_infinity_session(cur, user_id: int, game_id: int):
     return create_infinity_session(cur, user_id, game_id)
 
 
+def _resolve_infinity_session(
+    cur,
+    user_id: int,
+    session_id: int | None,
+    infinity_pool_session_id: int | None,
+):
+    if infinity_pool_session_id is not None:
+        infinity_session = get_infinity_session_by_id(
+            cur,
+            user_id,
+            infinity_pool_session_id,
+        )
+        if infinity_session is None:
+            raise LookupError('Infinity Pool not found.')
+        return infinity_session
+
+    daily_session = _require_completed_daily_session(cur, user_id, session_id)
+    return _get_or_create_infinity_session(cur, user_id, int(daily_session.GameId))
+
+
 def _map_guess(row) -> dict:
     return {
         'round_number': int(row.RoundNumber),
@@ -131,22 +152,29 @@ def _load_base_square(cur, game_id: int, round_number: int) -> dict:
     return map_square(square_row, city_rows, city_count_row, False)
 
 
-def get_infinity_state(user_id: int, session_id: int | None) -> tuple[dict, int]:
+def get_infinity_state(
+    user_id: int,
+    session_id: int | None,
+    infinity_pool_session_id: int | None = None,
+) -> tuple[dict, int]:
     operation = 'get_infinity_state'
     _logger.info('%s: started', operation)
     with get_conn() as conn:
         cur = conn.cursor()
         try:
-            with _logged_step(operation, 'load_completed_daily_session'):
-                daily_session = _require_completed_daily_session(cur, user_id, session_id)
+            with _logged_step(operation, 'load_infinity_session'):
+                infinity_session = _resolve_infinity_session(
+                    cur,
+                    user_id,
+                    session_id,
+                    infinity_pool_session_id,
+                )
         except LookupError as error:
             return {'error': str(error)}, 404
         except PermissionError as error:
             return {'error': str(error), 'unlocked': False}, 403
 
-        game_id = int(daily_session.GameId)
-        with _logged_step(operation, 'load_infinity_session', game_id=game_id):
-            infinity_session = _get_or_create_infinity_session(cur, user_id, game_id)
+        game_id = int(infinity_session.GameId)
         infinity_session_id = int(infinity_session.InfinityPoolSessionId)
         round_number = int(infinity_session.CurrentRoundNumber)
         with _logged_step(
@@ -183,6 +211,7 @@ def get_infinity_state(user_id: int, session_id: int | None) -> tuple[dict, int]
 
     return {
         'unlocked': True,
+        'infinity_pool_session_id': infinity_session_id,
         'current_round': int(infinity_session.CurrentRoundNumber),
         'round_count': ROUND_COUNT,
         'round_scores': scores,
@@ -196,6 +225,7 @@ def select_infinity_round(
     user_id: int,
     session_id: int | None,
     round_number: int,
+    infinity_pool_session_id: int | None = None,
 ) -> tuple[dict, int]:
     operation = 'select_infinity_round'
     _logger.info('%s: started round_number=%s', operation, round_number)
@@ -206,16 +236,19 @@ def select_infinity_round(
     with get_conn() as conn:
         cur = conn.cursor()
         try:
-            with _logged_step(operation, 'load_completed_daily_session', round_number=round_number):
-                daily_session = _require_completed_daily_session(cur, user_id, session_id)
+            with _logged_step(operation, 'load_infinity_session', round_number=round_number):
+                infinity_session = _resolve_infinity_session(
+                    cur,
+                    user_id,
+                    session_id,
+                    infinity_pool_session_id,
+                )
         except LookupError as error:
             return {'error': str(error)}, 404
         except PermissionError as error:
             return {'error': str(error), 'unlocked': False}, 403
 
-        game_id = int(daily_session.GameId)
-        with _logged_step(operation, 'load_infinity_session', game_id=game_id):
-            infinity_session = _get_or_create_infinity_session(cur, user_id, game_id)
+        game_id = int(infinity_session.GameId)
         infinity_session_id = int(infinity_session.InfinityPoolSessionId)
         with _logged_step(
             operation,
@@ -241,7 +274,11 @@ def select_infinity_round(
         round_number,
     )
 
-    return {'current_round': round_number, 'square': square}, 200
+    return {
+        'infinity_pool_session_id': infinity_session_id,
+        'current_round': round_number,
+        'square': square,
+    }, 200
 
 
 def submit_infinity_guess(
@@ -263,6 +300,9 @@ def submit_infinity_guess(
         if not guess_text:
             return {'error': 'Guess is required.'}, 400
     round_number = int(payload['round_number'])
+    infinity_pool_session_id = payload.get('infinity_pool_session_id')
+    if infinity_pool_session_id is not None:
+        infinity_pool_session_id = int(infinity_pool_session_id)
     try:
         _require_round_number(round_number)
     except ValueError as error:
@@ -272,16 +312,19 @@ def submit_infinity_guess(
     with get_conn() as conn:
         cur = conn.cursor()
         try:
-            with _logged_step(operation, 'load_completed_daily_session', round_number=round_number):
-                daily_session = _require_completed_daily_session(cur, user_id, session_id)
+            with _logged_step(operation, 'load_infinity_session', round_number=round_number):
+                infinity_session = _resolve_infinity_session(
+                    cur,
+                    user_id,
+                    session_id,
+                    infinity_pool_session_id,
+                )
         except LookupError as error:
             return {'error': str(error)}, 404
         except PermissionError as error:
             return {'error': str(error), 'unlocked': False}, 403
 
-        game_id = int(daily_session.GameId)
-        with _logged_step(operation, 'load_infinity_session', game_id=game_id):
-            infinity_session = _get_or_create_infinity_session(cur, user_id, game_id)
+        game_id = int(infinity_session.GameId)
         infinity_session_id = int(infinity_session.InfinityPoolSessionId)
         with _logged_step(
             operation,

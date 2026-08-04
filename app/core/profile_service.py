@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from time import perf_counter
 
 from app.core.db import get_conn
+from app.core.infinity_queries import get_started_infinity_pools
 from app.helpers.logging import info as log_info
 
 REGION_ORDER = [
@@ -174,6 +175,37 @@ def get_profile_history_payload(user_id: int | None, offset: int) -> tuple[dict,
             'has_more': len(sessions) > HISTORY_PAGE_SIZE,
         },
     }, 200
+
+
+def get_infinity_pools_payload(user_id: int | None) -> tuple[dict, int]:
+    if user_id is None:
+        return {'pools': []}, 200
+
+    with get_conn() as conn:
+        cur = conn.cursor()
+        rows = get_started_infinity_pools(cur, user_id)
+
+    pools_by_id = {}
+    for row in rows:
+        infinity_session_id = int(row.InfinityPoolSessionId)
+        pool = pools_by_id.setdefault(infinity_session_id, {
+            'infinity_pool_session_id': infinity_session_id,
+            'game_date': row.GameDate.isoformat(),
+            'current_round': int(row.CurrentRoundNumber),
+            'started_at': row.StartedAt.isoformat(),
+            'updated_at': row.UpdatedAt.isoformat(),
+            'total_score': 0,
+            'squares': [],
+        })
+        round_score = int(row.RoundScore)
+        pool['total_score'] += round_score
+        pool['squares'].append({
+            'round_number': int(row.RoundNumber),
+            'score': round_score,
+            'city_count': int(row.CityCount),
+        })
+
+    return {'pools': list(pools_by_id.values())}, 200
 
 def _get_user_row(cur, user_id: int):
     with _profile_stage('_get_user_row'):
