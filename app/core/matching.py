@@ -3,6 +3,7 @@ import logging
 
 from rapidfuzz import fuzz
 
+from app.core.country_names import get_country_name
 from app.helpers.text import normalize_place_name
 
 
@@ -299,10 +300,23 @@ def _score_candidate(guess_name: str, row) -> tuple[float, str, str, str, str]:
 
 
 def _suggestion(row) -> dict:
+    province = next(
+        (
+            value.strip()
+            for value in (row.ProvinceCodes or '').split(',')
+            if value.strip()
+        ),
+        '',
+    )
+    if len(province) > 10:
+        province = ''
+
     return {
         "city_id": int(row.CityId),
         "city": row.CityName,
         "country_code": row.CountryCode,
+        "country_name": get_country_name(row.CountryCode),
+        "province": province or None,
     }
 
 
@@ -387,16 +401,18 @@ def find_matching_city(
     scored_candidates = []
 
     for row in candidate_rows:
-        raw_score = _score_candidate(normalized_guess, row)[0]
+        candidate_score = _score_candidate(normalized_guess, row)
+        raw_score = candidate_score[0]
+        source_type = candidate_score[3]
         if raw_score == 100.0 or nearby_exact_match is None:
             score = raw_score
         else:
             score = max(0.0, raw_score - nearby_penalty)
-        scored_candidates.append((score, row))
+        scored_candidates.append((score, row, source_type))
 
     surviving_candidates = [
-        (score, row)
-        for score, row in scored_candidates
+        (score, row, source_type)
+        for score, row, source_type in scored_candidates
         if score >= FUZZY_LINE_SCORE
     ]
     discarded_count = len(scored_candidates) - len(surviving_candidates)
@@ -412,11 +428,29 @@ def find_matching_city(
             result["nearby_exact_match"] = nearby_exact_match
         return result
 
+    canonical_exact_matches = [
+        candidate
+        for candidate in surviving_candidates
+        if candidate[0] == 100.0 and candidate[2] == 'canonical'
+    ]
+    if len(canonical_exact_matches) == 1:
+        score, row, _source_type = canonical_exact_matches[0]
+        summary_parts.append(
+            f'{row.CityName}, {row.CountryCode} scored {score:.1f} as a canonical '
+            'exact match and was automatically accepted.'
+        )
+        _logger.info('City match for %r: %s', guess_text, ' '.join(summary_parts))
+        return {
+            "type": "match",
+            "row": row,
+        }
+
     if (
         len(surviving_candidates) == 1
         and surviving_candidates[0][0] >= AUTO_ACCEPT_SCORE
+        and surviving_candidates[0][2] == 'canonical'
     ):
-        score, row = surviving_candidates[0]
+        score, row, _source_type = surviving_candidates[0]
         summary_parts.append(
             f'{row.CityName}, {row.CountryCode} scored {score:.1f} and was '
             f'automatically accepted. The other {discarded_count} candidates '
@@ -438,7 +472,7 @@ def find_matching_city(
 
     viable_candidates = ', '.join(
         f'{row.CityName}, {row.CountryCode} ({score:.1f})'
-        for score, row in surviving_candidates
+        for score, row, _source_type in surviving_candidates
     )
     summary_parts.append(
         f'Viable candidate{"s" if len(surviving_candidates) != 1 else ""}: '
@@ -451,7 +485,7 @@ def find_matching_city(
         "type": "confirmation_required",
         "suggestions": [
             _suggestion(row)
-            for _score, row in surviving_candidates
+            for _score, row, _source_type in surviving_candidates
         ],
     }
     if nearby_exact_match is not None:

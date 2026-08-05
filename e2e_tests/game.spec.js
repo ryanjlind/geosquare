@@ -87,7 +87,12 @@ async function submitCity(page, roundNumber, method, projectName) {
   if (testCase.candidates) {
     progress(projectName, `round ${roundNumber}: checking disambiguation`);
     expect(firstBody.requires_confirmation).toBe(true);
-    expect(firstBody.candidates).toEqual(testCase.candidates);
+    expect(firstBody.candidates.map(({ city_id, city, country_code }) => ({
+      city_id,
+      city,
+      country_code,
+    }))).toEqual(testCase.candidates);
+    expect(firstBody.candidates.every((candidate) => candidate.country_name)).toBe(true);
 
     const modal = page.locator('#guessConflictModal');
     await expect(modal).toBeVisible();

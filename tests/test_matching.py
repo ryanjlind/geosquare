@@ -61,8 +61,14 @@ def test_multiple_survivors_require_confirmation_even_when_both_auto_accept():
     assert result == {
         'type': 'confirmation_required',
         'suggestions': [
-            {'city_id': 1, 'city': 'Kailua', 'country_code': 'US'},
-            {'city_id': 2, 'city': 'Kailua-Kona', 'country_code': 'US'},
+            {
+                'city_id': 1, 'city': 'Kailua', 'country_code': 'US',
+                'country_name': 'United States', 'province': None,
+            },
+            {
+                'city_id': 2, 'city': 'Kailua-Kona', 'country_code': 'US',
+                'country_name': 'United States', 'province': None,
+            },
         ],
     }
 
@@ -78,7 +84,10 @@ def test_single_phonetic_spelling_requires_confirmation():
     assert result == {
         'type': 'confirmation_required',
         'suggestions': [
-            {'city_id': 1, 'city': 'Sebu', 'country_code': 'US'},
+            {
+                'city_id': 1, 'city': 'Sebu', 'country_code': 'US',
+                'country_name': 'United States', 'province': None,
+            },
         ],
     }
 
@@ -158,7 +167,10 @@ def test_discarded_candidate_is_not_shown_with_a_viable_candidate():
     assert result == {
         'type': 'confirmation_required',
         'suggestions': [
-            {'city_id': 2, 'city': 'Sebu', 'country_code': 'PH'},
+            {
+                'city_id': 2, 'city': 'Sebu', 'country_code': 'PH',
+                'country_name': 'Philippines', 'province': None,
+            },
         ],
     }
 
@@ -185,8 +197,54 @@ def test_alternate_name_uses_its_best_score():
         current_expansion_level=0,
     )
 
+    assert result == {
+        'type': 'confirmation_required',
+        'suggestions': [
+            {
+                'city_id': 1, 'city': 'Rostov-on-Don', 'country_code': 'RU',
+                'country_name': 'Russia', 'province': None,
+            },
+        ],
+    }
+
+
+def test_unique_canonical_exact_match_wins_over_alternate_name_match():
+    result = find_matching_city(
+        [
+            CityRow(1, 'Southampton', 'GB'),
+            CityRow(2, 'Hampton', 'US', AlternateNames='Southampton'),
+        ],
+        'Southampton',
+        nearby_exact_match=None,
+        current_expansion_level=0,
+    )
+
     assert result['type'] == 'match'
-    assert result['row'].CityName == 'Rostov-on-Don'
+    assert result['row'].CityName == 'Southampton'
+
+
+def test_suggestion_uses_first_short_province_code():
+    result = find_matching_city(
+        [CityRow(1, 'Salem', 'US', ProvinceCodes='OR,Oregon')],
+        'Salem',
+        nearby_exact_match=None,
+        current_expansion_level=0,
+    )
+
+    assert result['type'] == 'match'
+
+    result = find_matching_city(
+        [
+            CityRow(1, 'Salem', 'US', ProvinceCodes='OR,Oregon'),
+            CityRow(2, 'Salem', 'US', ProvinceCodes='South West Ethiopia'),
+        ],
+        'Salem',
+        nearby_exact_match=None,
+        current_expansion_level=0,
+    )
+
+    assert result['suggestions'][0]['province'] == 'OR'
+    assert result['suggestions'][1]['province'] is None
 
 
 def test_connector_does_not_consume_substantive_alternate_name_token():

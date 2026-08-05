@@ -432,7 +432,7 @@ export function showGuessConfirmationModal(candidates, nearbyCity) {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'modal-btn';
-        btn.textContent = `${c.city} (${c.country_code})`;
+        btn.textContent = [c.city, c.province, c.country_name].filter(Boolean).join(', ');
 
         btn.onclick = async () => {
             modal.classList.add('hidden');
