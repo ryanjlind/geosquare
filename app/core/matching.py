@@ -433,7 +433,14 @@ def find_matching_city(
         for candidate in surviving_candidates
         if candidate[0] == 100.0 and candidate[2] == 'canonical'
     ]
-    if len(canonical_exact_matches) == 1:
+    other_candidates_are_alternate_matches = (
+        len(canonical_exact_matches) == 1
+        and all(
+            candidate is canonical_exact_matches[0] or candidate[2] == 'alternate'
+            for candidate in surviving_candidates
+        )
+    )
+    if other_candidates_are_alternate_matches:
         score, row, _source_type = canonical_exact_matches[0]
         summary_parts.append(
             f'{row.CityName}, {row.CountryCode} scored {score:.1f} as a canonical '
