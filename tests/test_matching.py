@@ -208,7 +208,7 @@ def test_alternate_name_uses_its_best_score():
     }
 
 
-def test_unique_canonical_exact_match_wins_over_alternate_name_match():
+def test_canonical_exact_match_and_alternate_name_match_require_confirmation():
     result = find_matching_city(
         [
             CityRow(1, 'Southampton', 'GB'),
@@ -219,8 +219,19 @@ def test_unique_canonical_exact_match_wins_over_alternate_name_match():
         current_expansion_level=0,
     )
 
-    assert result['type'] == 'match'
-    assert result['row'].CityName == 'Southampton'
+    assert result == {
+        'type': 'confirmation_required',
+        'suggestions': [
+            {
+                'city_id': 2, 'city': 'Hampton', 'country_code': 'US',
+                'country_name': 'United States', 'province': None,
+            },
+            {
+                'city_id': 1, 'city': 'Southampton', 'country_code': 'GB',
+                'country_name': 'United Kingdom', 'province': None,
+            },
+        ],
+    }
 
 
 def test_suggestion_uses_first_short_province_code():

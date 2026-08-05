@@ -428,30 +428,6 @@ def find_matching_city(
             result["nearby_exact_match"] = nearby_exact_match
         return result
 
-    canonical_exact_matches = [
-        candidate
-        for candidate in surviving_candidates
-        if candidate[0] == 100.0 and candidate[2] == 'canonical'
-    ]
-    other_candidates_are_alternate_matches = (
-        len(canonical_exact_matches) == 1
-        and all(
-            candidate is canonical_exact_matches[0] or candidate[2] == 'alternate'
-            for candidate in surviving_candidates
-        )
-    )
-    if other_candidates_are_alternate_matches:
-        score, row, _source_type = canonical_exact_matches[0]
-        summary_parts.append(
-            f'{row.CityName}, {row.CountryCode} scored {score:.1f} as a canonical '
-            'exact match and was automatically accepted.'
-        )
-        _logger.info('City match for %r: %s', guess_text, ' '.join(summary_parts))
-        return {
-            "type": "match",
-            "row": row,
-        }
-
     if (
         len(surviving_candidates) == 1
         and surviving_candidates[0][0] >= AUTO_ACCEPT_SCORE
