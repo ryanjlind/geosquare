@@ -1,0 +1,90 @@
+name: Weekly randomized E2E
+
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: weekly-random-e2e
+  cancel-in-progress: false
+
+jobs:
+  weekly-random-e2e:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      E2E_SQL_SERVER: ${{ secrets.E2E_SQL_SERVER }}
+      E2E_DATABASE: ${{ secrets.E2E_SQL_DATABASE }}
+      E2E_SQL_USERNAME: ${{ secrets.E2E_SQL_USERNAME }}
+      E2E_SQL_PASSWORD: ${{ secrets.E2E_SQL_PASSWORD }}
+      SECRET_KEY: ${{ secrets.E2E_SECRET_KEY }}
+      E2E_GAME_DATE: '2026-08-02'
+      GAME_DATE_OVERRIDE: '2026-08-02'
+      E2E_SQUARE_POOL_ID: ${{ vars.E2E_SQUARE_POOL_ID }}
+      LOCAL_AUTH_BYPASS: 'true'
+      DATABASE_TARGET: 'e2e'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: e2e_tests/package-lock.json
+
+      - name: Install Microsoft ODBC driver
+        run: |
+          curl https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
+          curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18 unixodbc-dev
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright
+        working-directory: e2e_tests
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Wait for E2E database
+        run: python -m e2e_tests.wait_for_database
+
+      - name: Create weekly randomized E2E game
+        run: python -m e2e_tests.setup_weekly_game
+
+      - name: Start Flask
+        run: |
+          gunicorn main:app --bind 127.0.0.1:8000 --timeout 60 > e2e_tests/artifacts/flask.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8000/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat e2e_tests/artifacts/flask.log
+          exit 1
+
+      - name: Run weekly browser E2E test
+        working-directory: e2e_tests
+        run: npm run test:weekly
+
+      - name: Show Flask log on failure
+        if: failure()
+        run: cat e2e_tests/artifacts/flask.log
+
+      - name: Upload weekly E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-random-e2e-artifacts
+          path: e2e_tests/artifacts/
+          retention-days: 14

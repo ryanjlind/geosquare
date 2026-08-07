@@ -2,7 +2,8 @@
   "name": "geosquare-e2e-tests",
   "private": true,
   "scripts": {
-    "test": "playwright test"
+    "test": "playwright test game.spec.js",
+    "test:weekly": "playwright test weekly_random.spec.js --project=chromium-desktop"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1"

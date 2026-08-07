@@ -4,6 +4,7 @@ from flask import Flask
 from app.routes.daily_dashboard import daily_dashboard_bp
 from app.routes.main import main_bp
 from app.routes.profile import profile_bp
+from app.routes.weekly_e2e import weekly_e2e_bp
 
 def create_app() -> Flask:
     app = Flask(
@@ -25,6 +26,7 @@ def create_app() -> Flask:
     app.register_blueprint(daily_dashboard_bp)
     app.register_blueprint(main_bp)
     app.register_blueprint(profile_bp)
+    app.register_blueprint(weekly_e2e_bp)
 
     if os.getenv('FLASK_ENV') == 'development':
         from app.admin.routes import admin_bp
