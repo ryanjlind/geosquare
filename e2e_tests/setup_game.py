@@ -1,12 +1,10 @@
 import os
-import random
 from datetime import date
 
 from app.core.db import get_conn
 from app.core.game_generation import fetch_cities_in_bounds, persist_square
 
-PLAYABILITY_THRESHOLD = 80.0
-ROUND_COUNT = 5
+FIXED_POOL_SQUARE_IDS = (242, 301, 289, 171, 236)
 EXPANSION_LEVEL_COUNT = 5
 EXPANSION_SCALE = 1.5
 MIN_LATITUDE = -56.0
@@ -67,50 +65,41 @@ def delete_existing_game(cur, game_date: date) -> None:
         )
 
 
-def select_playable_squares(cur, square_pool_id: int, random_seed: int) -> list[dict]:
-    cur.execute("""
+def load_fixed_squares(cur, square_pool_id: int) -> list[dict]:
+    placeholders = ', '.join('?' for _ in FIXED_POOL_SQUARE_IDS)
+    cur.execute(f"""
         SELECT
             sp.SquareId,
             sp.CenterLat,
             sp.CenterLng,
-            sp.SquareLength,
-            grade.PlayabilityScore
+            sp.SquareLength
         FROM dbo.SquarePool sp
-        INNER JOIN (
-            SELECT g.SquarePoolId, g.SquareId, g.PlayabilityScore
-            FROM dbo.SquarePoolGrades g
-            INNER JOIN (
-                SELECT SquarePoolId, SquareId, MAX(SquarePoolGradeId) AS GradeId
-                FROM dbo.SquarePoolGrades
-                GROUP BY SquarePoolId, SquareId
-            ) latest
-                ON latest.GradeId = g.SquarePoolGradeId
-        ) grade
-            ON grade.SquarePoolId = sp.SquarePoolId
-            AND grade.SquareId = sp.SquareId
         WHERE sp.SquarePoolId = ?
-          AND grade.PlayabilityScore > ?
-        ORDER BY sp.SquareId
-    """, square_pool_id, PLAYABILITY_THRESHOLD)
+          AND sp.SquareId IN ({placeholders})
+    """, square_pool_id, *FIXED_POOL_SQUARE_IDS)
 
-    candidates = [
-        {
+    squares_by_id = {
+        int(row.SquareId): {
             'square_id': int(row.SquareId),
             'center_lat': float(row.CenterLat),
             'center_lon': float(row.CenterLng),
             'square_length': float(row.SquareLength),
-            'playability_score': float(row.PlayabilityScore),
         }
         for row in cur.fetchall()
-    ]
+    }
 
-    if len(candidates) < ROUND_COUNT:
+    missing_square_ids = [
+        square_id
+        for square_id in FIXED_POOL_SQUARE_IDS
+        if square_id not in squares_by_id
+    ]
+    if missing_square_ids:
         raise ValueError(
-            f'Pool {square_pool_id} has {len(candidates)} playable squares; '
-            f'{ROUND_COUNT} are required.'
+            f'Pool {square_pool_id} is missing required E2E square IDs: '
+            + ', '.join(str(square_id) for square_id in missing_square_ids)
         )
 
-    return random.Random(random_seed).sample(candidates, ROUND_COUNT)
+    return [squares_by_id[square_id] for square_id in FIXED_POOL_SQUARE_IDS]
 
 
 def expansion_bounds(square: dict, expansion_level: int) -> dict:
@@ -182,13 +171,12 @@ def create_test_game(cur, game_date: date, selected_squares: list[dict]) -> int:
 def main() -> None:
     game_date = date.fromisoformat(required_environment_value('E2E_GAME_DATE'))
     square_pool_id = int(required_environment_value('E2E_SQUARE_POOL_ID'))
-    random_seed = int(required_environment_value('E2E_RANDOM_SEED'))
 
     with get_conn(e2e=True) as conn:
         cur = conn.cursor()
         print(f'Rebuilding E2E game for {game_date.isoformat()}...', flush=True)
         delete_existing_game(cur, game_date)
-        selected_squares = select_playable_squares(cur, square_pool_id, random_seed)
+        selected_squares = load_fixed_squares(cur, square_pool_id)
         print(
             'Selected pool squares: '
             + ', '.join(str(square['square_id']) for square in selected_squares),
