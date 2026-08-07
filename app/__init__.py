@@ -1,6 +1,7 @@
 import logging
 import os
 from flask import Flask
+from app.routes.daily_dashboard import daily_dashboard_bp
 from app.routes.main import main_bp
 from app.routes.profile import profile_bp
 
@@ -21,6 +22,7 @@ def create_app() -> Flask:
     logging.getLogger('geosquare').setLevel(logging.INFO)
     app.logger.setLevel(logging.INFO)
 
+    app.register_blueprint(daily_dashboard_bp)
     app.register_blueprint(main_bp)
     app.register_blueprint(profile_bp)
 

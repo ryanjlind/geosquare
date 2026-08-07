@@ -5,7 +5,7 @@ from datetime import date
 from app.core.db import get_conn
 from app.core.game_generation import fetch_cities_in_bounds, persist_square
 
-PLAYABILITY_THRESHOLD = 75.0
+PLAYABILITY_THRESHOLD = 80.0
 ROUND_COUNT = 5
 EXPANSION_LEVEL_COUNT = 5
 EXPANSION_SCALE = 1.5
