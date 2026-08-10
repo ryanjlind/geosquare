@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test": "playwright test game.spec.js",
-    "test:weekly": "playwright test weekly_random.spec.js --project=chromium-desktop"
+    "test:weekly": "playwright test weekly_random.spec.js"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1"

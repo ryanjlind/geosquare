@@ -6,6 +6,7 @@ from pathlib import Path
 
 from app.core.db import get_conn
 from app.core.game_generation import fetch_cities_in_bounds, persist_square
+from app.helpers.text import normalize_place_name
 from e2e_tests.setup_game import delete_existing_game, expansion_bounds
 
 
@@ -13,6 +14,8 @@ PLAYABILITY_THRESHOLD = 80.0
 ROUND_COUNT = 5
 EXPANSION_LEVEL_COUNT = 5
 FIXTURE_PATH = Path('e2e_tests/artifacts/weekly_fixture.json')
+GUESS_MAX_ROLL = 70
+EXPAND_MAX_ROLL = 95
 
 
 def required_environment_value(name: str) -> str:
@@ -64,6 +67,25 @@ def select_random_squares(cur, square_pool_id: int) -> list[dict]:
     return random.SystemRandom().sample(candidates, ROUND_COUNT)
 
 
+def random_round_action(random_source) -> str:
+    roll = random_source.randrange(100)
+    if roll < GUESS_MAX_ROLL:
+        return 'guess'
+    if roll < EXPAND_MAX_ROLL:
+        return 'expand'
+    return 'pass'
+
+
+def city_fixture(city: dict) -> dict:
+    return {
+        'city_id': city['city_id'],
+        'city_name': city['city_name'],
+        'country_code': city['country_code'],
+        'latitude': city['latitude'],
+        'longitude': city['longitude'],
+    }
+
+
 def create_weekly_game(cur, game_date: date, selected_squares: list[dict]) -> tuple[int, list[dict]]:
     cur.execute("""
         INSERT INTO dbo.Games (GameDate)
@@ -72,6 +94,7 @@ def create_weekly_game(cur, game_date: date, selected_squares: list[dict]) -> tu
     """, game_date)
     game_id = int(cur.fetchone()[0])
     rounds = []
+    random_source = random.SystemRandom()
 
     for round_number, selected_square in enumerate(selected_squares, start=1):
         print(
@@ -79,7 +102,8 @@ def create_weekly_game(cur, game_date: date, selected_squares: list[dict]) -> tu
             f'{selected_square["square_id"]}...',
             flush=True,
         )
-        round_guess = None
+        cities_by_expansion = []
+        bounds_by_expansion = []
         for expansion_level in range(EXPANSION_LEVEL_COUNT):
             bounds = expansion_bounds(selected_square, expansion_level)
             cities = fetch_cities_in_bounds(
@@ -89,12 +113,8 @@ def create_weekly_game(cur, game_date: date, selected_squares: list[dict]) -> tu
                 bounds['max_lat'],
                 bounds['max_lon'],
             )
-            if expansion_level == 0:
-                if not cities:
-                    raise ValueError(
-                        f'Pool square {selected_square["square_id"]} has no cities.'
-                    )
-                round_guess = max(cities, key=lambda city: city['population'])
+            cities_by_expansion.append(cities)
+            bounds_by_expansion.append(bounds)
 
             square_id = persist_square(cur, {
                 'seed_lat': selected_square['center_lat'],
@@ -116,13 +136,56 @@ def create_weekly_game(cur, game_date: date, selected_squares: list[dict]) -> tu
                 ) VALUES (?, ?, ?, ?)
             """, game_id, round_number, square_id, expansion_level)
 
-        rounds.append({
+        if not cities_by_expansion[0]:
+            raise ValueError(
+                f'Pool square {selected_square["square_id"]} has no cities.'
+            )
+
+        action = random_round_action(random_source)
+        round_fixture = {
             'round_number': round_number,
             'pool_square_id': selected_square['square_id'],
-            'city_id': round_guess['city_id'],
-            'city_name': round_guess['city_name'],
-            'country_code': round_guess['country_code'],
-        })
+            'action': action,
+            'base_bounds': bounds_by_expansion[0],
+        }
+
+        if action == 'guess':
+            round_fixture['correct_city'] = city_fixture(
+                random_source.choice(cities_by_expansion[0])
+            )
+
+        if action == 'expand':
+            round_fixture['correct_city'] = city_fixture(
+                random_source.choice(cities_by_expansion[1])
+            )
+            base_city_ids = {
+                city['city_id']
+                for city in cities_by_expansion[0]
+            }
+            base_city_names = {
+                normalize_place_name(city['city_name'])
+                for city in cities_by_expansion[0]
+            }
+            base_bounds = bounds_by_expansion[0]
+            nearby_candidates = [
+                city
+                for city in cities_by_expansion[1]
+                if city['city_id'] not in base_city_ids
+                and normalize_place_name(city['city_name']) not in base_city_names
+                and (
+                    city['latitude'] < base_bounds['min_lat']
+                    or city['latitude'] > base_bounds['max_lat']
+                    or city['longitude'] < base_bounds['min_lon']
+                    or city['longitude'] > base_bounds['max_lon']
+                )
+            ]
+            round_fixture['incorrect_city'] = (
+                city_fixture(random_source.choice(nearby_candidates))
+                if nearby_candidates
+                else None
+            )
+
+        rounds.append(round_fixture)
 
     return game_id, rounds
 
@@ -150,12 +213,11 @@ def main() -> None:
         encoding='utf-8',
     )
     for round_fixture in rounds:
-        print(
-            f'Round {round_fixture["round_number"]} guess: '
-            f'{round_fixture["city_name"]} '
-            f'(city {round_fixture["city_id"]})',
-            flush=True,
-        )
+        description = f'Round {round_fixture["round_number"]}: {round_fixture["action"]}'
+        if round_fixture['action'] != 'pass':
+            correct_city = round_fixture['correct_city']
+            description += f' {correct_city["city_name"]} (city {correct_city["city_id"]})'
+        print(description, flush=True)
     print(f'Created weekly E2E game {game_id}.', flush=True)
 
 
