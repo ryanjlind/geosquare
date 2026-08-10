@@ -155,9 +155,6 @@ def create_weekly_game(cur, game_date: date, selected_squares: list[dict]) -> tu
             )
 
         if action == 'expand':
-            round_fixture['correct_city'] = city_fixture(
-                random_source.choice(cities_by_expansion[1])
-            )
             base_city_ids = {
                 city['city_id']
                 for city in cities_by_expansion[0]
@@ -179,11 +176,17 @@ def create_weekly_game(cur, game_date: date, selected_squares: list[dict]) -> tu
                     or city['longitude'] > base_bounds['max_lon']
                 )
             ]
-            round_fixture['incorrect_city'] = (
-                city_fixture(random_source.choice(nearby_candidates))
-                if nearby_candidates
-                else None
-            )
+            if nearby_candidates:
+                expanded_city = city_fixture(
+                    random_source.choice(nearby_candidates)
+                )
+                round_fixture['incorrect_city'] = expanded_city
+                round_fixture['correct_city'] = expanded_city
+            else:
+                round_fixture['incorrect_city'] = None
+                round_fixture['correct_city'] = city_fixture(
+                    random_source.choice(cities_by_expansion[1])
+                )
 
         rounds.append(round_fixture)
 
