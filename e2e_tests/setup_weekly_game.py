@@ -213,10 +213,22 @@ def main() -> None:
         encoding='utf-8',
     )
     for round_fixture in rounds:
-        description = f'Round {round_fixture["round_number"]}: {round_fixture["action"]}'
+        description = (
+            f'Round {round_fixture["round_number"]}: pool square '
+            f'{round_fixture["pool_square_id"]}; action {round_fixture["action"]}'
+        )
         if round_fixture['action'] != 'pass':
             correct_city = round_fixture['correct_city']
-            description += f' {correct_city["city_name"]} (city {correct_city["city_id"]})'
+            description += (
+                f'; correct guess {correct_city["city_name"]} '
+                f'(city {correct_city["city_id"]}, {correct_city["country_code"]})'
+            )
+        incorrect_city = round_fixture.get('incorrect_city')
+        if incorrect_city is not None:
+            description += (
+                f'; incorrect next-ring guess {incorrect_city["city_name"]} '
+                f'(city {incorrect_city["city_id"]}, {incorrect_city["country_code"]})'
+            )
         print(description, flush=True)
     print(f'Created weekly E2E game {game_id}.', flush=True)
 
