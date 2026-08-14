@@ -327,6 +327,12 @@
     margin-bottom: 12px;
 }
 
+#statsTodayRoundsTable {
+    width: calc(100% + 24px);
+    margin-left: -12px;
+    margin-right: -12px;
+}
+
 @media (max-width: 760px) {
     .stats-rounds-table {
         font-size: 13px;

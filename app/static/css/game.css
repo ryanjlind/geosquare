@@ -129,7 +129,7 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
-    table-layout: fixed;
+    table-layout: auto;
 }
 
 #roundTable .round-column-number {
@@ -137,15 +137,15 @@
 }
 
 #roundTable .round-column-population {
-    width: 76px;
+    width: 1%;
 }
 
 #roundTable .round-column-rank {
-    width: 48px;
+    width: 1%;
 }
 
 #roundTable .round-column-points {
-    width: 72px;
+    width: 1%;
 }
 
 #roundTable th,
@@ -161,6 +161,7 @@
 }
 
 #roundTable td:nth-child(2) {
+    width: 100%;
     max-width: 0;
 }
 
@@ -170,6 +171,10 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+#roundTable th:nth-child(3) {
+    text-align: center;
 }
 
 #roundTable th:nth-child(4),

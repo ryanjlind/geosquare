@@ -1,4 +1,6 @@
-import { numberFmt, abbreviateNumber, abbreviatePopulationForDisplay, escapeHtml, parseFormattedInt } from './utils.js';
+import { numberFmt, abbreviateNumber, escapeHtml, parseFormattedInt } from './utils.js';
+
+const MIN_ROUND_CITY_COLUMN_WIDTH = 125;
 
 export function setMetaError(message) {
     document.getElementById('meta').innerHTML = `<div class="value">${escapeHtml(message)}</div>`;
@@ -169,7 +171,7 @@ export function addRoundRow(result, roundNumber) {
     tr.innerHTML = `
         <td>${roundNumber}</td>
         <td><span class="round-city">${escapeHtml(result.city)}</span></td>
-        <td class="pop-cell">${numberFmt(result.population)}</td>
+        <td class="pop-cell" data-population="${result.population}">${numberFmt(result.population)}</td>
         <td>${result.rank}</td>
         <td>${formatScoreWithPenalty(result.score ?? 0, result.expansion_level ?? 0)}</td>
     `;
@@ -182,21 +184,17 @@ export function addRoundRow(result, roundNumber) {
 
 export function adjustPopulationDisplay() {
     const popCells = document.querySelectorAll('#roundTable .pop-cell');
-    
     if (popCells.length === 0) return;
-    
-    const referenceCell = popCells[0];
-    
+
     popCells.forEach((cell) => {
-        const value = parseInt(cell.textContent.replace(/,/g, ''), 10);
-        if (isNaN(value)) return;
-        
-        const formatted = numberFmt(value);
-        const width = abbreviatePopulationForDisplay(value, '#roundTable td:nth-child(3)');
-        
-        if (width !== formatted) {
-            cell.textContent = width;
-        }
+        cell.textContent = numberFmt(Number(cell.dataset.population));
+    });
+
+    const cityColumn = document.querySelector('#roundTable th:nth-child(2)');
+    if (!cityColumn || cityColumn.getBoundingClientRect().width >= MIN_ROUND_CITY_COLUMN_WIDTH) return;
+
+    popCells.forEach((cell) => {
+        cell.textContent = abbreviateNumber(Number(cell.dataset.population));
     });
 }
 
