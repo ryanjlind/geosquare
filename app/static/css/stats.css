@@ -358,9 +358,32 @@
 }
 
 .share-card-round-number,
-.share-card-round-meta,
-.share-card-spoiler {
+.share-card-round-meta {
     color: #8e9db1;
+}
+
+.share-card-spoiler {
+    min-width: 0;
+    padding: 0 2px;
+    overflow: hidden;
+    border: 0;
+    border-radius: 3px;
+    background: #1e1f22;
+    color: transparent;
+    font: inherit;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.share-card-spoiler:hover {
+    background: #2b2d31;
+}
+
+.share-card-spoiler.revealed {
+    background: rgba(79, 84, 92, 0.48);
+    color: #dbdee1;
 }
 
 .share-card-city {

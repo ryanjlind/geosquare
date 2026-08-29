@@ -406,7 +406,16 @@ function renderSharePreview() {
 
         appendPreviewElement(row, 'share-card-round-number', `R${round.round}`);
         if (activeShareFormat === SHARE_FORMAT_DISCORD) {
-            appendPreviewElement(row, 'share-card-spoiler', `||${city} · pop. ${numberFmt(round.population)}||`);
+            const spoiler = document.createElement('button');
+            spoiler.type = 'button';
+            spoiler.className = 'share-card-spoiler';
+            spoiler.textContent = `${city} · pop. ${numberFmt(round.population)}`;
+            spoiler.setAttribute('aria-label', 'Reveal spoiler');
+            spoiler.onclick = () => {
+                const isRevealed = spoiler.classList.toggle('revealed');
+                spoiler.setAttribute('aria-label', isRevealed ? 'Hide spoiler' : 'Reveal spoiler');
+            };
+            row.appendChild(spoiler);
         } else {
             appendPreviewElement(row, 'share-card-city', city);
         }

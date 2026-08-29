@@ -286,7 +286,12 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
   await page.locator('#shareScoreBtn').click();
   await page.locator('#shareFormatBtn').click();
   await expect(page.locator('#shareFormatBtn')).toHaveAttribute('aria-label', 'Discord spoilers');
-  await expect(page.locator('#shareTextPreview')).toContainText('||');
+  const firstSpoiler = page.locator('.share-card-spoiler').first();
+  await expect(firstSpoiler).toHaveAttribute('aria-label', 'Reveal spoiler');
+  await expect(page.locator('#shareTextPreview')).not.toContainText('||');
+  await firstSpoiler.click();
+  await expect(firstSpoiler).toHaveClass(/revealed/);
+  await expect(firstSpoiler).toHaveAttribute('aria-label', 'Hide spoiler');
   await page.locator('#shareCopyBtn').click();
   const discordText = await page.evaluate(() => window.__copiedText);
   expect(discordText).toContain('GeoSquare ');
