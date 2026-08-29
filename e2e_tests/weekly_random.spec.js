@@ -240,14 +240,17 @@ test('completes five randomly selected squares', async ({ page }, testInfo) => {
   progress(projectName, `all rounds complete with ${solvedCount}/5 solved; testing share text`);
   await expect(page.locator('#shareScoreBtn')).toBeVisible();
   await page.locator('#shareScoreBtn').click();
+  await expect(page.locator('#shareScoreModal')).toBeVisible();
+  await expect(page.locator('#shareTextPreview')).toContainText(`${solvedCount}/5 solved`);
+  await page.locator('#shareCopyBtn').click();
   const copiedText = await page.evaluate(() => window.__copiedText);
-  const expectedHeadline = solvedCount === 5 ? 'Perfect Game' : 'Game Complete';
-  expect(copiedText).toContain(`${expectedHeadline} | ${solvedCount}/5 solved`);
-  expect(copiedText).toContain('R1:');
-  expect(copiedText).toContain('R5:');
+  expect(copiedText).toContain(`points | ${solvedCount}/5 solved`);
+  expect(copiedText).toContain('R1  ');
+  expect(copiedText).toContain('R5  ');
+  expect(copiedText).toContain('?ref=share');
   progress(
     projectName,
-    `share text verified with headline "${expectedHeadline}" and ${solvedCount}/5 solved`,
+    `share text verified with ${solvedCount}/5 solved`,
   );
 
   progress(projectName, 'fetching final game state');

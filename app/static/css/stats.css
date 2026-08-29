@@ -259,6 +259,211 @@
     color: #b7c4d4;
 }
 
+.share-modal-content {
+    position: relative;
+    width: min(320px, calc(100vw - 16px));
+    max-height: calc(100vh - 16px);
+    overflow: hidden;
+    box-sizing: border-box;
+    padding: 10px;
+    border: 1px solid #3a4658;
+    background: #151922;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+.share-modal-title {
+    margin: 0 30px 8px 0;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.share-modal-close-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #b7c4d4;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.share-modal-close-btn:hover {
+    background: #253244;
+    color: #e9eef5;
+}
+
+.share-card-preview {
+    margin-bottom: 8px;
+    padding: 10px;
+    border: 1px solid #2a3442;
+    border-radius: 6px;
+    background: #111824;
+    color: #e9eef5;
+}
+
+.share-card-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 7px;
+}
+
+.share-card-brand {
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.share-card-date,
+.share-card-solved {
+    color: #8e9db1;
+    font-size: 9px;
+}
+
+.share-card-summary {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    margin-bottom: 7px;
+}
+
+.share-card-score {
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.share-card-rounds {
+    display: grid;
+    gap: 3px;
+}
+
+.share-card-round {
+    display: grid;
+    grid-template-columns: 14px 20px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    font-size: 9px;
+}
+
+.share-card-marker {
+    font-size: 10px;
+    line-height: 1;
+}
+
+.share-card-round-number,
+.share-card-round-meta,
+.share-card-spoiler {
+    color: #8e9db1;
+}
+
+.share-card-city {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.share-card-hidden-grid {
+    margin: 3px 0 7px;
+    font-size: 15px;
+    letter-spacing: 2px;
+}
+
+.share-card-challenge {
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.share-card-url {
+    margin-top: 7px;
+    padding-top: 6px;
+    overflow-wrap: anywhere;
+    border-top: 1px solid #2a3442;
+    color: #8e9db1;
+    font-size: 8px;
+    line-height: 1.25;
+}
+
+.share-modal-status {
+    min-height: 0;
+    margin-bottom: 3px;
+    color: #fca5a5;
+    font-size: 10px;
+}
+
+.share-modal-status:empty {
+    display: none;
+}
+
+.share-modal-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.share-format-btn,
+.share-copy-btn {
+    height: 32px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.share-format-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    padding: 0;
+    border: 1px solid #3a4658;
+    background: #1d2633;
+    color: #b7c4d4;
+}
+
+.share-format-btn:hover {
+    background: #253244;
+    color: #e9eef5;
+}
+
+.share-copy-btn {
+    width: 84px;
+    border: 1px solid #3b82f6;
+    background: #3b82f6;
+    color: #fff;
+}
+
+.share-copy-btn:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+
+@media (max-width: 360px) {
+    .share-modal-content {
+        width: calc(100vw - 16px);
+    }
+
+    .share-format-btn,
+    .share-copy-btn {
+        min-height: 40px;
+    }
+
+    .share-format-btn {
+        width: 40px;
+    }
+
+    .share-copy-btn {
+        width: 96px;
+    }
+}
+
 .stats-section-title {
     margin-bottom: 12px;
     font-size: 16px;

@@ -2,7 +2,12 @@ import { fetchGameState, fetchPlayerStats, fetchJson } from './api.js';
 import { gameState } from './state.js';
 import { escapeHtml, numberFmt, parseFormattedInt } from './utils.js';
 
+const SHARE_FORMAT_DETAILED = 'detailed';
+const SHARE_FORMAT_DISCORD = 'discord';
+const SHARE_FORMAT_COMPACT = 'compact';
+
 let shareStatusTimerId = null;
+let activeShareFormat = SHARE_FORMAT_DETAILED;
 let shareSource = {
     gameDate: '',
     rounds: new Map(),
@@ -32,6 +37,17 @@ function recomputeShareTotal() {
 function getShareRoundsSorted() {
     return Array.from(shareSource.rounds.values())
         .sort((a, b) => a.round - b.round);
+}
+
+function getRoundMarker(round) {
+    if (round.points <= 0) return '⬛';
+    return round.expansionPenalty ? '🟨' : '🟩';
+}
+
+function getShareUrl() {
+    const gameUrl = new URL(window.location.pathname, window.location.origin);
+    gameUrl.searchParams.set('ref', 'share');
+    return gameUrl.toString();
 }
 
 export function hydrateShareFromState(state) {
@@ -71,18 +87,66 @@ export function isShareReady() {
 }
 
 function buildShareSummaryText({ gameDate, total, solved, totalRounds, rounds, isPerfect }) {
-    const headline = isPerfect ? 'Perfect Game' : 'Game Complete';
     const roundLines = (rounds || []).map((round) => {
         const city = round.city && round.city !== '—' ? round.city : 'Pass';
         const penalty = round.expansionPenalty ? ` ${round.expansionPenalty}` : '';
-        return `R${round.round}: ${city} | pop. ${numberFmt(round.population)} | ${numberFmt(round.points)} pts${penalty}`;
+        return `${getRoundMarker(round)} R${round.round}  ${city} · pop. ${numberFmt(round.population)}  ${numberFmt(round.points)} pts${penalty}`;
     });
 
     return [
         `GeoSquare ${gameDate || ''}`.trim(),
-        `${headline} | ${solved}/${totalRounds} solved | ${numberFmt(total || 0)} points`,
-        ...roundLines
+        `${numberFmt(total || 0)} points | ${solved}/${totalRounds} solved`,
+        ...roundLines,
+        getShareUrl(),
     ].join('\n');
+}
+
+function buildDiscordShareText({ gameDate, total, solved, totalRounds, rounds, isPerfect }) {
+    const roundLines = rounds.map((round) => {
+        const city = round.city && round.city !== '—' ? round.city : 'Pass';
+        const penalty = round.expansionPenalty ? ` ${round.expansionPenalty}` : '';
+        const spoiler = `${city} · pop. ${numberFmt(round.population)}`;
+        return `${getRoundMarker(round)} R${round.round}  ||${spoiler}||  ${numberFmt(round.points)} pts${penalty}`;
+    });
+
+    return [
+        `GeoSquare ${gameDate || ''}`.trim(),
+        `${numberFmt(total || 0)} points | ${solved}/${totalRounds} solved`,
+        ...roundLines,
+        getShareUrl(),
+    ].join('\n');
+}
+
+function buildCompactShareText({ gameDate, total, solved, totalRounds, rounds }) {
+    const resultGrid = rounds.map(getRoundMarker).join(' ');
+
+    return [
+        `GeoSquare ${gameDate || ''}`.trim(),
+        `${numberFmt(total || 0)} points | ${solved}/${totalRounds} solved`,
+        resultGrid,
+        'Can you beat me?',
+        getShareUrl(),
+    ].join('\n');
+}
+
+function getShareText(format) {
+    const rounds = getShareRoundsSorted();
+    const totalRounds = rounds.length;
+    const solved = rounds.filter((round) => round.points > 0).length;
+    const total = shareSource.total || 0;
+    const isPerfect = totalRounds > 0 && solved === totalRounds;
+    const shareData = {
+        gameDate: shareSource.gameDate || '',
+        total,
+        solved,
+        totalRounds,
+        rounds,
+        isPerfect,
+    };
+
+    if (format === SHARE_FORMAT_DISCORD) return buildDiscordShareText(shareData);
+    if (format === SHARE_FORMAT_COMPACT) return buildCompactShareText(shareData);
+    return buildShareSummaryText(shareData);
 }
 
 async function copyTextToClipboard(text) {
@@ -287,48 +351,114 @@ export function wireStatsOverlay() {
             hideStatsOverlay();
         }
     });
+
+    wireShareModal();
 }
 
 export function hideStatsOverlay() {
     document.getElementById('statsOverlay').style.display = 'none';
 }
 
-export async function shareCurrentGameScore() {
+function hideShareModal() {
+    document.getElementById('shareScoreModal').classList.add('hidden');
+}
+
+function appendPreviewElement(parent, className, text) {
+    const element = document.createElement('div');
+    element.className = className;
+    element.textContent = text;
+    parent.appendChild(element);
+    return element;
+}
+
+function renderSharePreview() {
+    const preview = document.getElementById('shareTextPreview');
+    const rounds = getShareRoundsSorted();
+    const solved = rounds.filter((round) => round.points > 0).length;
+    const header = document.createElement('div');
+    const summary = document.createElement('div');
+
+    preview.replaceChildren();
+    header.className = 'share-card-header';
+    appendPreviewElement(header, 'share-card-brand', 'GeoSquare');
+    appendPreviewElement(header, 'share-card-date', shareSource.gameDate || '');
+    preview.appendChild(header);
+
+    summary.className = 'share-card-summary';
+    appendPreviewElement(summary, 'share-card-score', numberFmt(shareSource.total || 0));
+    appendPreviewElement(summary, 'share-card-solved', `${solved}/${rounds.length} solved`);
+    preview.appendChild(summary);
+
+    if (activeShareFormat === SHARE_FORMAT_COMPACT) {
+        const resultGrid = rounds.map(getRoundMarker).join(' ');
+        appendPreviewElement(preview, 'share-card-hidden-grid', resultGrid);
+        appendPreviewElement(preview, 'share-card-challenge', 'Can you beat me?');
+        appendPreviewElement(preview, 'share-card-url', getShareUrl());
+        return;
+    }
+
+    const roundList = appendPreviewElement(preview, 'share-card-rounds', '');
+    rounds.forEach((round) => {
+        const row = appendPreviewElement(roundList, 'share-card-round', '');
+        appendPreviewElement(row, 'share-card-marker', getRoundMarker(round));
+        const city = round.city && round.city !== '—' ? round.city : 'Pass';
+        const penalty = round.expansionPenalty ? ` ${round.expansionPenalty}` : '';
+
+        appendPreviewElement(row, 'share-card-round-number', `R${round.round}`);
+        if (activeShareFormat === SHARE_FORMAT_DISCORD) {
+            appendPreviewElement(row, 'share-card-spoiler', `||${city} · pop. ${numberFmt(round.population)}||`);
+        } else {
+            appendPreviewElement(row, 'share-card-city', city);
+        }
+        appendPreviewElement(row, 'share-card-round-meta', `${numberFmt(round.points)} pts${penalty}`);
+    });
+    appendPreviewElement(preview, 'share-card-url', getShareUrl());
+}
+
+function selectShareFormat(format) {
+    activeShareFormat = format;
+    const icon = document.getElementById('shareFormatIcon');
+    const button = document.getElementById('shareFormatBtn');
+
+    if (format === SHARE_FORMAT_DISCORD) {
+        icon.className = 'fa-brands fa-discord';
+        button.setAttribute('aria-label', 'Discord spoilers');
+    } else if (format === SHARE_FORMAT_COMPACT) {
+        icon.className = 'fa-regular fa-eye-slash';
+        button.setAttribute('aria-label', 'Details hidden');
+    } else {
+        icon.className = 'fa-regular fa-eye';
+        button.setAttribute('aria-label', 'Details visible');
+    }
+
+    renderSharePreview();
+    document.getElementById('shareModalStatus').textContent = '';
+}
+
+function cycleShareFormat() {
+    if (activeShareFormat === SHARE_FORMAT_DETAILED) {
+        selectShareFormat(SHARE_FORMAT_DISCORD);
+    } else if (activeShareFormat === SHARE_FORMAT_DISCORD) {
+        selectShareFormat(SHARE_FORMAT_COMPACT);
+    } else {
+        selectShareFormat(SHARE_FORMAT_DETAILED);
+    }
+}
+
+async function copySelectedShareText() {
     const shareStatus = document.getElementById('shareScoreStatus');
+    const modalStatus = document.getElementById('shareModalStatus');
 
     try {
-        const rounds = getShareRoundsSorted();
-
-        if (!rounds.length) {
-            if (shareStatus) {
-                shareStatus.textContent = 'Not ready';
-            }
-            return;
-        }
-
-        const totalRounds = rounds.length;
-        const solved = rounds.filter((round) => round.points > 0).length;
-        const total = shareSource.total || 0;
-        const isPerfect = totalRounds > 0 && solved === totalRounds;
-
-        const shareText = buildShareSummaryText({
-            gameDate: shareSource.gameDate || '',
-            total,
-            solved,
-            totalRounds,
-            rounds,
-            isPerfect,
-        });
-
-        await copyTextToClipboard(shareText);
+        await copyTextToClipboard(getShareText(activeShareFormat));
+        hideShareModal();
 
         if (shareStatus) {
             shareStatus.textContent = 'Copied';
         }
     } catch (_error) {
-        if (shareStatus) {
-            shareStatus.textContent = 'Copy failed';
-        }
+        modalStatus.textContent = 'Copy failed';
+        return;
     }
 
     if (shareStatusTimerId) {
@@ -340,6 +470,34 @@ export async function shareCurrentGameScore() {
             shareStatus.textContent = '';
         }, 1800);
     }
+}
+
+function wireShareModal() {
+    const modal = document.getElementById('shareScoreModal');
+
+    document.getElementById('shareModalCloseBtn').onclick = hideShareModal;
+    document.getElementById('shareFormatBtn').onclick = cycleShareFormat;
+    document.getElementById('shareCopyBtn').onclick = copySelectedShareText;
+    modal.onclick = (event) => {
+        if (event.target === modal) hideShareModal();
+    };
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !modal.classList.contains('hidden')) hideShareModal();
+    });
+}
+
+export function shareCurrentGameScore() {
+    const shareStatus = document.getElementById('shareScoreStatus');
+
+    if (!getShareRoundsSorted().length) {
+        if (shareStatus) shareStatus.textContent = 'Not ready';
+        return;
+    }
+
+    selectShareFormat(SHARE_FORMAT_DETAILED);
+    document.getElementById('shareScoreModal').classList.remove('hidden');
+    document.getElementById('shareFormatBtn').focus();
 }
 
 export function showStatsOverlay() {

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>GeoSquare</title>
     <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/game.css') }}">
@@ -352,6 +353,22 @@
                 <button id="conflictAbortBtn" class="modal-btn">
                     Cancel
                 </button>
+            </div>
+        </div>
+    </div>
+    <div id="shareScoreModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="shareScoreModalTitle">
+        <div class="modal-content share-modal-content">
+            <button id="shareModalCloseBtn" class="share-modal-close-btn" type="button" aria-label="Close">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+            <div id="shareScoreModalTitle" class="share-modal-title">Share your score</div>
+            <div id="shareTextPreview" class="share-card-preview" aria-live="polite"></div>
+            <div id="shareModalStatus" class="share-modal-status" aria-live="polite"></div>
+            <div class="share-modal-actions">
+                <button id="shareFormatBtn" class="share-format-btn" type="button" aria-label="Change spoiler visibility">
+                    <i id="shareFormatIcon" class="fa-regular fa-eye" aria-hidden="true"></i>
+                </button>
+                <button id="shareCopyBtn" class="share-copy-btn" type="button">Copy</button>
             </div>
         </div>
     </div>

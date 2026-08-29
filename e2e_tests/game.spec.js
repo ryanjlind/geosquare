@@ -272,11 +272,35 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
   progress(projectName, 'checking share text');
   await expect(page.locator('#shareScoreBtn')).toBeVisible();
   await page.locator('#shareScoreBtn').click();
-  const copiedText = await page.evaluate(() => window.__copiedText);
-  expect(copiedText).toContain('Game Complete | 4/5 solved');
-  expect(copiedText).toContain('R1:');
-  expect(copiedText).toContain('R5:');
-  expect(copiedText).toContain('pop.');
+  await expect(page.locator('#shareScoreModal')).toBeVisible();
+  await expect(page.locator('#shareFormatBtn')).toHaveAttribute('aria-label', 'Details visible');
+  await expect(page.locator('#shareTextPreview')).toContainText('4/5 solved');
+  await page.locator('#shareCopyBtn').click();
+  await expect(page.locator('#shareScoreModal')).toBeHidden();
+  const detailedText = await page.evaluate(() => window.__copiedText);
+  expect(detailedText).toContain('🟨 R1  ');
+  expect(detailedText).toContain('🟩 R5  ');
+  expect(detailedText).toContain('pop.');
+  expect(detailedText).toContain('?ref=share');
+
+  await page.locator('#shareScoreBtn').click();
+  await page.locator('#shareFormatBtn').click();
+  await expect(page.locator('#shareFormatBtn')).toHaveAttribute('aria-label', 'Discord spoilers');
+  await expect(page.locator('#shareTextPreview')).toContainText('||');
+  await page.locator('#shareCopyBtn').click();
+  const discordText = await page.evaluate(() => window.__copiedText);
+  expect(discordText).toContain('GeoSquare ');
+  expect(discordText).toContain('R5  ||');
+  expect(discordText).toContain('?ref=share');
+
+  await page.locator('#shareScoreBtn').click();
+  await page.locator('#shareFormatBtn').click();
+  await page.locator('#shareFormatBtn').click();
+  await expect(page.locator('#shareFormatBtn')).toHaveAttribute('aria-label', 'Details hidden');
+  await expect(page.locator('#shareTextPreview')).toContainText('Can you beat me?');
+  await page.locator('#shareCopyBtn').click();
+  const compactText = await page.evaluate(() => window.__copiedText);
+  expect(compactText).toContain('?ref=share');
   progress(projectName, 'share text verified');
 
   progress(projectName, 'opening final summary');
