@@ -1,4 +1,4 @@
-import { gameState } from './state.js';
+import { gameState } from './state.js?v=4';
 
 (function () {
     function isMobile() {

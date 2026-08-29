@@ -1,6 +1,6 @@
-import { fetchGameState, fetchPlayerStats, fetchJson } from './api.js';
-import { gameState } from './state.js';
-import { escapeHtml, numberFmt, parseFormattedInt } from './utils.js';
+import { fetchGameState, fetchPlayerStats, fetchJson } from './api.js?v=4';
+import { gameState } from './state.js?v=4';
+import { escapeHtml, numberFmt, parseFormattedInt } from './utils.js?v=4';
 
 const SHARE_FORMAT_DETAILED = 'detailed';
 const SHARE_FORMAT_DISCORD = 'discord';

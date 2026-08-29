@@ -1,4 +1,4 @@
-import { fetchJson } from './api.js';
+import { fetchJson } from './api.js?v=4';
 
 let authCallbacks = {
     onAuthSuccess: null,

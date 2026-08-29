@@ -1,6 +1,6 @@
-import { postClientLog, numberFmt } from './utils.js';
-import { gameState } from './state.js';
-import { expandSquareRequest } from './api.js';
+import { postClientLog, numberFmt } from './utils.js?v=4';
+import { gameState } from './state.js?v=4';
+import { expandSquareRequest } from './api.js?v=4';
 
 let expansionEntity = null;
 let currentBounds = null;

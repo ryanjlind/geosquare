@@ -1,7 +1,7 @@
-import { gameState } from './state.js';
-import { postClientLog, escapeHtml, numberFmt, ordinal } from './utils.js';
-import { fetchGameState, fetchRound, fetchAllDailySquares, submitGuessRequest, submitPassRequest, setDifficultyRequest } from './api.js';
-import { getSfxCtx, playSuccess, playFail, playComplete, playPerfect } from './audio.js';
+import { gameState } from './state.js?v=4';
+import { postClientLog, escapeHtml, numberFmt, ordinal } from './utils.js?v=4';
+import { fetchGameState, fetchRound, fetchAllDailySquares, submitGuessRequest, submitPassRequest, setDifficultyRequest } from './api.js?v=4';
+import { getSfxCtx, playSuccess, playFail, playComplete, playPerfect } from './audio.js?v=4';
 import {
     initCesium,
     renderRoundMap,
@@ -14,7 +14,7 @@ import {
     updateExpandButton,
     renderDifficultyLayer,
     clearDifficultyLayer,
-} from './map.js';
+} from './map.js?v=4';
 import {
     setMetaError,
     renderSidebar,
@@ -37,13 +37,13 @@ import {
     hideAuthConflictModal,
     wireAuthConflictModal,
     adjustPopulationDisplay
-} from './ui.js';
-import { wireStatsOverlay, showEndGameSummary, shareCurrentGameScore, hydrateShareFromState, recordShareRound, isShareReady, renderEndGameFeedbackFromState } from './stats.js';
-import { initFeedback } from './feedback.js';
-import { initAuth, resolveAuthConflict } from './auth.js';
-import { expandSquareRequest } from './api.js';
-import { drawSquare } from './map.js';
-import { initInfinityMode, isInfinityModeActive, unlockInfinityMode } from './infinity.js';
+} from './ui.js?v=4';
+import { wireStatsOverlay, showEndGameSummary, shareCurrentGameScore, hydrateShareFromState, recordShareRound, isShareReady, renderEndGameFeedbackFromState } from './stats.js?v=4';
+import { initFeedback } from './feedback.js?v=4';
+import { initAuth, resolveAuthConflict } from './auth.js?v=4';
+import { expandSquareRequest } from './api.js?v=4';
+import { drawSquare } from './map.js?v=4';
+import { initInfinityMode, isInfinityModeActive, unlockInfinityMode } from './infinity.js?v=4';
 
 let endGameRounds = [];
 

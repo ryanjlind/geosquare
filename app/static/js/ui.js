@@ -1,4 +1,4 @@
-import { numberFmt, abbreviateNumber, escapeHtml, parseFormattedInt } from './utils.js';
+import { numberFmt, abbreviateNumber, escapeHtml, parseFormattedInt } from './utils.js?v=4';
 
 const MIN_ROUND_CITY_COLUMN_WIDTH = 125;
 

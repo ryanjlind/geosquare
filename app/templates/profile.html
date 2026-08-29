@@ -4,12 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>GeoSquare Profile</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/stats.css') }}">    
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
-    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css', v=4) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css', v=4) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/stats.css', v=4) }}">    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css', v=4) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css', v=4) }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico', v=4) }}">
 </head>
 <body class="profile-page">
     <div class="layout profile-layout">
@@ -165,7 +165,7 @@
         </main>
     </div>
 
-    <script type="module" src="{{ url_for('static', filename='js/profile.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/mobile.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/profile.js', v=4) }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/mobile.js', v=4) }}"></script>
 </body>
 </html>

@@ -2,10 +2,10 @@ import {
     fetchInfinityState,
     selectInfinityRoundRequest,
     submitInfinityGuessRequest,
-} from './api.js';
-import { playFail, playSuccess } from './audio.js';
-import { drawCities, renderRoundMap, showIncorrectGuessedCity } from './map.js';
-import { escapeHtml, numberFmt } from './utils.js';
+} from './api.js?v=4';
+import { playFail, playSuccess } from './audio.js?v=4';
+import { drawCities, renderRoundMap, showIncorrectGuessedCity } from './map.js?v=4';
+import { escapeHtml, numberFmt } from './utils.js?v=4';
 
 
 const infinityState = {

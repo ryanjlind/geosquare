@@ -1,5 +1,5 @@
-import { numberFmt, abbreviateNumber, abbreviatePopulationForDisplay, escapeHtml } from './utils.js';
-import { fetchJson } from './api.js';
+import { numberFmt, abbreviateNumber, abbreviatePopulationForDisplay, escapeHtml } from './utils.js?v=4';
+import { fetchJson } from './api.js?v=4';
 
 let historyOffset = 0;
 let historyHasMore = false;

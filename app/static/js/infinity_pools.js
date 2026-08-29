@@ -1,5 +1,5 @@
-import { fetchJson } from './api.js';
-import { numberFmt } from './utils.js';
+import { fetchJson } from './api.js?v=4';
+import { numberFmt } from './utils.js?v=4';
 
 
 function formatDate(dateString) {
