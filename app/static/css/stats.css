@@ -345,8 +345,9 @@
 
 .share-card-round {
     display: grid;
-    grid-template-columns: 14px 20px minmax(0, 1fr) auto;
+    grid-template-columns: 14px 20px minmax(0, max-content) auto;
     align-items: center;
+    justify-content: start;
     gap: 5px;
     min-width: 0;
     font-size: 9px;

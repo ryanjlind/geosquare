@@ -280,7 +280,8 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
   const detailedText = await page.evaluate(() => window.__copiedText);
   expect(detailedText).toContain('🟨 R1  ');
   expect(detailedText).toContain('🟩 R5  ');
-  expect(detailedText).toContain('pop.');
+  expect(detailedText).toMatch(/· [\d,]+ · \d+(st|nd|rd|th) · \d+ pts/);
+  expect(detailedText).not.toContain('pop.');
   expect(detailedText).toContain('?ref=share');
 
   await page.locator('#shareScoreBtn').click();
@@ -296,6 +297,7 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
   const discordText = await page.evaluate(() => window.__copiedText);
   expect(discordText).toContain('GeoSquare ');
   expect(discordText).toContain('R5  ||');
+  expect(discordText).toMatch(/· \d+(st|nd|rd|th)\|\| · \d+ pts/);
   expect(discordText).toContain('?ref=share');
 
   await page.locator('#shareScoreBtn').click();

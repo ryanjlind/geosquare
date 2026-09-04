@@ -1,6 +1,6 @@
 import { fetchGameState, fetchPlayerStats, fetchJson } from './api.js?v=4';
 import { gameState } from './state.js?v=4';
-import { escapeHtml, numberFmt, parseFormattedInt } from './utils.js?v=4';
+import { escapeHtml, numberFmt, ordinal, parseFormattedInt } from './utils.js?v=4';
 
 const SHARE_FORMAT_DETAILED = 'detailed';
 const SHARE_FORMAT_DISCORD = 'discord';
@@ -50,6 +50,11 @@ function getShareUrl() {
     return gameUrl.toString();
 }
 
+function formatShareRank(rank) {
+    const numericRank = Number(rank);
+    return Number.isInteger(numericRank) ? ordinal(numericRank) : String(rank);
+}
+
 export function hydrateShareFromState(state) {
     shareSource = {
         gameDate: state?.game_date || '',
@@ -90,7 +95,7 @@ function buildShareSummaryText({ gameDate, total, solved, totalRounds, rounds, i
     const roundLines = (rounds || []).map((round) => {
         const city = round.city && round.city !== '—' ? round.city : 'Pass';
         const penalty = round.expansionPenalty ? ` ${round.expansionPenalty}` : '';
-        return `${getRoundMarker(round)} R${round.round}  ${city} · pop. ${numberFmt(round.population)}  ${numberFmt(round.points)} pts${penalty}`;
+        return `${getRoundMarker(round)} R${round.round}  ${city} · ${numberFmt(round.population)} · ${formatShareRank(round.rank)} · ${numberFmt(round.points)} pts${penalty}`;
     });
 
     return [
@@ -105,8 +110,8 @@ function buildDiscordShareText({ gameDate, total, solved, totalRounds, rounds, i
     const roundLines = rounds.map((round) => {
         const city = round.city && round.city !== '—' ? round.city : 'Pass';
         const penalty = round.expansionPenalty ? ` ${round.expansionPenalty}` : '';
-        const spoiler = `${city} · pop. ${numberFmt(round.population)}`;
-        return `${getRoundMarker(round)} R${round.round}  ||${spoiler}||  ${numberFmt(round.points)} pts${penalty}`;
+        const spoiler = `${city} · ${numberFmt(round.population)} · ${formatShareRank(round.rank)}`;
+        return `${getRoundMarker(round)} R${round.round}  ||${spoiler}|| · ${numberFmt(round.points)} pts${penalty}`;
     });
 
     return [
@@ -409,7 +414,7 @@ function renderSharePreview() {
             const spoiler = document.createElement('button');
             spoiler.type = 'button';
             spoiler.className = 'share-card-spoiler';
-            spoiler.textContent = `${city} · pop. ${numberFmt(round.population)}`;
+            spoiler.textContent = `${city} · ${numberFmt(round.population)} · ${formatShareRank(round.rank)}`;
             spoiler.setAttribute('aria-label', 'Reveal spoiler');
             spoiler.onclick = () => {
                 const isRevealed = spoiler.classList.toggle('revealed');
@@ -417,9 +422,13 @@ function renderSharePreview() {
             };
             row.appendChild(spoiler);
         } else {
-            appendPreviewElement(row, 'share-card-city', city);
+            appendPreviewElement(
+                row,
+                'share-card-city',
+                `${city} · ${numberFmt(round.population)} · ${formatShareRank(round.rank)}`,
+            );
         }
-        appendPreviewElement(row, 'share-card-round-meta', `${numberFmt(round.points)} pts${penalty}`);
+        appendPreviewElement(row, 'share-card-round-meta', `· ${numberFmt(round.points)} pts${penalty}`);
     });
     appendPreviewElement(preview, 'share-card-url', getShareUrl());
 }
