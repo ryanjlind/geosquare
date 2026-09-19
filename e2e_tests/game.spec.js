@@ -284,6 +284,45 @@ async function submitInfinityCity(
   return response.json();
 }
 
+async function submitInfinityCandidate(
+  page,
+  roundNumber,
+  infinityPoolSessionId,
+  candidate,
+  method = 'click',
+) {
+  const firstResult = await submitInfinityGuess(
+    page,
+    roundNumber,
+    infinityPoolSessionId,
+    INFINITY_MULTI_CITY_CASE.guess,
+    method,
+  );
+  expect(firstResult.requires_confirmation).toBe(true);
+  expect(firstResult.candidates.map(({ city_id, city, country_code }) => ({
+    city_id,
+    city,
+    country_code,
+  }))).toEqual(INFINITY_MULTI_CITY_CASE.candidates);
+
+  const candidateIndex = firstResult.candidates.findIndex(
+    (resultCandidate) => resultCandidate.city_id === candidate.city_id,
+  );
+  expect(candidateIndex).toBeGreaterThanOrEqual(0);
+  const responsePromise = page.waitForResponse((response) => (
+    response.url().endsWith('/api/infinity-guess')
+    && response.request().method() === 'POST'
+  ));
+  const modal = page.locator('#guessConflictModal');
+  await expect(modal).toBeVisible();
+  const candidateButtons = modal.locator('.modal-btn').filter({ hasNotText: 'None of these' });
+  await candidateButtons.nth(candidateIndex).click();
+  const response = await responsePromise;
+  expect(response.ok()).toBe(true);
+  expect(response.request().postDataJSON().confirmed_city_id).toBe(candidate.city_id);
+  return response.json();
+}
+
 async function completeSideMission(
   page,
   assignment,
@@ -452,31 +491,47 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
   );
 
   progress(projectName, 'Infinity Pool square 2: submitting Santa Cruz');
-  const infinityResult = await submitInfinityGuess(
-    page,
-    2,
-    infinityState.infinity_pool_session_id,
-    INFINITY_MULTI_CITY_CASE.guess,
-    'click',
-  );
-  expect(infinityResult.correct).toBe(true);
-  expect(infinityResult.duplicate).toBe(false);
-  expect(infinityResult.guesses.map(({ city_id, city, country_code }) => ({
-    city_id,
-    city,
-    country_code,
-  }))).toEqual(INFINITY_MULTI_CITY_CASE.candidates);
-  expect(infinityResult.duplicates).toEqual([]);
-  const roundTwoCityCount = (
-    1
-    + SIDE_MISSIONS_BY_ROUND[2].targets.length
-    + INFINITY_MULTI_CITY_CASE.candidates.length
-  );
+  const existingCityIds = new Set([
+    SIDE_MISSIONS_BY_ROUND[2].daily_answer.city_id,
+    ...SIDE_MISSIONS_BY_ROUND[2].targets.map((city) => city.city_id),
+  ]);
+  const acceptedCandidates = [];
+  let infinityResult = latestResult;
+  for (const candidate of INFINITY_MULTI_CITY_CASE.candidates) {
+    const candidateResult = await submitInfinityCandidate(
+      page,
+      2,
+      infinityState.infinity_pool_session_id,
+      candidate,
+      'enter',
+    );
+    expect(candidateResult.correct).toBe(true);
+    if (existingCityIds.has(candidate.city_id)) {
+      expect(candidateResult).toEqual({
+        correct: true,
+        duplicate: true,
+        duplicates: [candidate.city],
+        ok: true,
+      });
+    } else {
+      expect(candidateResult.duplicate).toBe(false);
+      expect(candidateResult.guesses.map(({ city_id, city, country_code }) => ({
+        city_id,
+        city,
+        country_code,
+      }))).toEqual([candidate]);
+      expect(candidateResult.duplicates).toEqual([]);
+      acceptedCandidates.push(candidate);
+      existingCityIds.add(candidate.city_id);
+      infinityResult = candidateResult;
+    }
+  }
+  const roundTwoCityCount = existingCityIds.size;
   const chips = page.locator('#infinityChips .infinity-chip');
   await expect(chips).toHaveCount(roundTwoCityCount);
   const chipNames = await page.locator('#infinityChips .infinity-chip-city').allTextContents();
-  expect(chipNames.slice(0, INFINITY_MULTI_CITY_CASE.candidates.length)).toEqual(
-    INFINITY_MULTI_CITY_CASE.candidates.map((candidate) => candidate.city).reverse(),
+  expect(chipNames.slice(0, acceptedCandidates.length)).toEqual(
+    acceptedCandidates.map((candidate) => candidate.city).reverse(),
   );
   await expect(page.locator('#infinityRoundScore')).toHaveText(
     infinityResult.round_score.toLocaleString('en-US'),
@@ -487,19 +542,20 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
   progress(projectName, 'Infinity Pool multi-city result verified');
 
   progress(projectName, 'Infinity Pool square 2: checking duplicate submission');
-  const duplicateResult = await submitInfinityGuess(
-    page,
-    2,
-    infinityState.infinity_pool_session_id,
-    INFINITY_MULTI_CITY_CASE.guess,
-    'enter',
-  );
-  expect(duplicateResult).toEqual({
-    correct: true,
-    duplicate: true,
-    duplicates: INFINITY_MULTI_CITY_CASE.candidates.map((candidate) => candidate.city),
-    ok: true,
-  });
+  for (const candidate of INFINITY_MULTI_CITY_CASE.candidates) {
+    const duplicateResult = await submitInfinityCandidate(
+      page,
+      2,
+      infinityState.infinity_pool_session_id,
+      candidate,
+    );
+    expect(duplicateResult).toEqual({
+      correct: true,
+      duplicate: true,
+      duplicates: [candidate.city],
+      ok: true,
+    });
+  }
   await expect(chips).toHaveCount(roundTwoCityCount);
   await expect(page.locator('#infinityRoundScore')).toHaveText(
     infinityResult.round_score.toLocaleString('en-US'),
