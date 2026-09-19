@@ -295,6 +295,8 @@ function setModeButtons() {
 function setPoolLayout() {
     infinityState.active = true;
     infinityState.mode = 'infinity';
+    document.getElementById('sidebar').classList.remove('mobile-open');
+    document.querySelector('.mobile-drawer-scrim')?.classList.remove('mobile-open');
     document.body.classList.add('infinity-mode');
     document.getElementById('roundTable').classList.add('hidden');
     document.getElementById('infinityPanel').classList.remove('hidden');

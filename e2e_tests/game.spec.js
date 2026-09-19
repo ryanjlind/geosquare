@@ -262,7 +262,7 @@ async function submitInfinityCity(
     roundNumber,
     infinityPoolSessionId,
     city.city_name,
-    'click',
+    'enter',
   );
   if (!firstResult.requires_confirmation) return firstResult;
 
