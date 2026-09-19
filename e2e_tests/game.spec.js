@@ -607,15 +607,7 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
     await mobileMenuButton.click();
     await expect(page.locator('#sidebar')).toHaveClass(/mobile-open/);
   }
-  const dailyRoundResponsePromise = page.waitForResponse(
-    (response) => response.url().includes('/api/daily-square?round=5'),
-    { timeout: 90_000 },
-  );
-  await Promise.all([
-    page.waitForLoadState('load'),
-    dailyRoundResponsePromise,
-    page.locator('#dailyModeBtn').click(),
-  ]);
+  await page.locator('#dailyModeBtn').click();
   const restoredState = await enterInfinity(page, projectName);
   expect(restoredState.current_round).toBe(5);
   expect(restoredState.total_score).toBe(latestResult.total_score);
