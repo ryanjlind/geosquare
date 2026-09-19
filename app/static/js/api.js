@@ -99,6 +99,7 @@ export async function submitInfinityGuessRequest(
     roundNumber,
     revealCityId = null,
     infinityPoolSessionId = null,
+    confirmedCityId = null,
 ) {
     const payload = {
         guess,
@@ -110,10 +111,20 @@ export async function submitInfinityGuessRequest(
     if (infinityPoolSessionId !== null) {
         payload.infinity_pool_session_id = infinityPoolSessionId;
     }
+    if (confirmedCityId !== null) {
+        payload.confirmed_city_id = confirmedCityId;
+    }
 
     return fetchJson('/api/infinity-guess', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+    });
+}
+
+export async function startSideMissionsRequest() {
+    return fetchJson('/api/side-missions/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
     });
 }

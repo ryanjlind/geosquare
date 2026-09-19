@@ -1,10 +1,18 @@
+import json
 import os
 from datetime import date
+from pathlib import Path
 
 from app.core.db import get_conn
 from app.core.game_generation import fetch_cities_in_bounds, persist_square
 
 FIXED_POOL_SQUARE_IDS = (242, 301, 289, 171, 236)
+FIXTURE_PATH = Path('e2e_tests/artifacts/game_fixture.json')
+SIDE_MISSION_IDS = {
+    2: 'smallest_to_largest',
+    3: 'north_to_south',
+    5: 'west_to_east',
+}
 EXPANSION_LEVEL_COUNT = 5
 EXPANSION_SCALE = 1.5
 MIN_LATITUDE = -56.0
@@ -33,6 +41,24 @@ def delete_existing_game(cur, game_date: date) -> None:
     )
     square_ids = [int(square.SquareId) for square in cur.fetchall()]
 
+    cur.execute("""
+        DELETE mission
+        FROM dbo.SideMissionRounds mission
+        INNER JOIN dbo.InfinityPoolSessions pool
+            ON pool.InfinityPoolSessionId = mission.InfinityPoolSessionId
+        WHERE pool.GameId = ?
+    """, game_id)
+    cur.execute("""
+        DELETE guess
+        FROM dbo.InfinityPoolGuesses guess
+        INNER JOIN dbo.InfinityPoolSessions pool
+            ON pool.InfinityPoolSessionId = guess.InfinityPoolSessionId
+        WHERE pool.GameId = ?
+    """, game_id)
+    cur.execute(
+        'DELETE FROM dbo.InfinityPoolSessions WHERE GameId = ?',
+        game_id,
+    )
     cur.execute("""
         DELETE gg
         FROM dbo.GameGuesses gg
@@ -122,7 +148,62 @@ def expansion_bounds(square: dict, expansion_level: int) -> dict:
     }
 
 
-def create_test_game(cur, game_date: date, selected_squares: list[dict]) -> int:
+def city_fixture(city: dict) -> dict:
+    return {
+        'city_id': city['city_id'],
+        'city_name': city['city_name'],
+        'country_code': city['country_code'],
+    }
+
+
+def build_side_mission_fixture(cities_by_round: dict[int, list[dict]]) -> list[dict]:
+    fixtures = []
+    for round_number, mission_id in SIDE_MISSION_IDS.items():
+        cities = cities_by_round[round_number]
+        if len(cities) < 4:
+            raise ValueError(
+                f'E2E round {round_number} requires at least four cities for {mission_id}.'
+            )
+        if mission_id == 'smallest_to_largest':
+            answer = min(cities, key=lambda city: (city['population'], city['city_id']))
+            targets = sorted(
+                cities,
+                key=lambda city: (-city['population'], city['city_id']),
+            )[:3]
+        elif mission_id == 'north_to_south':
+            answer = max(cities, key=lambda city: (city['latitude'], -city['city_id']))
+            southernmost_latitude = min(city['latitude'] for city in cities)
+            targets = [
+                city for city in cities
+                if city['latitude'] == southernmost_latitude
+            ]
+        elif mission_id == 'west_to_east':
+            answer = min(cities, key=lambda city: (city['longitude'], city['city_id']))
+            easternmost_longitude = max(city['longitude'] for city in cities)
+            targets = [
+                city for city in cities
+                if city['longitude'] == easternmost_longitude
+            ]
+        else:
+            raise ValueError(f'Unsupported E2E Side Mission: {mission_id}.')
+        if any(city['city_id'] == answer['city_id'] for city in targets):
+            raise ValueError(
+                f'E2E round {round_number} answer is also a target for {mission_id}.'
+            )
+        fixtures.append({
+            'round_number': round_number,
+            'mission_id': mission_id,
+            'daily_answer': city_fixture(answer),
+            'targets': [city_fixture(city) for city in targets],
+        })
+    return fixtures
+
+
+def create_test_game(
+    cur,
+    game_date: date,
+    selected_squares: list[dict],
+) -> tuple[int, dict[int, list[dict]]]:
     cur.execute("""
         INSERT INTO dbo.Games (GameDate)
         OUTPUT INSERTED.GameId
@@ -130,6 +211,7 @@ def create_test_game(cur, game_date: date, selected_squares: list[dict]) -> int:
     """, game_date)
     game_id = int(cur.fetchone()[0])
 
+    cities_by_round = {}
     for round_number, selected_square in enumerate(selected_squares, start=1):
         print(
             f'Creating round {round_number} from pool square '
@@ -145,6 +227,8 @@ def create_test_game(cur, game_date: date, selected_squares: list[dict]) -> int:
                 bounds['max_lat'],
                 bounds['max_lon'],
             )
+            if expansion_level == 0:
+                cities_by_round[round_number] = cities
             square_id = persist_square(cur, {
                 'seed_lat': selected_square['center_lat'],
                 'seed_lon': selected_square['center_lon'],
@@ -165,7 +249,7 @@ def create_test_game(cur, game_date: date, selected_squares: list[dict]) -> int:
                 ) VALUES (?, ?, ?, ?)
             """, game_id, round_number, square_id, expansion_level)
 
-    return game_id
+    return game_id, cities_by_round
 
 
 def main() -> None:
@@ -182,9 +266,22 @@ def main() -> None:
             + ', '.join(str(square['square_id']) for square in selected_squares),
             flush=True,
         )
-        game_id = create_test_game(cur, game_date, selected_squares)
+        game_id, cities_by_round = create_test_game(cur, game_date, selected_squares)
+        side_missions = build_side_mission_fixture(cities_by_round)
         conn.commit()
 
+    FIXTURE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    FIXTURE_PATH.write_text(
+        json.dumps({'game_id': game_id, 'side_missions': side_missions}, indent=2) + '\n',
+        encoding='utf-8',
+    )
+    for mission in side_missions:
+        print(
+            f'Round {mission["round_number"]}: {mission["mission_id"]}; '
+            f'answer {mission["daily_answer"]["city_name"]}; targets '
+            + ', '.join(target['city_name'] for target in mission['targets']),
+            flush=True,
+        )
     print(f'Created E2E game {game_id}.', flush=True)
 
 

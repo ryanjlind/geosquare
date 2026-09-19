@@ -31,6 +31,7 @@ from app.core.infinity_service import (
 )
 
 from app.core.session_service import resolve_request_identity
+from app.core.side_missions.service import start_side_missions
 from app.core.user import is_username_available, set_username
 from app.helpers.session import attach_session_cookie, COOKIE_NAME, get_user_id_from_cookie, get_session_id_from_cookie
 from app.core.db import get_conn
@@ -191,6 +192,18 @@ def infinity_state():
     return attach_session_cookie(resp, identity["user_id"], identity["session_id"])
 
 
+@main_bp.route("/api/side-missions/start", methods=["POST"])
+def side_missions_start():
+    identity = _identity()
+    body, status = start_side_missions(
+        identity["user_id"],
+        identity["session_id"],
+    )
+    resp = jsonify(body)
+    resp.status_code = status
+    return attach_session_cookie(resp, identity["user_id"], identity["session_id"])
+
+
 @main_bp.route("/api/infinity-round", methods=["POST"])
 def infinity_round():
     identity = _identity()
@@ -222,6 +235,24 @@ def infinity_guess():
         payload,
         identity["user_id"],
         identity["session_id"],
+        'infinity',
+    )
+    resp = jsonify(body)
+    resp.status_code = status
+    return attach_session_cookie(resp, identity["user_id"], identity["session_id"])
+
+
+@main_bp.route("/api/side-mission-guess", methods=["POST"])
+def side_mission_guess():
+    identity = _identity()
+    payload = request.get_json()
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Invalid or missing JSON body"}), 400
+    body, status = submit_infinity_guess(
+        payload,
+        identity["user_id"],
+        identity["session_id"],
+        'side_missions',
     )
     resp = jsonify(body)
     resp.status_code = status

@@ -1,15 +1,19 @@
 import {
     fetchInfinityState,
     selectInfinityRoundRequest,
+    startSideMissionsRequest,
     submitInfinityGuessRequest,
-} from './api.js?v=4';
+} from './api.js?v=5';
 import { playFail, playSuccess } from './audio.js?v=4';
 import { drawCities, renderRoundMap, showIncorrectGuessedCity } from './map.js?v=4';
 import { escapeHtml, numberFmt } from './utils.js?v=4';
 
 
+const SIDE_MISSION_ACKNOWLEDGEMENT_MS = 2500;
+
 const infinityState = {
     active: false,
+    mode: 'daily',
     poolSessionId: null,
     currentRound: 1,
     roundCount: 5,
@@ -17,7 +21,13 @@ const infinityState = {
     totalScore: 0,
     guesses: [],
     square: null,
+    sideMissions: [],
+    sideMissionsAvailable: false,
 };
+
+let showDailyRound = null;
+let showSummary = null;
+let sideMissionAcknowledgementTimer = null;
 
 
 function requireObject(value, path) {
@@ -132,6 +142,43 @@ function validateInfinityStateResponse(data) {
         (guess, index) => validateRestoredGuess(guess, `state.guesses[${index}]`),
     );
     validateSquare(data.square, 'state.square');
+    validateSideMissionState(data.side_missions, 'state.side_missions');
+}
+
+
+function validateSideMissionState(sideMissions, path) {
+    requireObject(sideMissions, path);
+    requireBoolean(sideMissions.started, `${path}.started`);
+    requireArray(sideMissions.missions, `${path}.missions`);
+    sideMissions.missions.forEach((mission, index) => {
+        const missionPath = `${path}.missions[${index}]`;
+        requireObject(mission, missionPath);
+        requireInteger(mission.round_number, `${missionPath}.round_number`);
+        requireString(mission.mission_id, `${missionPath}.mission_id`);
+        requireString(mission.name, `${missionPath}.name`);
+        requireString(mission.prompt, `${missionPath}.prompt`);
+        requireObject(mission.answer, `${missionPath}.answer`);
+        requireInteger(mission.answer.city_id, `${missionPath}.answer.city_id`);
+        requireString(mission.answer.city_name, `${missionPath}.answer.city_name`);
+        requireString(mission.answer.country_code, `${missionPath}.answer.country_code`);
+        requireNumber(mission.answer.latitude, `${missionPath}.answer.latitude`);
+        requireNumber(mission.answer.longitude, `${missionPath}.answer.longitude`);
+        requireObject(mission.progress, `${missionPath}.progress`);
+        requireInteger(mission.progress.current, `${missionPath}.progress.current`);
+        requireInteger(mission.progress.target, `${missionPath}.progress.target`);
+        validateStringArray(mission.progress.named, `${missionPath}.progress.named`);
+        requireObject(
+            mission.progress.acknowledgements,
+            `${missionPath}.progress.acknowledgements`,
+        );
+        mission.progress.named.forEach(name => requireString(
+            mission.progress.acknowledgements[name],
+            `${missionPath}.progress.acknowledgements[${name}]`,
+        ));
+        if (mission.completed_at !== null && typeof mission.completed_at !== 'string') {
+            throw new Error(`Invalid Infinity response: ${missionPath}.completed_at must be a string or null.`);
+        }
+    });
 }
 
 
@@ -146,6 +193,11 @@ function validateRoundResponse(data) {
 function validateSubmitResponse(data) {
     requireObject(data, 'guess');
     requireBoolean(data.ok, 'guess.ok');
+    if (data.requires_confirmation === true) {
+        requireArray(data.candidates, 'guess.candidates');
+        requireString(data.guess, 'guess.guess');
+        return;
+    }
     requireBoolean(data.correct, 'guess.correct');
     if (!data.correct) {
         requireInteger(data.score, 'guess.score');
@@ -176,6 +228,7 @@ function validateSubmitResponse(data) {
     );
     requireInteger(data.round_score, 'guess.round_score');
     requireInteger(data.total_score, 'guess.total_score');
+    validateSideMissionState(data.side_missions, 'guess.side_missions');
 }
 
 
@@ -234,26 +287,79 @@ function renderProgressItems(progress) {
 
 
 function setModeButtons() {
-    document.getElementById('dailyModeBtn').classList.toggle('active', !infinityState.active);
-    document.getElementById('infinityModeBtn').classList.toggle('active', infinityState.active);
+    document.getElementById('dailyModeBtn').classList.toggle('active', infinityState.mode === 'daily');
+    document.getElementById('infinityModeBtn').classList.toggle('active', infinityState.mode === 'infinity');
 }
 
 
-function setInfinityLayout() {
+function setPoolLayout() {
     infinityState.active = true;
+    infinityState.mode = 'infinity';
     document.body.classList.add('infinity-mode');
     document.getElementById('roundTable').classList.add('hidden');
     document.getElementById('infinityPanel').classList.remove('hidden');
-    document.getElementById('infinityInvite').classList.add('hidden');
+    document.getElementById('sideMissionsInvite').classList.add('hidden');
     document.getElementById('difficultyRow').classList.add('hidden');
     document.getElementById('passBtn').style.display = 'none';
     document.getElementById('expandBtn').style.display = 'none';
     document.getElementById('previousBtn').style.display = 'inline-block';
     document.getElementById('nextBtn').style.display = 'inline-block';
     document.getElementById('shareScoreBtn').style.display = 'none';
+    document.getElementById('summaryBtn').classList.remove('hidden');
     document.getElementById('postGameActions').style.display = 'grid';
     document.getElementById('guessBox').style.display = 'block';
+    document.getElementById('sideMissionPanel').classList.add('hidden');
     setModeButtons();
+}
+
+
+function setDailyLayout() {
+    infinityState.active = false;
+    infinityState.mode = 'daily';
+    document.body.classList.remove('infinity-mode');
+    document.getElementById('roundTable').classList.remove('hidden');
+    document.getElementById('infinityPanel').classList.add('hidden');
+    document.getElementById('sideMissionPanel').classList.add('hidden');
+    document.getElementById('guessBox').style.display = 'none';
+    document.getElementById('previousBtn').style.display = 'none';
+    document.getElementById('nextBtn').style.display = 'none';
+    document.getElementById('shareScoreBtn').style.display = 'inline-block';
+    document.getElementById('summaryBtn').classList.remove('hidden');
+    document.getElementById('sideMissionsInvite').classList.toggle(
+        'hidden',
+        !infinityState.sideMissionsAvailable,
+    );
+    setModeButtons();
+}
+
+
+function currentSideMission() {
+    return infinityState.sideMissions.find(
+        mission => mission.round_number === infinityState.currentRound,
+    );
+}
+
+
+function renderSideMission() {
+    const panel = document.getElementById('sideMissionPanel');
+    const mission = currentSideMission();
+    if (!mission) {
+        panel.classList.add('hidden');
+        return;
+    }
+    const complete = mission.completed_at !== null;
+    panel.classList.remove('hidden');
+    document.getElementById('guessBox').style.display = 'block';
+    document.getElementById('sideMissionName').textContent = mission.name;
+    document.getElementById('sideMissionPrompt').textContent = mission.prompt;
+    const targetChips = mission.progress.named.map(
+        name => `<span class="side-mission-target">${escapeHtml(name)}</span>`,
+    ).join('');
+    document.getElementById('sideMissionProgress').innerHTML = `
+        <strong class="side-mission-count">${mission.progress.current} / ${mission.progress.target}</strong>
+        <span class="side-mission-targets">${targetChips}</span>
+        ${complete ? '<strong class="side-mission-complete">Complete!</strong>' : ''}
+    `;
 }
 
 
@@ -265,6 +371,7 @@ function renderInfinityMeta() {
     const largestUnnamedText = largestCity === null
         ? 'All cities named'
         : `Largest unnamed city: ${numberFmt(largestCity.population)}`;
+    const revealAvailable = largestCity !== null;
     const largestUnnamedMarkup = largestCity === null
         ? `<div class="desktop-meta-only infinity-largest-unnamed">${largestUnnamedText}</div>`
         : `<button id="infinityLargestUnnamed" class="desktop-meta-only infinity-largest-unnamed can-reveal" type="button" title="click to reveal, no points will be added.">${largestUnnamedText}</button>`;
@@ -272,8 +379,7 @@ function renderInfinityMeta() {
         <div class="infinity-round-heading">
             <span>Square ${infinityState.currentRound} of ${infinityState.roundCount}</span>
         </div>
-        <div class="desktop-meta-only infinity-gameplay-copy">
-            Name as many cities as you can. You can move back and forth between squares to add as many cities as you want. See how high you can reach!
+        <div class="desktop-meta-only infinity-gameplay-copy">            
         </div>
         <div class="desktop-meta-only infinity-progress-board">
             ${progressItems}
@@ -294,20 +400,20 @@ function renderInfinityMeta() {
         mobileLargestUnnamed,
     ].filter(Boolean);
     for (const control of revealControls) {
-        control.classList.toggle('can-reveal', largestCity !== null);
-        control.title = largestCity === null
+        control.classList.toggle('can-reveal', revealAvailable);
+        control.title = !revealAvailable
             ? ''
             : 'click to reveal, no points will be added.';
-        control.onclick = largestCity === null ? null : () => submitGuess(largestCity);
-        control.onkeydown = largestCity === null ? null : event => {
+        control.onclick = !revealAvailable ? null : () => submitGuess(largestCity);
+        control.onkeydown = !revealAvailable ? null : event => {
             if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
                 submitGuess(largestCity);
             }
         };
         if (control !== document.getElementById('infinityLargestUnnamed')) {
-            control.tabIndex = largestCity === null ? -1 : 0;
-            control.setAttribute('role', largestCity === null ? 'status' : 'button');
+            control.tabIndex = !revealAvailable ? -1 : 0;
+            control.setAttribute('role', !revealAvailable ? 'status' : 'button');
         }
     }
     const mobileRound = document.getElementById('mobileRoundStat');
@@ -382,8 +488,7 @@ function renderScores(previousRoundScore = null, previousTotalScore = null) {
 
 
 function renderMarkers() {
-    drawCities(
-        guessesForCurrentRound().map(guess => ({
+    const markers = guessesForCurrentRound().map(guess => ({
             city_name: guess.city_name,
             label: guess.city_name,
             latitude: guess.latitude,
@@ -392,8 +497,8 @@ function renderMarkers() {
             color: guess.score === 0 ? Cesium.Color.WHITE : Cesium.Color.LIME,
             outline_color: Cesium.Color.BLACK,
             outline_width: 2,
-        }))
-    );
+        }));
+    drawCities(markers);
 }
 
 
@@ -401,33 +506,100 @@ function renderRound() {
     renderRoundMap(infinityState.square);
     renderMarkers();
     renderInfinityMeta();
+    renderSideMission();
     renderChips();
     renderScores();
-    document.getElementById('previousBtn').disabled = infinityState.currentRound === 1;
-    document.getElementById('nextBtn').disabled = infinityState.currentRound === infinityState.roundCount;
-    document.getElementById('nextBtn').textContent = 'Next Square';
+    const previousButton = document.getElementById('previousBtn');
+    const nextButton = document.getElementById('nextBtn');
+    previousButton.textContent = 'Previous Square';
+    nextButton.textContent = 'Next Square';
+    previousButton.style.display = infinityState.currentRound === 1 ? 'none' : 'inline-block';
+    nextButton.style.display = infinityState.currentRound === infinityState.roundCount
+        ? 'none'
+        : 'inline-block';
+    previousButton.disabled = infinityState.currentRound === 1;
+    nextButton.disabled = infinityState.currentRound === infinityState.roundCount;
     document.getElementById('guessFeedback').innerHTML = '';
     document.getElementById('guessInput').value = '';
-    document.getElementById('guessInput').focus();
+    if (!document.getElementById('guessInput').disabled) {
+        document.getElementById('guessInput').focus();
+    }
 }
 
 
 async function selectRound(roundNumber) {
-    const { response, data } = await selectInfinityRoundRequest(
-        roundNumber,
-        infinityState.poolSessionId,
-    );
-    if (!response.ok) {
-        throw new Error(data.error);
+    const startedAt = performance.now();
+    console.info('pool_round: started', {
+        mode: infinityState.mode,
+        fromRound: infinityState.currentRound,
+        toRound: roundNumber,
+    });
+    try {
+        const { response, data } = await selectInfinityRoundRequest(
+            roundNumber,
+            infinityState.poolSessionId,
+        );
+        if (!response.ok) {
+            throw new Error(data.error);
+        }
+        validateRoundResponse(data);
+        infinityState.currentRound = data.current_round;
+        infinityState.square = data.square;
+        renderRound();
+        console.info('pool_round: completed', {
+            mode: infinityState.mode,
+            round: infinityState.currentRound,
+            elapsedMs: performance.now() - startedAt,
+        });
+    } catch (error) {
+        console.error('pool_round: failed', {
+            mode: infinityState.mode,
+            fromRound: infinityState.currentRound,
+            toRound: roundNumber,
+            elapsedMs: performance.now() - startedAt,
+            error,
+        });
+        throw error;
     }
-    validateRoundResponse(data);
-    infinityState.currentRound = data.current_round;
-    infinityState.square = data.square;
-    renderRound();
 }
 
 
-async function submitGuess(revealedCity = null) {
+function showPoolGuessConfirmation(data) {
+    const modal = document.getElementById('guessConflictModal');
+    const list = document.getElementById('guessConflictList');
+    list.innerHTML = '<div class="modal-title">Did you mean:</div>';
+    for (const candidate of data.candidates) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'modal-btn';
+        button.textContent = [candidate.city, candidate.province, candidate.country_name]
+            .filter(Boolean)
+            .join(', ');
+        button.onclick = () => {
+            modal.classList.add('hidden');
+            submitGuess(null, candidate.city_id);
+        };
+        list.appendChild(button);
+    }
+    const noneButton = document.createElement('button');
+    noneButton.type = 'button';
+    noneButton.className = 'modal-btn';
+    noneButton.textContent = 'None of these';
+    noneButton.onclick = () => {
+        modal.classList.add('hidden');
+        document.getElementById('guessFeedback').textContent = 'Not in this square.';
+        if (data.nearby_city) {
+            showIncorrectGuessedCity(data.nearby_city);
+        }
+        playFail();
+    };
+    list.appendChild(noneButton);
+    modal.classList.remove('hidden');
+}
+
+
+async function submitGuess(revealedCity = null, confirmedCityId = null) {
+    const startedAt = performance.now();
     const input = document.getElementById('guessInput');
     const button = document.getElementById('guessBtn');
     const isReveal = revealedCity !== null;
@@ -438,18 +610,37 @@ async function submitGuess(revealedCity = null) {
 
     input.disabled = true;
     button.disabled = true;
+    console.info('pool_guess: started', {
+        mode: infinityState.mode,
+        round: infinityState.currentRound,
+        confirmedCityId,
+    });
     try {
         const { response, data } = await submitInfinityGuessRequest(
             guess,
             infinityState.currentRound,
             isReveal ? revealedCity.city_id : null,
             infinityState.poolSessionId,
+            confirmedCityId,
         );
         if (!response.ok) {
             throw new Error(data.error);
         }
         validateSubmitResponse(data);
+        if (data.requires_confirmation === true) {
+            console.info('pool_guess: confirmation required', {
+                mode: infinityState.mode,
+                round: infinityState.currentRound,
+                candidateCount: data.candidates.length,
+            });
+            showPoolGuessConfirmation(data);
+            return;
+        }
         if (!data.correct) {
+            console.info('pool_guess: incorrect', {
+                mode: infinityState.mode,
+                round: infinityState.currentRound,
+            });
             document.getElementById('guessFeedback').textContent = 'Not in this square.';
             if ('matched_city' in data) {
                 showIncorrectGuessedCity(data.matched_city);
@@ -458,14 +649,22 @@ async function submitGuess(revealedCity = null) {
             return;
         }
         if (data.duplicate) {
+            console.info('pool_guess: duplicate', {
+                mode: infinityState.mode,
+                round: infinityState.currentRound,
+                cities: data.duplicates,
+            });
             document.getElementById('guessFeedback').textContent = `${data.duplicates.join(', ')} already in your pool.`;
             return;
         }
 
         const previousRoundScore = infinityState.roundScores[infinityState.currentRound] || 0;
         const previousTotalScore = infinityState.totalScore;
+        const previousMission = currentSideMission();
+        const previousNamedTargets = new Set(previousMission?.progress.named || []);
         infinityState.roundScores[infinityState.currentRound] = data.round_score;
         infinityState.totalScore = data.total_score;
+        infinityState.sideMissions = data.side_missions.missions;
         infinityState.guesses.push(...data.guesses.map(acceptedGuess => ({
             round_number: infinityState.currentRound,
             square_id: infinityState.square.square_id,
@@ -490,6 +689,7 @@ async function submitGuess(revealedCity = null) {
         renderInfinityMeta();
         renderChips(data.guesses.map(acceptedGuess => acceptedGuess.city_id));
         renderScores(previousRoundScore, previousTotalScore);
+        renderSideMission();
         const acceptedNames = data.guesses.map(acceptedGuess => acceptedGuess.city).join(', ');
         const awardedScore = data.guesses.reduce(
             (total, acceptedGuess) => total + acceptedGuess.score,
@@ -498,13 +698,62 @@ async function submitGuess(revealedCity = null) {
         const duplicateText = data.duplicates.length
             ? `<br>${escapeHtml(data.duplicates.join(', '))} already in your pool.`
             : '';
-        document.getElementById('guessFeedback').innerHTML = isReveal
+        const mission = currentSideMission();
+        const newlyNamedTargets = mission?.progress.named.filter(
+            name => !previousNamedTargets.has(name),
+        ) || [];
+        const scoreFeedback = isReveal
             ? `<b>${escapeHtml(acceptedNames)}</b> revealed`
             : `<b>${escapeHtml(acceptedNames)}</b> +${numberFmt(awardedScore)}${duplicateText}`;
+        const acknowledgements = newlyNamedTargets.map(
+            name => mission.progress.acknowledgements[name],
+        );
+        const acknowledgementMarkup = acknowledgements.length > 0
+            ? `<div id="sideMissionAcknowledgement" class="side-mission-success">${acknowledgements.map(
+                acknowledgement => `<strong>${escapeHtml(acknowledgement)}</strong>`,
+            ).join('')}</div>`
+            : '';
+        document.getElementById('guessFeedback').innerHTML = `
+            <div>${scoreFeedback}</div>
+            ${acknowledgementMarkup}
+        `;
+        if (sideMissionAcknowledgementTimer !== null) {
+            window.clearTimeout(sideMissionAcknowledgementTimer);
+        }
+        if (acknowledgements.length > 0) {
+            sideMissionAcknowledgementTimer = window.setTimeout(() => {
+                document.getElementById('sideMissionAcknowledgement')?.remove();
+                sideMissionAcknowledgementTimer = null;
+            }, SIDE_MISSION_ACKNOWLEDGEMENT_MS);
+        }
         if (!isReveal) {
             input.value = '';
             playSuccess();
         }
+        console.info('pool_guess: completed', {
+            mode: infinityState.mode,
+            round: infinityState.currentRound,
+            acceptedCities: data.guesses.map(acceptedGuess => acceptedGuess.city),
+            roundScore: data.round_score,
+            totalScore: data.total_score,
+            missionProgress: mission ? mission.progress : null,
+            elapsedMs: performance.now() - startedAt,
+        });
+        if (previousMission?.completed_at === null && mission?.completed_at !== null) {
+            console.info('side_mission: completed', {
+                round: mission.round_number,
+                missionId: mission.mission_id,
+                progress: mission.progress,
+            });
+        }
+    } catch (error) {
+        console.error('pool_guess: failed', {
+            mode: infinityState.mode,
+            round: infinityState.currentRound,
+            elapsedMs: performance.now() - startedAt,
+            error,
+        });
+        throw error;
     } finally {
         input.disabled = false;
         button.disabled = false;
@@ -517,13 +766,15 @@ async function submitGuess(revealedCity = null) {
 
 
 export async function enterInfinityMode(poolSessionId = null, requestedRound = null) {
+    const startedAt = performance.now();
+    console.info('infinity_mode: started', { poolSessionId, requestedRound });
     const { response, data } = await fetchInfinityState(poolSessionId);
     if (!response.ok) {
         throw new Error(data.error);
     }
     validateInfinityStateResponse(data);
     document.getElementById('statsOverlay').style.display = 'none';
-    setInfinityLayout();
+    setPoolLayout();
     infinityState.poolSessionId = data.infinity_pool_session_id;
     infinityState.currentRound = data.current_round;
     infinityState.roundCount = data.round_count;
@@ -531,12 +782,62 @@ export async function enterInfinityMode(poolSessionId = null, requestedRound = n
     infinityState.totalScore = data.total_score;
     infinityState.guesses = data.guesses;
     infinityState.square = data.square;
+    infinityState.sideMissions = data.side_missions.missions;
     document.getElementById('guessInput').disabled = false;
     document.getElementById('guessBtn').disabled = false;
     if (requestedRound !== null && requestedRound !== infinityState.currentRound) {
         await selectRound(requestedRound);
     } else {
         renderRound();
+    }
+    console.info('infinity_mode: completed', {
+        poolSessionId: infinityState.poolSessionId,
+        round: infinityState.currentRound,
+        guessCount: infinityState.guesses.length,
+        totalScore: infinityState.totalScore,
+        elapsedMs: performance.now() - startedAt,
+    });
+}
+
+
+async function startSideMissions() {
+    const startedAt = performance.now();
+    console.info('side_missions: start requested', {
+        currentPoolSessionId: infinityState.poolSessionId,
+        currentRound: infinityState.currentRound,
+    });
+    try {
+        const { response: startResponse, data: startData } = await startSideMissionsRequest();
+        if (!startResponse.ok) {
+            throw new Error(startData.error);
+        }
+        requireInteger(
+            startData.infinity_pool_session_id,
+            'side_missions_start.infinity_pool_session_id',
+        );
+        validateSideMissionState(startData.side_missions, 'side_missions_start.side_missions');
+        console.info('side_missions: assignments loaded', {
+            poolSessionId: startData.infinity_pool_session_id,
+            missions: startData.side_missions.missions.map(mission => ({
+                round: mission.round_number,
+                missionId: mission.mission_id,
+                progress: mission.progress,
+                completed: mission.completed_at !== null,
+            })),
+        });
+
+        await enterInfinityMode(startData.infinity_pool_session_id);
+        console.info('side_missions: ready', {
+            poolSessionId: infinityState.poolSessionId,
+            round: infinityState.currentRound,
+            elapsedMs: performance.now() - startedAt,
+        });
+    } catch (error) {
+        console.error('side_missions: failed', {
+            elapsedMs: performance.now() - startedAt,
+            error,
+        });
+        throw error;
     }
 }
 
@@ -547,38 +848,70 @@ export function isInfinityModeActive() {
 
 
 async function handleEnterInfinityClick() {
+    const startedAt = performance.now();
     try {
         await enterInfinityMode();
     } catch (error) {
-        console.error('Infinity mode failed:', error);
+        console.error('infinity_mode: failed', {
+            elapsedMs: performance.now() - startedAt,
+            error,
+        });
     }
 }
 
 
-export function unlockInfinityMode() {
+function setSideMissionAvailability(availability) {
+    requireObject(availability, 'side_mission_availability');
+    requireBoolean(availability.available, 'side_mission_availability.available');
+    requireBoolean(availability.started, 'side_mission_availability.started');
+    validateStringArray(availability.reasons, 'side_mission_availability.reasons');
+    console.info('side_missions: availability evaluated', availability);
+    infinityState.sideMissionsAvailable = availability.available;
+    document.getElementById('sideMissionsInvite').classList.toggle(
+        'hidden',
+        !availability.available,
+    );
+}
+
+
+function handleEnterSideMissionsClick() {
+    startSideMissions().catch(error => {
+        console.error('Side Missions mode failed:', error);
+    });
+}
+
+
+export function unlockInfinityMode(sideMissionAvailability) {
     const infinityButton = document.getElementById('infinityModeBtn');
     document.getElementById('gameModeSwitch').classList.remove('hidden');
     infinityButton.disabled = false;
     infinityButton.removeAttribute('title');
-    document.getElementById('infinityInvite').classList.remove('hidden');
     document.getElementById('statsInfinityInvite').classList.remove('hidden');
+    setSideMissionAvailability(sideMissionAvailability);
 }
 
 
-export function initInfinityMode(dailyCompleted) {
+export function initInfinityMode(dailyCompleted, sideMissionAvailability, callbacks) {
     const infinityButton = document.getElementById('infinityModeBtn');
+    showDailyRound = callbacks.showDailyRound;
+    showSummary = callbacks.showSummary;
     infinityButton.disabled = !dailyCompleted;
     if (!dailyCompleted) {
         infinityButton.title = 'Complete the Daily game to unlock Infinity Pool';
     }
 
     document.getElementById('dailyModeBtn').onclick = () => {
-        window.location.href = '/';
+        document.getElementById('statsOverlay').style.display = 'none';
+        setDailyLayout();
+        showDailyRound(infinityState.currentRound);
     };
     infinityButton.onclick = handleEnterInfinityClick;
-    document.getElementById('infinityInviteBtn').onclick = handleEnterInfinityClick;
+    document.getElementById('sideMissionsInviteBtn').onclick = handleEnterSideMissionsClick;
     document.getElementById('statsInfinityInviteBtn').onclick = handleEnterInfinityClick;
-    document.getElementById('previousBtn').onclick = () => selectRound(infinityState.currentRound - 1);
+    document.getElementById('summaryBtn').onclick = () => showSummary();
+    document.getElementById('previousBtn').onclick = () => selectRound(
+        infinityState.currentRound - 1,
+    );
     document.getElementById('nextBtn').addEventListener('click', event => {
         if (!infinityState.active) {
             return;
@@ -603,7 +936,7 @@ export function initInfinityMode(dailyCompleted) {
     }, true);
 
     if (dailyCompleted) {
-        unlockInfinityMode();
+        unlockInfinityMode(sideMissionAvailability);
     }
     setModeButtons();
 

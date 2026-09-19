@@ -8,8 +8,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css', v=4) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css', v=4) }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/game.css', v=4) }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/infinity.css', v=4) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/game.css', v=6) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/infinity.css', v=8) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/stats.css', v=4) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css', v=4) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/feedback.css', v=4) }}">
@@ -49,6 +49,12 @@
             <div id="meta"></div>
 
             <div class="sidebar-divider"></div>
+
+            <div id="sideMissionPanel" class="side-mission-panel hidden">
+                <strong id="sideMissionName"></strong>
+                <span id="sideMissionPrompt"></span>
+                <span id="sideMissionProgress"></span>
+            </div>
 
             <div id="guessBox">
                 <div id="guessControls">
@@ -110,15 +116,16 @@
                 <button id="previousBtn" class="hidden" type="button">Previous Square</button>
                 <button id="nextBtn" class="hidden" type="button">Next Square</button>
                 <button id="shareScoreBtn" class="hidden" type="button">Share</button>
+                <button id="summaryBtn" class="hidden" type="button">Summary</button>
                 <span id="shareScoreStatus" aria-live="polite"></span>
             </div>
 
-            <div id="infinityInvite" class="infinity-invite hidden">
-                <strong>Want to keep playing?</strong>
-                <span>Wade into the Infinity Pool and find every city you can.</span>
-                <button id="infinityInviteBtn" type="button">Enter Infinity Pool</button>
+            <div id="sideMissionsInvite" class="infinity-invite side-missions-invite hidden">
+                <strong>Side missions unlocked!</strong>
+                <span>Return to today&apos;s squares with a new objective for each eligible round.</span>
+                <button id="sideMissionsInviteBtn" type="button">Start Side Missions</button>
             </div>
-                        
+
             <div class="sidebar-attribution">
                 <div class="sidebar-attribution-title">Credits</div>
 
@@ -379,8 +386,8 @@
         };
     </script>
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
-    <script type="module" src="{{ url_for('static', filename='js/app.js', v=4) }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/mobile.js', v=4) }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/app.js', v=9) }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/mobile.js', v=6) }}"></script>
     <script>
         window.addEventListener("load", () => {
             const guessInput = document.getElementById("guessInput");

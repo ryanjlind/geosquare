@@ -36,6 +36,7 @@ from app.core.game_queries import (
 from app.core.matching import find_matching_city
 from app.core.scoring import compute_score
 from app.core.session_service import get_current_session
+from app.core.side_missions.service import get_side_mission_availability
 from app.core.game_mappers import (
     map_completed_rounds,
     map_square,
@@ -420,12 +421,17 @@ def get_game_state_payload(user_id: int, session_id: int | None):
             flush=True,
         )
 
-        conn.commit()
-        print(f"{time.perf_counter():.9f} get_game_state_payload: commit", flush=True)
-
         map_t0 = time.perf_counter()
         result = map_game_state(session, completed, is_authenticated, username)
         result["game_date"] = game_date
+        result["side_missions"] = get_side_mission_availability(
+            cur,
+            session,
+            completed,
+            user_id,
+        )
+        conn.commit()
+        print(f"{time.perf_counter():.9f} get_game_state_payload: commit", flush=True)
         print(
             f"{time.perf_counter():.9f} get_game_state_payload: result built elapsed_ms={(time.perf_counter() - map_t0) * 1000.0:.1f}",
             flush=True,

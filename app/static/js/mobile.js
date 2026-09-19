@@ -67,6 +67,7 @@ import { gameState } from './state.js?v=4';
     function initGameMobile({
         sidebar,
         closeBtn,
+        sideMissionPanel,
         guessBox,
         guessFeedback,
         postGameActions,
@@ -109,6 +110,7 @@ import { gameState } from './state.js?v=4';
         infinityLargestUnnamed.id = 'mobileInfinityLargestUnnamed';
         infinityLargestUnnamed.className = 'infinity-largest-unnamed mobile-infinity-largest-unnamed';
         bottomTray.appendChild(infinityLargestUnnamed);
+        bottomTray.appendChild(sideMissionPanel);
         bottomTray.appendChild(guessBox);
         bottomTray.appendChild(guessFeedback);
         bottomTray.appendChild(postGameActions);
@@ -209,14 +211,16 @@ import { gameState } from './state.js?v=4';
         }
 
         const guessBox = document.getElementById('guessBox');
+        const sideMissionPanel = document.getElementById('sideMissionPanel');
         const guessFeedback = document.getElementById('guessFeedback');
         const postGameActions = document.getElementById('postGameActions');
 
-        if (!guessBox || !guessFeedback || !postGameActions) return;
+        if (!sideMissionPanel || !guessBox || !guessFeedback || !postGameActions) return;
 
         initGameMobile({
             sidebar,
             closeBtn,
+            sideMissionPanel,
             guessBox,
             guessFeedback,
             postGameActions,

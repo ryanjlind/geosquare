@@ -1,6 +1,6 @@
 .game-mode-switch {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 150px;
     gap: 2px;
     padding: 2px;
@@ -45,21 +45,108 @@
 }
 
 .infinity-panel.hidden,
-.infinity-invite.hidden {
+.infinity-invite.hidden,
+.side-mission-panel.hidden,
+.game-mode-btn.hidden {
     display: none;
 }
 
+.side-mission-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 10px;
+    border-left: 4px solid #e3b341;
+    background: #111824;
+}
+
+.side-mission-panel strong {
+    color: #e9eef5;
+    font-size: 13px;
+}
+
+.side-mission-panel span {
+    color: #b7c4d4;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+#sideMissionProgress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 5px;
+    padding: 9px 10px;
+    border-top: 1px solid #4d4728;
+    background: #1b2118;
+}
+
+#sideMissionProgress .side-mission-count {
+    flex: 0 0 auto;
+    color: #ffd866;
+    font-size: 18px;
+    line-height: 1;
+}
+
+#sideMissionProgress .side-mission-targets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+#sideMissionProgress .side-mission-target {
+    padding: 3px 6px;
+    border: 1px solid #5a6136;
+    background: #2a321d;
+    color: #fff2bd;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+#sideMissionProgress .side-mission-complete {
+    margin-left: auto;
+    color: #ffd866;
+    font-size: 12px;
+}
+
+.side-mission-success {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 14px 12px;
+    border: 1px solid #e3b341;
+    border-left-width: 5px;
+    background: #202717;
+    color: #e9eef5;
+    text-align: left;
+    animation: side-mission-success-arrive 420ms ease-out;
+}
+
+.side-mission-success strong {
+    color: #ffd866;
+    font-size: 18px;
+}
+
+.side-mission-success span {
+    font-size: 13px;
+}
+
 .infinity-mode #postGameActions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
     gap: 10px;
     margin: 18px 0 12px;
 }
 
 .infinity-mode #previousBtn,
-.infinity-mode #nextBtn {
+.infinity-mode #nextBtn,
+.infinity-mode #summaryBtn {
     width: 100%;
     min-width: 0;
     min-height: 38px;
+    padding-inline: 4px;
+    overflow-wrap: anywhere;
+    line-height: 1.15;
+    white-space: normal;
 }
 
 .infinity-scoreboard {
@@ -270,6 +357,27 @@
     cursor: pointer;
 }
 
+.side-missions-invite {
+    border-left-color: #e3b341;
+    background: #202717;
+}
+
+.side-missions-invite strong {
+    color: #ffd866;
+    font-size: 17px;
+}
+
+.side-missions-invite button {
+    border-color: #e3b341;
+    background: #2a321d;
+    color: #fff2bd;
+}
+
+.side-missions-invite button:hover,
+.side-missions-invite button:focus-visible {
+    background: #394324;
+}
+
 .stats-infinity-invite {
     margin: 14px 0;
 }
@@ -280,8 +388,17 @@
     100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes side-mission-success-arrive {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .infinity-chip.newly-scored {
+        animation: none;
+    }
+
+    .side-mission-success {
         animation: none;
     }
 }

@@ -76,8 +76,31 @@ COUNTRY_NAMES = {
 }
 
 
+SOVEREIGN_COUNTRY_CODES = {
+    'AI': 'GB', 'AS': 'US', 'AW': 'NL', 'AX': 'FI', 'BL': 'FR',
+    'BM': 'GB', 'BQ': 'NL', 'BV': 'NO', 'CC': 'AU', 'CW': 'NL',
+    'CX': 'AU', 'FK': 'GB', 'FO': 'DK', 'GF': 'FR', 'GG': 'GB',
+    'GI': 'GB', 'GL': 'DK', 'GP': 'FR', 'GS': 'GB', 'GU': 'US',
+    'HK': 'CN', 'HM': 'AU', 'IM': 'GB', 'IO': 'GB', 'JE': 'GB',
+    'KY': 'GB', 'MF': 'FR', 'MO': 'CN', 'MP': 'US', 'MQ': 'FR',
+    'MS': 'GB', 'NC': 'FR', 'NF': 'AU', 'PF': 'FR', 'PM': 'FR',
+    'PN': 'GB', 'PR': 'US', 'RE': 'FR', 'SH': 'GB', 'SJ': 'NO',
+    'SX': 'NL', 'TC': 'GB', 'TF': 'FR', 'TK': 'NZ', 'UM': 'US',
+    'VG': 'GB', 'VI': 'US', 'WF': 'FR', 'YT': 'FR',
+}
+
+
 def get_country_name(country_code: str | None) -> str:
     code = (country_code or '').upper()
     if code not in COUNTRY_NAMES:
         raise ValueError(f'Unknown country code: {country_code!r}')
     return COUNTRY_NAMES[code]
+
+
+def get_sovereign_country_code(country_code: str | None) -> str:
+    code = (country_code or '').upper()
+    if code not in COUNTRY_NAMES:
+        raise ValueError(f'Unknown country code: {country_code!r}')
+    if code in SOVEREIGN_COUNTRY_CODES:
+        return SOVEREIGN_COUNTRY_CODES[code]
+    return code

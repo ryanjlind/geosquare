@@ -45,7 +45,8 @@
 #previousBtn,
 #nextBtn,
 #expandBtn,
-#shareScoreBtn {
+#shareScoreBtn,
+#summaryBtn {
     padding: 8px;
     border: 1px solid #3a4658;
     background: #1d2633;
@@ -68,7 +69,8 @@
 #previousBtn:hover,
 #nextBtn:hover,
 #expandBtn:hover,
-#shareScoreBtn:hover {
+#shareScoreBtn:hover,
+#summaryBtn:hover {
     background: #253244;
     border-color: #51627c;
 }
@@ -78,7 +80,8 @@
 #previousBtn:disabled,
 #nextBtn:disabled,
 #expandBtn:disabled,
-#shareScoreBtn:disabled {
+#shareScoreBtn:disabled,
+#summaryBtn:disabled {
     opacity: 0.55;
     cursor: default;
 }

@@ -1,6 +1,6 @@
 import { gameState } from './state.js?v=4';
 import { postClientLog, escapeHtml, numberFmt, ordinal } from './utils.js?v=4';
-import { fetchGameState, fetchRound, fetchAllDailySquares, submitGuessRequest, submitPassRequest, setDifficultyRequest } from './api.js?v=4';
+import { fetchGameState, fetchRound, fetchAllDailySquares, submitGuessRequest, submitPassRequest, setDifficultyRequest } from './api.js?v=6';
 import { getSfxCtx, playSuccess, playFail, playComplete, playPerfect } from './audio.js?v=4';
 import {
     initCesium,
@@ -43,7 +43,7 @@ import { initFeedback } from './feedback.js?v=4';
 import { initAuth, resolveAuthConflict } from './auth.js?v=4';
 import { expandSquareRequest } from './api.js?v=4';
 import { drawSquare } from './map.js?v=4';
-import { initInfinityMode, isInfinityModeActive, unlockInfinityMode } from './infinity.js?v=4';
+import { initInfinityMode, isInfinityModeActive, unlockInfinityMode } from './infinity.js?v=9';
 
 let endGameRounds = [];
 
@@ -157,13 +157,28 @@ function handleEndGameRoundSelect(roundNumber) {
 
 async function enterEndGameGlobe() {
     gameState.gameCompleted = true;
-    unlockInfinityMode();
+    const { response, data } = await fetchGameState();
+    if (!response.ok) {
+        throw new Error(data.error || 'Failed to refresh post-game availability.');
+    }
+    unlockInfinityMode(data.side_missions);
     setGuessControlsEnabled(false);
     setGuessBoxVisible(false);
     setShareButtonReady(isShareReady());
     showNextButton(5);
     await loadEndGameRounds();
     setSelectedRoundRow(5);
+}
+
+function showDailyPostGameRound(roundNumber) {
+    const round = endGameRounds.find(item => item.round_number === roundNumber);
+    if (!round) {
+        throw new Error(`Round ${roundNumber} not found in end-game data.`);
+    }
+    renderSidebar(round);
+    setGuessBoxVisible(false);
+    renderEndGameFeedbackFromState(gameState);
+    handleEndGameRoundSelect(roundNumber);
 }
 
 function wireGuessing() {
@@ -391,7 +406,10 @@ export async function initGame() {
     });
     wireRoundTable(handleEndGameRoundSelect);
     initFeedback();
-    initInfinityMode(Boolean(state.completed_at));
+    initInfinityMode(Boolean(state.completed_at), state.side_missions, {
+        showDailyRound: showDailyPostGameRound,
+        showSummary: showEndGameSummary,
+    });
 
     initAuth(state, {
         onAuthSuccess: async () => {

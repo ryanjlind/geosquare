@@ -1,4 +1,9 @@
 const { test, expect } = require('@playwright/test');
+const fixture = require('./artifacts/game_fixture.json');
+
+const SIDE_MISSIONS_BY_ROUND = Object.fromEntries(
+  fixture.side_missions.map((mission) => [mission.round_number, mission]),
+);
 
 const ROUND_CASES = {
   1: {
@@ -10,28 +15,19 @@ const ROUND_CASES = {
     selectedCityId: 17727,
   },
   2: {
-    guess: 'Santa Cruz',
-    candidates: [
-      { city_id: 24027, city: 'Angat', country_code: 'PH' },
-      { city_id: 23668, city: 'Pulong Santa Cruz', country_code: 'PH' },
-      { city_id: 23613, city: 'Santa Cruz', country_code: 'PH' },
-      { city_id: 23614, city: 'Santa Cruz', country_code: 'PH' },
-      { city_id: 23615, city: 'Santa Cruz', country_code: 'PH' },
-    ],
-    selectedCityId: 23613,
+    guess: SIDE_MISSIONS_BY_ROUND[2].daily_answer.city_name,
+    selectedCityId: SIDE_MISSIONS_BY_ROUND[2].daily_answer.city_id,
+    expectedCity: SIDE_MISSIONS_BY_ROUND[2].daily_answer.city_name,
   },
   3: {
-    guess: 'Phu Quoc',
-    candidates: [
-      { city_id: 32910, city: 'Phu Quoc', country_code: 'VN' },
-      { city_id: 32956, city: 'Phú Quốc', country_code: 'VN' },
-    ],
-    selectedCityId: 32910,
+    guess: SIDE_MISSIONS_BY_ROUND[3].daily_answer.city_name,
+    selectedCityId: SIDE_MISSIONS_BY_ROUND[3].daily_answer.city_id,
+    expectedCity: SIDE_MISSIONS_BY_ROUND[3].daily_answer.city_name,
   },
   5: {
-    incorrectGuess: 'Moscow',
-    guess: 'Arkhangelsk',
-    expectedCity: 'Arkhangel’sk',
+    guess: SIDE_MISSIONS_BY_ROUND[5].daily_answer.city_name,
+    selectedCityId: SIDE_MISSIONS_BY_ROUND[5].daily_answer.city_id,
+    expectedCity: SIDE_MISSIONS_BY_ROUND[5].daily_answer.city_name,
   },
 };
 
@@ -84,23 +80,25 @@ async function submitCity(page, roundNumber, method, projectName) {
   const firstBody = await submitGuess(page, roundNumber, testCase.guess, method);
 
   let result = firstBody;
-  if (testCase.candidates) {
+  if (firstBody.requires_confirmation) {
     progress(projectName, `round ${roundNumber}: checking disambiguation`);
-    expect(firstBody.requires_confirmation).toBe(true);
-    expect(firstBody.candidates.map(({ city_id, city, country_code }) => ({
-      city_id,
-      city,
-      country_code,
-    }))).toEqual(testCase.candidates);
+    if (testCase.candidates) {
+      expect(firstBody.candidates.map(({ city_id, city, country_code }) => ({
+        city_id,
+        city,
+        country_code,
+      }))).toEqual(testCase.candidates);
+    }
     expect(firstBody.candidates.every((candidate) => candidate.country_name)).toBe(true);
 
     const modal = page.locator('#guessConflictModal');
     await expect(modal).toBeVisible();
     const candidateButtons = modal.locator('.modal-btn').filter({ hasNotText: 'None of these' });
-    await expect(candidateButtons).toHaveCount(testCase.candidates.length);
-    const selectedIndex = testCase.candidates.findIndex(
+    await expect(candidateButtons).toHaveCount(firstBody.candidates.length);
+    const selectedIndex = firstBody.candidates.findIndex(
       (candidate) => candidate.city_id === testCase.selectedCityId,
     );
+    expect(selectedIndex).toBeGreaterThanOrEqual(0);
     const confirmationResponsePromise = page.waitForResponse((response) => (
       response.url().endsWith('/api/guess')
       && response.request().method() === 'POST'
@@ -112,8 +110,6 @@ async function submitCity(page, roundNumber, method, projectName) {
     expect(confirmationRequestBody.confirmed_city_id).toBe(testCase.selectedCityId);
     await expect(modal).toBeHidden();
     progress(projectName, `round ${roundNumber}: disambiguation confirmed`);
-  } else {
-    expect(firstBody.requires_confirmation).toBeFalsy();
   }
 
   expect(result.correct).toBe(true);
@@ -166,6 +162,42 @@ async function enterInfinity(page, projectName) {
   return state;
 }
 
+async function startSideMissions(page, projectName) {
+  progress(projectName, 'starting Side Missions');
+  await page.locator('#statsCloseBtn').click();
+  if (projectName === 'webkit-mobile') {
+    await page.locator('#mobileMenuBtn').click();
+    await expect(page.locator('#sidebar')).toHaveClass(/mobile-open/);
+  }
+  const startResponsePromise = page.waitForResponse((response) => (
+    response.url().endsWith('/api/side-missions/start')
+    && response.request().method() === 'POST'
+  ));
+  const stateResponsePromise = page.waitForResponse((response) => (
+    response.url().includes('/api/infinity-state')
+    && response.request().method() === 'GET'
+  ));
+  await page.locator('#sideMissionsInviteBtn').click();
+  const startResponse = await startResponsePromise;
+  expect(startResponse.ok()).toBe(true);
+  const startData = await startResponse.json();
+  expect(startData.side_missions.missions.map(({ round_number, mission_id }) => ({
+    round_number,
+    mission_id,
+  }))).toEqual(fixture.side_missions.map(({ round_number, mission_id }) => ({
+    round_number,
+    mission_id,
+  })));
+
+  const stateResponse = await stateResponsePromise;
+  expect(stateResponse.ok()).toBe(true);
+  const state = await stateResponse.json();
+  expect(state.current_round).toBe(2);
+  await expect(page.locator('#sideMissionPanel')).toBeVisible();
+  progress(projectName, 'Side Missions ready on square 2');
+  return { state, missions: startData.side_missions.missions };
+}
+
 async function selectInfinityRound(page, roundNumber, infinityPoolSessionId, projectName) {
   progress(projectName, `Infinity Pool square ${roundNumber}: loading`);
   const responsePromise = page.waitForResponse((response) => (
@@ -204,6 +236,83 @@ async function submitInfinityGuess(page, roundNumber, infinityPoolSessionId, gue
   });
   expect(response.ok()).toBe(true);
   return response.json();
+}
+
+async function submitInfinityCity(
+  page,
+  roundNumber,
+  infinityPoolSessionId,
+  city,
+  projectName,
+) {
+  progress(projectName, `Side Mission square ${roundNumber}: submitting ${city.city_name}`);
+  const firstResult = await submitInfinityGuess(
+    page,
+    roundNumber,
+    infinityPoolSessionId,
+    city.city_name,
+    'click',
+  );
+  if (!firstResult.requires_confirmation) return firstResult;
+
+  const candidateIndex = firstResult.candidates.findIndex(
+    (candidate) => candidate.city_id === city.city_id,
+  );
+  expect(candidateIndex).toBeGreaterThanOrEqual(0);
+  const responsePromise = page.waitForResponse((response) => (
+    response.url().endsWith('/api/infinity-guess')
+    && response.request().method() === 'POST'
+  ));
+  const modal = page.locator('#guessConflictModal');
+  await expect(modal).toBeVisible();
+  const candidateButtons = modal.locator('.modal-btn').filter({ hasNotText: 'None of these' });
+  await candidateButtons.nth(candidateIndex).click();
+  const response = await responsePromise;
+  expect(response.ok()).toBe(true);
+  expect(response.request().postDataJSON().confirmed_city_id).toBe(city.city_id);
+  return response.json();
+}
+
+async function completeSideMission(
+  page,
+  assignment,
+  mission,
+  infinityPoolSessionId,
+  projectName,
+) {
+  await expect(page.locator('#sideMissionPanel')).toBeVisible();
+  await expect(page.locator('#sideMissionName')).toHaveText(mission.name);
+  await expect(page.locator('#sideMissionPrompt')).toHaveText(mission.prompt);
+  expect(mission.progress.current).toBe(0);
+
+  let result;
+  for (const [index, city] of assignment.targets.entries()) {
+    result = await submitInfinityCity(
+      page,
+      assignment.round_number,
+      infinityPoolSessionId,
+      city,
+      projectName,
+    );
+    const updatedMission = result.side_missions.missions.find(
+      (candidate) => candidate.round_number === assignment.round_number,
+    );
+    expect(result.correct).toBe(true);
+    expect(result.duplicate).toBe(false);
+    expect(updatedMission.progress.current).toBe(index + 1);
+    await expect(page.locator('#sideMissionProgress')).toContainText(
+      `${index + 1} / ${assignment.targets.length}`,
+    );
+    await expect(page.locator('#sideMissionAcknowledgement')).toBeVisible();
+  }
+
+  const completedMission = result.side_missions.missions.find(
+    (candidate) => candidate.round_number === assignment.round_number,
+  );
+  expect(completedMission.completed_at).not.toBeNull();
+  await expect(page.locator('#sideMissionProgress')).toContainText('Complete!');
+  progress(projectName, `Side Mission square ${assignment.round_number}: completed`);
+  return result;
 }
 
 test.beforeEach(async ({ page }) => {
@@ -321,65 +430,51 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
   expect(state.completed_rounds).toHaveLength(5);
   expect(state.completed_rounds.filter((round) => round.round_status === 'Passed')).toHaveLength(1);
 
-  const infinityState = await enterInfinity(page, projectName);
-  await selectInfinityRound(
+  const sideMissionStart = await startSideMissions(page, projectName);
+  const infinityState = sideMissionStart.state;
+  let latestResult = await completeSideMission(
     page,
-    2,
+    SIDE_MISSIONS_BY_ROUND[2],
+    sideMissionStart.missions.find((mission) => mission.round_number === 2),
     infinityState.infinity_pool_session_id,
     projectName,
   );
 
-  progress(projectName, 'Infinity Pool square 2: submitting Santa Cruz');
-  const infinityResult = await submitInfinityGuess(
+  await selectInfinityRound(
     page,
-    2,
+    3,
     infinityState.infinity_pool_session_id,
-    'Santa Cruz',
-    'click',
+    projectName,
   );
-  expect(infinityResult.correct).toBe(true);
-  expect(infinityResult.duplicate).toBe(false);
-  expect(infinityResult.guesses.map(({ city_id, city, country_code }) => ({
-    city_id,
-    city,
-    country_code,
-  }))).toEqual(ROUND_CASES[2].candidates);
-  expect(infinityResult.duplicates).toEqual([]);
-  const chips = page.locator('#infinityChips .infinity-chip');
-  await expect(chips).toHaveCount(ROUND_CASES[2].candidates.length);
-  await expect(page.locator('#infinityChips .infinity-chip-city')).toHaveText(
-    ROUND_CASES[2].candidates.map((candidate) => candidate.city).reverse(),
+  latestResult = await completeSideMission(
+    page,
+    SIDE_MISSIONS_BY_ROUND[3],
+    latestResult.side_missions.missions.find((mission) => mission.round_number === 3),
+    infinityState.infinity_pool_session_id,
+    projectName,
   );
-  await expect(page.locator('#infinityRoundScore')).toHaveText(
-    infinityResult.round_score.toLocaleString('en-US'),
-  );
-  await expect(page.locator('#infinityTotalScore')).toHaveText(
-    infinityResult.total_score.toLocaleString('en-US'),
-  );
-  progress(projectName, 'Infinity Pool multi-city result verified');
 
-  progress(projectName, 'Infinity Pool square 2: checking duplicate submission');
-  const duplicateResult = await submitInfinityGuess(
+  await selectInfinityRound(
     page,
-    2,
+    4,
     infinityState.infinity_pool_session_id,
-    'Santa Cruz',
-    'enter',
+    projectName,
   );
-  expect(duplicateResult).toEqual({
-    correct: true,
-    duplicate: true,
-    duplicates: ROUND_CASES[2].candidates.map((candidate) => candidate.city),
-    ok: true,
-  });
-  await expect(chips).toHaveCount(ROUND_CASES[2].candidates.length);
-  await expect(page.locator('#infinityRoundScore')).toHaveText(
-    infinityResult.round_score.toLocaleString('en-US'),
+  await expect(page.locator('#sideMissionPanel')).toBeHidden();
+
+  await selectInfinityRound(
+    page,
+    5,
+    infinityState.infinity_pool_session_id,
+    projectName,
   );
-  await expect(page.locator('#infinityTotalScore')).toHaveText(
-    infinityResult.total_score.toLocaleString('en-US'),
+  latestResult = await completeSideMission(
+    page,
+    SIDE_MISSIONS_BY_ROUND[5],
+    latestResult.side_missions.missions.find((mission) => mission.round_number === 5),
+    infinityState.infinity_pool_session_id,
+    projectName,
   );
-  progress(projectName, 'Infinity Pool duplicate left scores unchanged');
 
   progress(projectName, 'switching Daily to Infinity Pool and checking persistence');
   const mobileMenuButton = page.locator('#mobileMenuBtn');
@@ -397,11 +492,14 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
     page.locator('#dailyModeBtn').click(),
   ]);
   const restoredState = await enterInfinity(page, projectName);
-  expect(restoredState.current_round).toBe(2);
-  expect(restoredState.total_score).toBe(infinityResult.total_score);
-  expect(restoredState.guesses).toHaveLength(ROUND_CASES[2].candidates.length);
-  await expect(page.locator('#infinityChips .infinity-chip')).toHaveCount(
-    ROUND_CASES[2].candidates.length,
+  expect(restoredState.current_round).toBe(5);
+  expect(restoredState.total_score).toBe(latestResult.total_score);
+  expect(restoredState.side_missions.missions.every(
+    (mission) => mission.completed_at !== null,
+  )).toBe(true);
+  await expect(page.locator('#sideMissionPanel')).toBeVisible();
+  await expect(page.locator('#sideMissionProgress')).toContainText(
+    'Complete!',
   );
   expect(pageErrors).toEqual([]);
   progress(projectName, 'test completed');

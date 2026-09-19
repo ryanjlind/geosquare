@@ -3,10 +3,11 @@ import logging
 from time import perf_counter
 
 from app.core.db import get_conn
-from app.core.game_mappers import map_square
+from app.core.game_mappers import map_completed_rounds, map_square
 from app.core.game_queries import (
     find_exact_city_in_expansions,
     get_base_square_id_for_round,
+    get_completed_round_rows,
     get_ranked_square_cities,
     get_square_by_id,
     get_square_cities,
@@ -25,6 +26,11 @@ from app.core.infinity_queries import (
 from app.core.matching import find_matching_city
 from app.core.scoring import compute_score
 from app.core.session_service import get_current_session
+from app.core.side_missions.queries import get_side_mission_round
+from app.core.side_missions.service import (
+    get_original_answer_city_id,
+    load_side_mission_state,
+)
 
 
 ROUND_COUNT = 5
@@ -135,11 +141,35 @@ def _load_guesses(cur, infinity_session_id: int) -> list[dict]:
     ]
 
 
+def _load_daily_answers(cur, daily_session_id: int) -> list[dict]:
+    completed_rounds = map_completed_rounds(
+        get_completed_round_rows(cur, daily_session_id)
+    )
+    return [
+        {
+            'round_number': int(round_data['round_number']),
+            'city_id': int(round_data['guesses'][0]['city_id']),
+            'city_name': round_data['guesses'][0]['city_name'],
+            'population': int(round_data['guesses'][0]['population']),
+            'score': int(round_data['score']),
+            'latitude': float(round_data['guesses'][0]['latitude']),
+            'longitude': float(round_data['guesses'][0]['longitude']),
+        }
+        for round_data in completed_rounds
+        if round_data['guesses']
+    ]
+
+
 def _map_scores(score_rows) -> dict[int, int]:
     scores = {round_number: 0 for round_number in range(1, ROUND_COUNT + 1)}
     for row in score_rows:
         scores[int(row.RoundNumber)] = int(row.RoundScore)
     return scores
+
+
+def _add_daily_scores(scores: dict[int, int], daily_answers: list[dict]) -> None:
+    for answer in daily_answers:
+        scores[answer['round_number']] += answer['score']
 
 
 def _load_base_square(cur, game_id: int, round_number: int) -> dict:
@@ -177,13 +207,16 @@ def get_infinity_state(
         game_id = int(infinity_session.GameId)
         infinity_session_id = int(infinity_session.InfinityPoolSessionId)
         round_number = int(infinity_session.CurrentRoundNumber)
+        daily_session = _require_completed_daily_session(cur, user_id, session_id)
         with _logged_step(
             operation,
-            'load_guesses',
+            'load_guesses_and_daily_answers',
             infinity_session_id=infinity_session_id,
         ) as details:
-            guesses = _load_guesses(cur, infinity_session_id)
+            daily_answers = _load_daily_answers(cur, int(daily_session.SessionId))
+            guesses = daily_answers + _load_guesses(cur, infinity_session_id)
             details['guess_count'] = len(guesses)
+            details['daily_answer_count'] = len(daily_answers)
         with _logged_step(
             operation,
             'load_scores',
@@ -192,6 +225,7 @@ def get_infinity_state(
             score_rows = get_infinity_scores(cur, infinity_session_id)
             details['score_row_count'] = len(score_rows)
             scores = _map_scores(score_rows)
+            _add_daily_scores(scores, daily_answers)
         with _logged_step(
             operation,
             'load_square',
@@ -199,6 +233,12 @@ def get_infinity_state(
             round_number=round_number,
         ):
             square = _load_base_square(cur, game_id, round_number)
+        with _logged_step(
+            operation,
+            'load_side_missions',
+            infinity_session_id=infinity_session_id,
+        ):
+            side_missions = load_side_mission_state(cur, daily_session, infinity_session)
         with _logged_step(operation, 'commit', infinity_session_id=infinity_session_id):
             conn.commit()
 
@@ -218,6 +258,7 @@ def get_infinity_state(
         'total_score': sum(scores.values()),
         'guesses': guesses,
         'square': square,
+        'side_missions': side_missions,
     }, 200
 
 
@@ -285,6 +326,7 @@ def submit_infinity_guess(
     payload: dict,
     user_id: int,
     session_id: int | None,
+    mode: str,
 ) -> tuple[dict, int]:
     operation = 'submit_infinity_guess'
     is_reveal = 'reveal_city_id' in payload
@@ -300,6 +342,9 @@ def submit_infinity_guess(
         if not guess_text:
             return {'error': 'Guess is required.'}, 400
     round_number = int(payload['round_number'])
+    if mode not in {'infinity', 'side_missions'}:
+        return {'error': 'Invalid game mode.'}, 400
+    confirmed_city_id = payload.get('confirmed_city_id')
     infinity_pool_session_id = payload.get('infinity_pool_session_id')
     if infinity_pool_session_id is not None:
         infinity_pool_session_id = int(infinity_pool_session_id)
@@ -326,6 +371,13 @@ def submit_infinity_guess(
 
         game_id = int(infinity_session.GameId)
         infinity_session_id = int(infinity_session.InfinityPoolSessionId)
+        daily_session = _require_completed_daily_session(cur, user_id, session_id)
+        if mode == 'side_missions':
+            mission_round = get_side_mission_round(cur, infinity_session_id, round_number)
+            if mission_round is None:
+                return {'error': 'Side missions have not been started.'}, 409
+            if mission_round.CompletedAt is not None:
+                return {'error': 'This side mission is complete.'}, 409
         with _logged_step(
             operation,
             'load_base_square_id',
@@ -363,6 +415,13 @@ def submit_infinity_guess(
                 or int(matched_rows[0].Population) != int(unnamed_cities[0].Population)
             ):
                 return {'error': 'Reveal city must be the largest unnamed city.'}, 409
+        elif confirmed_city_id is not None:
+            matched_rows = [
+                city for city in ranked_cities
+                if int(city.CityId) == int(confirmed_city_id)
+            ]
+            if not matched_rows:
+                return {'error': 'Invalid confirmation selection.'}, 400
         else:
             with _logged_step(
                 operation,
@@ -401,14 +460,15 @@ def submit_infinity_guess(
             if result_type == 'match':
                 matched_rows = [result['row']]
             elif result_type == 'confirmation_required':
-                rows_by_city_id = {
-                    int(row.CityId): row
-                    for row in ranked_cities
+                response = {
+                    'ok': True,
+                    'requires_confirmation': True,
+                    'candidates': result['suggestions'],
+                    'guess': guess_text,
                 }
-                matched_rows = [
-                    rows_by_city_id[int(suggestion['city_id'])]
-                    for suggestion in result['suggestions']
-                ]
+                if 'nearby_exact_match' in result:
+                    response['nearby_city'] = _map_incorrect_city(result['nearby_exact_match'])
+                return response, 200
             else:
                 return {'error': 'Invalid match result.'}, 500
         _logger.info(
@@ -421,8 +481,17 @@ def submit_infinity_guess(
 
         added_guesses = []
         duplicate_cities = []
+        original_answer_city_id = get_original_answer_city_id(
+            cur,
+            daily_session,
+            infinity_session_id,
+            round_number,
+        )
         for matched in matched_rows:
             city_id = int(matched.CityId)
+            if city_id == original_answer_city_id:
+                duplicate_cities.append(matched.CityName)
+                continue
             with _logged_step(
                 operation,
                 'check_duplicate',
@@ -495,6 +564,15 @@ def submit_infinity_guess(
             score_rows = get_infinity_scores(cur, infinity_session_id)
             details['score_row_count'] = len(score_rows)
             scores = _map_scores(score_rows)
+            daily_answers = _load_daily_answers(cur, int(daily_session.SessionId))
+            _add_daily_scores(scores, daily_answers)
+        with _logged_step(
+            operation,
+            'update_side_mission_progress',
+            infinity_session_id=infinity_session_id,
+            round_number=round_number,
+        ):
+            side_missions = load_side_mission_state(cur, daily_session, infinity_session)
         with _logged_step(operation, 'commit', infinity_session_id=infinity_session_id):
             conn.commit()
 
@@ -515,4 +593,5 @@ def submit_infinity_guess(
         'duplicates': duplicate_cities,
         'round_score': scores[round_number],
         'total_score': sum(scores.values()),
+                'side_missions': side_missions,
     }, 200

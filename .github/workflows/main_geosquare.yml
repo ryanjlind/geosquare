@@ -85,6 +85,7 @@ jobs:
       E2E_GAME_DATE: '2026-08-01'
       GAME_DATE_OVERRIDE: '2026-08-01'
       E2E_SQUARE_POOL_ID: ${{ vars.E2E_SQUARE_POOL_ID }}
+      E2E_SIDE_MISSION_ASSIGNMENTS: '2:smallest_to_largest,3:north_to_south,5:west_to_east'
       LOCAL_AUTH_BYPASS: 'true'
       DATABASE_TARGET: 'e2e'
 
