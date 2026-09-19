@@ -154,9 +154,12 @@ async function enterInfinity(page, projectName) {
   if (!await statsOverlay.isVisible()) {
     if (projectName === 'webkit-mobile') {
       const mobileMenuButton = page.locator('#mobileMenuBtn');
-      await expect(mobileMenuButton).toBeVisible();
-      await mobileMenuButton.click();
-      await expect(page.locator('#sidebar')).toHaveClass(/mobile-open/);
+      const sidebar = page.locator('#sidebar');
+      if (!await sidebar.evaluate((element) => element.classList.contains('mobile-open'))) {
+        await expect(mobileMenuButton).toBeVisible();
+        await mobileMenuButton.click();
+        await expect(sidebar).toHaveClass(/mobile-open/);
+      }
     }
     entryButton = page.locator('#infinityModeBtn');
   }
@@ -262,7 +265,7 @@ async function submitInfinityCity(
     roundNumber,
     infinityPoolSessionId,
     city.city_name,
-    'enter',
+    'click',
   );
   if (!firstResult.requires_confirmation) return firstResult;
 
@@ -503,7 +506,7 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
       2,
       infinityState.infinity_pool_session_id,
       candidate,
-      'enter',
+      'click',
     );
     expect(candidateResult.correct).toBe(true);
     if (existingCityIds.has(candidate.city_id)) {
