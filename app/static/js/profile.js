@@ -118,8 +118,6 @@ function renderSummary(summary) {
 function renderRegionPerformance(summaryRows, detailRows) {
     const tbody = document.getElementById('profileRegionTableBody');
 
-    if (!tbody) return;
-
     const grouped = {};
     detailRows.forEach((row) => {
         if (!grouped[row.region]) {
@@ -294,9 +292,6 @@ async function loadMoreHistory() {
 
     try {
         const { response, data } = await fetchJson(`/api/profile/history?offset=${historyOffset}`);
-        if (!response.ok) {
-            return;
-        }
         const history = data.history;
         renderHistory(history, true);
         updateHistoryPagination(data.history_pagination, history.length);
@@ -310,11 +305,7 @@ function adjustProfilePopulationDisplay() {
     
     popCells.forEach((cell) => {
         const text = cell.textContent.trim();
-        if (text === '—') return;
-        
         const value = parseInt(text.replace(/,/g, ''), 10);
-        if (isNaN(value)) return;
-        
         const formatted = numberFmt(value);
         const width = abbreviatePopulationForDisplay(value, '.stats-rounds-table td:nth-child(3)');
         
@@ -403,10 +394,6 @@ function wireRegionDetailsToggle() {
     const button = document.getElementById('profileRegionDetailsToggle');
     const wrap = document.getElementById('profileRegionDetailsWrap');
 
-    if (!button || !wrap) {
-        return;
-    }
-
     button.onclick = () => {
         const isHidden = wrap.classList.contains('hidden');
 
@@ -428,8 +415,6 @@ function wireRegionRowToggle() {
         row.onclick = () => {
             const targetId = row.getAttribute('data-target');
             const detail = document.getElementById(targetId);
-
-            if (!detail) return;
 
             detail.classList.toggle('hidden');
         };

@@ -83,8 +83,6 @@ function wireDifficultySlider(roundData) {
     const slider = document.getElementById('difficultySlider');
     const helpBtn = document.getElementById('difficultyHelpBtn');
     const tooltipBox = document.getElementById('difficultyTooltipBox');
-    if (!slider || !row || row.classList.contains('hidden')) return;
-
     const storedUi = getStoredDifficulty();
     slider.value = String(storedUi);
     updateSliderFill(slider);
@@ -147,10 +145,6 @@ async function loadEndGameRounds() {
 }
 
 function handleEndGameRoundSelect(roundNumber) {
-    if (!endGameRounds.length) {
-        return;
-    }
-
     setSelectedRoundRow(roundNumber);
     renderEndGameRound(endGameRounds, roundNumber);
 }
@@ -455,9 +449,6 @@ export function showGuessConfirmationModal(candidates, nearbyCity) {
 
         btn.onclick = async () => {
             modal.classList.add('hidden');
-
-            const pending = window.pendingGuessConfirmation;
-            if (!pending) return;
 
             const guessBtn = document.getElementById('guessBtn');
             const guessInput = document.getElementById('guessInput');

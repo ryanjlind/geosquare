@@ -552,7 +552,7 @@ export async function renderDifficultyLayer(squareData, level) {
     clearDifficultyLayer();
 
     // First easy level: show large-city dots only.
-    if (level < 2 || !squareData || !squareData.cities || !squareData.cities.length) {
+    if (level < 2) {
         return;
     }
 

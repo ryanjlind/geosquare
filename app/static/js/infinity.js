@@ -606,10 +606,6 @@ async function submitGuess(revealedCity = null, confirmedCityId = null) {
     const button = document.getElementById('guessBtn');
     const isReveal = revealedCity !== null;
     const guess = isReveal ? '' : input.value.trim();
-    if (!guess && !isReveal) {
-        return;
-    }
-
     input.disabled = true;
     button.disabled = true;
     console.info('pool_guess: started', {

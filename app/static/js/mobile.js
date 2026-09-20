@@ -200,8 +200,6 @@ import { gameState } from './state.js?v=4';
         const sidebar = document.getElementById('sidebar');
         const closeBtn = document.getElementById('mobileDrawerCloseBtn');
 
-        if (!sidebar || !closeBtn) return;
-
         const isProfilePage = document.body.classList.contains('profile-page');
 
         if (isProfilePage) {
@@ -214,8 +212,6 @@ import { gameState } from './state.js?v=4';
         const sideMissionPanel = document.getElementById('sideMissionPanel');
         const guessFeedback = document.getElementById('guessFeedback');
         const postGameActions = document.getElementById('postGameActions');
-
-        if (!sideMissionPanel || !guessBox || !guessFeedback || !postGameActions) return;
 
         initGameMobile({
             sidebar,

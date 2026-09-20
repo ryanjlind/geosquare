@@ -129,8 +129,6 @@ export function initFeedback() {
     const emailWrap = document.getElementById('fbEmailWrap');
     const submit = document.getElementById('fbSubmit');
 
-    if (!btn || !overlay) return;
-
     btn.onclick = () => {
         overlay.style.display = 'block';
     };

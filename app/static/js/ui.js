@@ -39,7 +39,6 @@ export function renderSidebar(data) {
 
 export function setDifficultyVisible(visible) {
     const row = document.getElementById('difficultyRow');
-    if (!row) return;
     if (visible) {
         row.classList.remove('hidden');
     } else {
@@ -136,27 +135,18 @@ export function setShareButtonReady(isReady) {
     const shareBtn = document.getElementById('shareScoreBtn');
     const nextBtn = document.getElementById('nextBtn');
 
-    if (!shareBtn) {
-        return;
-    }
-
     shareBtn.dataset.ready = isReady ? '1' : '0';
 
-    if (!isReady) {
+    if (isReady) {
+        const isSummaryVisible = nextBtn && nextBtn.style.display !== 'none' && nextBtn.textContent === 'Show Summary';
+        shareBtn.style.display = isSummaryVisible ? 'inline-block' : 'none';
+    } else {
         shareBtn.style.display = 'none';
-        return;
     }
-
-    const isSummaryVisible = nextBtn && nextBtn.style.display !== 'none' && nextBtn.textContent === 'Show Summary';
-    shareBtn.style.display = isSummaryVisible ? 'inline-block' : 'none';
 }
 
 export function wireShareScoreButton(onShareClick) {
     const shareBtn = document.getElementById('shareScoreBtn');
-
-    if (!shareBtn) {
-        return;
-    }
 
     shareBtn.onclick = onShareClick;
 }
@@ -184,18 +174,16 @@ export function addRoundRow(result, roundNumber) {
 
 export function adjustPopulationDisplay() {
     const popCells = document.querySelectorAll('#roundTable .pop-cell');
-    if (popCells.length === 0) return;
-
     popCells.forEach((cell) => {
         cell.textContent = numberFmt(Number(cell.dataset.population));
     });
 
     const cityColumn = document.querySelector('#roundTable th:nth-child(2)');
-    if (!cityColumn || cityColumn.getBoundingClientRect().width >= MIN_ROUND_CITY_COLUMN_WIDTH) return;
-
-    popCells.forEach((cell) => {
-        cell.textContent = abbreviateNumber(Number(cell.dataset.population));
-    });
+    if (cityColumn.getBoundingClientRect().width < MIN_ROUND_CITY_COLUMN_WIDTH) {
+        popCells.forEach((cell) => {
+            cell.textContent = abbreviateNumber(Number(cell.dataset.population));
+        });
+    }
 }
 
 export function wireRoundTable(onRoundSelect) {
@@ -203,11 +191,9 @@ export function wireRoundTable(onRoundSelect) {
 
     tbody.onclick = (e) => {
         const row = e.target.closest('tr[data-round-number]');
-        if (!row) {
-            return;
+        if (row) {
+            onRoundSelect(Number(row.dataset.roundNumber));
         }
-
-        onRoundSelect(Number(row.dataset.roundNumber));
     };
 }
 
