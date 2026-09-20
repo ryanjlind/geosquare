@@ -155,6 +155,8 @@ async function passRound(page, roundNumber, projectName) {
   const body = await response.json();
   expect(body.passed).toBe(true);
   expect(body.round_number).toBe(roundNumber);
+  expect(body.score).toBe(0);
+  expect(body.expansion_level).toBe(0);
   await expect(page.locator('#guessFeedback')).toContainText('No guess submitted');
   progress(projectName, `round ${roundNumber}: pass response and feedback verified`);
 }

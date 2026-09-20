@@ -253,14 +253,17 @@ export async function handlePass() {
 
     addRoundRow({
         city: '—',
-        population: 0,
+        population: null,
         rank: '—',
-        score: 0
+        score: data.score,
+        expansion_level: data.expansion_level,
     }, gameState.currentRound);
     recordShareRound({
         city: '—',
+        population: null,
         rank: '—',
-        score: 0
+        score: data.score,
+        expansion_level: data.expansion_level,
     }, gameState.currentRound);
     adjustPopulationDisplay();
 

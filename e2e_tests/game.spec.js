@@ -398,6 +398,8 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
   await page.locator('#passBtn').click();
   const passBody = await (await passResponsePromise).json();
   expect(passBody.passed).toBe(true);
+  expect(passBody.score).toBe(0);
+  expect(passBody.expansion_level).toBe(0);
   await expect(page.locator('#guessFeedback')).toContainText('No guess submitted');
   progress(projectName, 'round 4: pass completed');
   await advanceToNextRound(page, 5, projectName);

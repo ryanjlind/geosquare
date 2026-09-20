@@ -368,6 +368,7 @@ def submit_pass(payload: dict, user_id: int, session_id: int | None):
             "passed": True,
             "round_number": round_number,
             "score": 0,
+            "expansion_level": int(square_row.ExpansionLevel),
             "largest_city": {
                 "city_name": largest.CityName,
                 "country_code": largest.CountryCode,
