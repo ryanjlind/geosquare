@@ -10,6 +10,9 @@ from app.core.side_missions.framework import (
 )
 
 
+NAME_CHAIN_MINIMUM_STEP_POPULATION = 150_000
+
+
 class AnswerIsCapital:
 	def __call__(self, context: SideMissionContext) -> bool:
 		return bool(context.answer['is_capital'])
@@ -84,11 +87,17 @@ class AnswerStartsThreeCityNameChain:
 	def _has_chain(self, cities: tuple[dict, ...], required_letter: str, remaining: int) -> bool:
 		if remaining == 0:
 			return True
-		for city in cities:
+		matching_cities = tuple(
+			city for city in cities
+			if (letters := _normalized_name_letters(city['city_name']))
+			and letters[0] == required_letter
+		)
+		if sum(int(city['population']) for city in matching_cities) < NAME_CHAIN_MINIMUM_STEP_POPULATION:
+			return False
+		for city in matching_cities:
 			letters = _normalized_name_letters(city['city_name'])
-			if letters and letters[0] == required_letter:
-				next_cities = tuple(candidate for candidate in cities if candidate is not city)
-				if self._has_chain(next_cities, letters[-1], remaining - 1):
+			next_cities = tuple(candidate for candidate in cities if candidate is not city)
+			if self._has_chain(next_cities, letters[-1], remaining - 1):
 					return True
 		return False
 

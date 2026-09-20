@@ -67,6 +67,7 @@ import { gameState } from './state.js?v=4';
     function initGameMobile({
         sidebar,
         closeBtn,
+        sideMissionsInvite,
         sideMissionPanel,
         guessBox,
         guessFeedback,
@@ -114,6 +115,7 @@ import { gameState } from './state.js?v=4';
         bottomTray.appendChild(guessBox);
         bottomTray.appendChild(guessFeedback);
         bottomTray.appendChild(postGameActions);
+        bottomTray.appendChild(sideMissionsInvite);
 
         function syncMobileHeroStats() {
             const mobileRoundStat = document.getElementById('mobileRoundStat');
@@ -209,6 +211,7 @@ import { gameState } from './state.js?v=4';
         }
 
         const guessBox = document.getElementById('guessBox');
+        const sideMissionsInvite = document.getElementById('sideMissionsInvite');
         const sideMissionPanel = document.getElementById('sideMissionPanel');
         const guessFeedback = document.getElementById('guessFeedback');
         const postGameActions = document.getElementById('postGameActions');
@@ -216,6 +219,7 @@ import { gameState } from './state.js?v=4';
         initGameMobile({
             sidebar,
             closeBtn,
+            sideMissionsInvite,
             sideMissionPanel,
             guessBox,
             guessFeedback,
