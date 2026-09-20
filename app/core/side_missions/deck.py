@@ -11,6 +11,7 @@ from app.core.side_missions.framework import (
 
 
 NAME_CHAIN_MINIMUM_STEP_POPULATION = 150_000
+SIDE_MISSION_TARGET_COUNT = 3
 
 
 class AnswerIsCapital:
@@ -122,6 +123,63 @@ class AnswerHasNoCityWithin100Km:
 			_distance_km(context.answer, city) >= 100
 			for city in context.cities
 			if int(city['city_id']) != int(context.answer['city_id'])
+		)
+
+
+class AnswerHasThreeCountryPeers:
+	def __call__(self, context: SideMissionContext) -> bool:
+		answer_country_code = get_sovereign_country_code(context.answer['country_code'])
+		return sum(
+			get_sovereign_country_code(city['country_code']) == answer_country_code
+			and int(city['city_id']) != int(context.answer['city_id'])
+			for city in context.cities
+		) >= SIDE_MISSION_TARGET_COUNT
+
+
+class AnswerHasThreeMorePopulousCities:
+	def __call__(self, context: SideMissionContext) -> bool:
+		return sum(
+			int(city['population']) > int(context.answer['population'])
+			for city in context.cities
+		) >= SIDE_MISSION_TARGET_COUNT
+
+
+class AnswerHasThreeDirectionalCities:
+	def __init__(self, field: str, comparison: str):
+		self.field = field
+		self.comparison = comparison
+
+	def __call__(self, context: SideMissionContext) -> bool:
+		return sum(
+			{
+				'less_than': city[self.field] < context.answer[self.field],
+				'greater_than': city[self.field] > context.answer[self.field],
+			}[self.comparison]
+			for city in context.cities
+		) >= SIDE_MISSION_TARGET_COUNT
+
+
+class AnswerHasNearestNeighbor:
+	def __call__(self, context: SideMissionContext) -> bool:
+		return any(
+			int(city['city_id']) != int(context.answer['city_id'])
+			for city in context.cities
+		)
+
+
+class AnswerHasCitiesInEveryDirection:
+	def __call__(self, context: SideMissionContext) -> bool:
+		return all(
+			any(
+				{
+					'north': city['latitude'] > context.answer['latitude'],
+					'south': city['latitude'] < context.answer['latitude'],
+					'east': city['longitude'] > context.answer['longitude'],
+					'west': city['longitude'] < context.answer['longitude'],
+				}[direction]
+				for city in context.cities
+			)
+			for direction in ('north', 'south', 'east', 'west')
 		)
 
 
@@ -258,6 +316,89 @@ class ThreeLargestCitiesProgress:
 		)
 
 
+class TargetCitiesPrompt:
+	def __init__(self, mission_id: str):
+		self.mission_id = mission_id
+
+	def __call__(self, context: SideMissionContext) -> str:
+		return MISSION_COPY[self.mission_id]['prompt'].format(
+			city_name=context.answer['city_name'],
+		)
+
+
+class DiplomatPrompt:
+	def __call__(self, context: SideMissionContext) -> str:
+		country_name = get_country_name(
+			get_sovereign_country_code(context.answer['country_code'])
+		).upper()
+		return MISSION_COPY['diplomat']['prompt'].format(country_name=country_name)
+
+
+class ThreeTargetCitiesProgress:
+	def __init__(self, target_filter):
+		self.target_filter = target_filter
+
+	def __call__(self, context: SideMissionContext) -> MissionProgress:
+		target_cities = {
+			int(city['city_id']): city
+			for city in context.cities
+			if self.target_filter(context, city)
+		}
+		found_ids = context.found_city_ids & target_cities.keys()
+		return MissionProgress(
+			current=min(len(found_ids), SIDE_MISSION_TARGET_COUNT),
+			target=SIDE_MISSION_TARGET_COUNT,
+			named=tuple(sorted(target_cities[city_id]['city_name'] for city_id in found_ids)),
+		)
+
+
+class NearestNeighborProgress:
+	def __call__(self, context: SideMissionContext) -> MissionProgress:
+		target_city = min(
+			(
+				city for city in context.cities
+				if int(city['city_id']) != int(context.answer['city_id'])
+			),
+			key=lambda city: (
+				_distance_km(context.answer, city),
+				int(city['city_id']),
+			),
+		)
+		found_ids = context.found_city_ids & {int(target_city['city_id'])}
+		return MissionProgress(
+			current=len(found_ids),
+			target=1,
+			named=(target_city['city_name'],) if found_ids else (),
+		)
+
+
+class CompassSweepProgress:
+	def __call__(self, context: SideMissionContext) -> MissionProgress:
+		cities_by_id = {
+			int(city['city_id']): city
+			for city in context.cities
+		}
+		remaining_directions = ['north', 'south', 'east', 'west']
+		found_directions = []
+		for guess in context.guesses:
+			city = cities_by_id[int(guess['city_id'])]
+			for direction in remaining_directions:
+				if {
+					'north': city['latitude'] > context.answer['latitude'],
+					'south': city['latitude'] < context.answer['latitude'],
+					'east': city['longitude'] > context.answer['longitude'],
+					'west': city['longitude'] < context.answer['longitude'],
+				}[direction]:
+					found_directions.append(direction)
+					remaining_directions.remove(direction)
+					break
+		return MissionProgress(
+			current=len(found_directions),
+			target=4,
+			named=tuple(direction.title() for direction in found_directions),
+		)
+
+
 class NameChainPrompt:
 	def __call__(self, context: SideMissionContext) -> str:
 		letters = _normalized_name_letters(context.answer['city_name'])
@@ -355,6 +496,14 @@ ELIGIBILITY_SCENARIOS = {
 	'answer_has_two_word_name': AnswerHasTwoWordName(),
 	'square_has_other_multi_word_city': SquareHasOtherMultiWordCity(),
 	'answer_has_no_city_within_100_km': AnswerHasNoCityWithin100Km(),
+	'answer_has_three_country_peers': AnswerHasThreeCountryPeers(),
+	'answer_has_three_more_populous_cities': AnswerHasThreeMorePopulousCities(),
+	'answer_has_three_northern_cities': AnswerHasThreeDirectionalCities('latitude', 'greater_than'),
+	'answer_has_three_southern_cities': AnswerHasThreeDirectionalCities('latitude', 'less_than'),
+	'answer_has_three_eastern_cities': AnswerHasThreeDirectionalCities('longitude', 'greater_than'),
+	'answer_has_three_western_cities': AnswerHasThreeDirectionalCities('longitude', 'less_than'),
+	'answer_has_nearest_neighbor': AnswerHasNearestNeighbor(),
+	'answer_has_cities_in_every_direction': AnswerHasCitiesInEveryDirection(),
 }
 
 
@@ -429,6 +578,78 @@ MISSIONS = {
 		calculate_progress=ThreeNearestNeighborsProgress(),
 		build_acknowledgement=DiscoveredAcknowledgement(),
 	),
+	'diplomat': SideMissionDefinition(
+		mission_id='diplomat',
+		name=MISSION_COPY['diplomat']['name'],
+		build_prompt=DiplomatPrompt(),
+		calculate_progress=ThreeTargetCitiesProgress(
+			lambda context, city: (
+				int(city['city_id']) != int(context.answer['city_id'])
+				and get_sovereign_country_code(city['country_code'])
+				== get_sovereign_country_code(context.answer['country_code'])
+			),
+		),
+		build_acknowledgement=DiscoveredAcknowledgement(),
+	),
+	'bigger_fish': SideMissionDefinition(
+		mission_id='bigger_fish',
+		name=MISSION_COPY['bigger_fish']['name'],
+		build_prompt=TargetCitiesPrompt('bigger_fish'),
+		calculate_progress=ThreeTargetCitiesProgress(
+			lambda context, city: int(city['population']) > int(context.answer['population']),
+		),
+		build_acknowledgement=DiscoveredAcknowledgement(),
+	),
+	'northbound': SideMissionDefinition(
+		mission_id='northbound',
+		name=MISSION_COPY['northbound']['name'],
+		build_prompt=TargetCitiesPrompt('northbound'),
+		calculate_progress=ThreeTargetCitiesProgress(
+			lambda context, city: city['latitude'] > context.answer['latitude'],
+		),
+		build_acknowledgement=DiscoveredAcknowledgement(),
+	),
+	'southbound': SideMissionDefinition(
+		mission_id='southbound',
+		name=MISSION_COPY['southbound']['name'],
+		build_prompt=TargetCitiesPrompt('southbound'),
+		calculate_progress=ThreeTargetCitiesProgress(
+			lambda context, city: city['latitude'] < context.answer['latitude'],
+		),
+		build_acknowledgement=DiscoveredAcknowledgement(),
+	),
+	'eastbound': SideMissionDefinition(
+		mission_id='eastbound',
+		name=MISSION_COPY['eastbound']['name'],
+		build_prompt=TargetCitiesPrompt('eastbound'),
+		calculate_progress=ThreeTargetCitiesProgress(
+			lambda context, city: city['longitude'] > context.answer['longitude'],
+		),
+		build_acknowledgement=DiscoveredAcknowledgement(),
+	),
+	'westbound': SideMissionDefinition(
+		mission_id='westbound',
+		name=MISSION_COPY['westbound']['name'],
+		build_prompt=TargetCitiesPrompt('westbound'),
+		calculate_progress=ThreeTargetCitiesProgress(
+			lambda context, city: city['longitude'] < context.answer['longitude'],
+		),
+		build_acknowledgement=DiscoveredAcknowledgement(),
+	),
+	'okily_dokily': SideMissionDefinition(
+		mission_id='okily_dokily',
+		name=MISSION_COPY['okily_dokily']['name'],
+		build_prompt=TargetCitiesPrompt('okily_dokily'),
+		calculate_progress=NearestNeighborProgress(),
+		build_acknowledgement=DiscoveredAcknowledgement(),
+	),
+	'compass_sweep': SideMissionDefinition(
+		mission_id='compass_sweep',
+		name=MISSION_COPY['compass_sweep']['name'],
+		build_prompt=TargetCitiesPrompt('compass_sweep'),
+		calculate_progress=CompassSweepProgress(),
+		build_acknowledgement=DiscoveredAcknowledgement(),
+	),
 }
 
 
@@ -467,6 +688,14 @@ MISSION_ELIGIBILITY = {
 		'answer_has_no_city_within_100_km',
 		'square_has_four_cities',
 	),
+	'diplomat': ('answer_has_three_country_peers',),
+	'bigger_fish': ('answer_has_three_more_populous_cities',),
+	'northbound': ('answer_has_three_northern_cities',),
+	'southbound': ('answer_has_three_southern_cities',),
+	'eastbound': ('answer_has_three_eastern_cities',),
+	'westbound': ('answer_has_three_western_cities',),
+	'okily_dokily': ('answer_has_nearest_neighbor',),
+	'compass_sweep': ('answer_has_cities_in_every_direction',),
 }
 
 

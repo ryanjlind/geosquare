@@ -6,14 +6,14 @@
     <title>GeoSquare</title>
     <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css', v=4) }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css', v=4) }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/game.css', v=6) }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/infinity.css', v=8) }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/stats.css', v=4) }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css', v=4) }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/feedback.css', v=4) }}">
-    <link rel="icon" href="{{ url_for('static', filename='favicon.ico', v=4) }}">
+    <link rel="stylesheet" href="{{ asset_url('css/base.css') }}">
+    <link rel="stylesheet" href="{{ asset_url('css/layout.css') }}">
+    <link rel="stylesheet" href="{{ asset_url('css/game.css') }}">
+    <link rel="stylesheet" href="{{ asset_url('css/infinity.css') }}">
+    <link rel="stylesheet" href="{{ asset_url('css/stats.css') }}">
+    <link rel="stylesheet" href="{{ asset_url('css/mobile.css') }}">
+    <link rel="stylesheet" href="{{ asset_url('css/feedback.css') }}">
+    <link rel="icon" href="{{ asset_url('favicon.ico') }}">
 </head>
 <body>
     <div class="layout">
@@ -390,8 +390,9 @@
         };
     </script>
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
-    <script type="module" src="{{ url_for('static', filename='js/app.js', v=10) }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/mobile.js', v=6) }}"></script>
+    <script type="importmap">{{ {'imports': js_import_map()}|tojson }}</script>
+    <script type="module" src="{{ asset_url('js/app.js') }}"></script>
+    <script type="module" src="{{ asset_url('js/mobile.js') }}"></script>
     <script>
         window.addEventListener("load", () => {
             const guessInput = document.getElementById("guessInput");

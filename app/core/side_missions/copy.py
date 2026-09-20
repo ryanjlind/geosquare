@@ -68,4 +68,38 @@ MISSION_COPY = {
 			'Can you name its three nearest neighbors?'
 		),
 	},
+	'diplomat': {
+		'name': 'Diplomat',
+		'prompt': 'Your named a city in {country_name}. Can you name three other cities there?',
+	},
+	'bigger_fish': {
+		'name': 'Bigger Fish',
+		'prompt': 'You named {city_name}. Can you name three more populous cities?',
+	},
+	'northbound': {
+		'name': 'Northbound',
+		'prompt': 'Can you name three cities north of {city_name}?',
+	},
+	'southbound': {
+		'name': 'Southbound',
+		'prompt': 'Can you name three cities south of {city_name}?',
+	},
+	'eastbound': {
+		'name': 'Eastbound',
+		'prompt': 'Can you name three cities east of {city_name}?',
+	},
+	'westbound': {
+		'name': 'Westbound',
+		'prompt': 'Can you name three cities west of {city_name}?',
+	},
+	'okily_dokily': {
+		'name': 'Okily-Dokily',
+		'prompt': 'Can you name the nearest neighbour of {city_name}?',
+	},
+	'compass_sweep': {
+		'name': 'Compass Sweep',
+		'prompt': (
+			'Can you name three additional cities, where at least one is each of north, south, east, and west of {city_name}?'
+		),
+	},
 }

@@ -20,8 +20,9 @@
 <body>
 <div id="cesiumContainer"></div>
 
+<script type="importmap">{{ {'imports': js_import_map()}|tojson }}</script>
 <script type="module">
-import { initCesium, renderAllSquares } from '/static/js/map.js?v=4';
+import { initCesium, renderAllSquares } from '@geosquare/map.js';
 
 const params = new URLSearchParams(window.location.search);
 const gameDate = params.get('game_date');

@@ -1,6 +1,6 @@
-import { postClientLog, numberFmt } from './utils.js?v=4';
-import { gameState } from './state.js?v=4';
-import { expandSquareRequest } from './api.js?v=4';
+import { postClientLog, numberFmt } from '@geosquare/utils.js';
+import { gameState } from '@geosquare/state.js';
+import { expandSquareRequest } from '@geosquare/api.js';
 
 let expansionEntity = null;
 let currentBounds = null;

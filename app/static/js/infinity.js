@@ -3,10 +3,10 @@ import {
     selectInfinityRoundRequest,
     startSideMissionsRequest,
     submitInfinityGuessRequest,
-} from './api.js?v=5';
-import { playFail, playSuccess } from './audio.js?v=4';
-import { drawCities, renderRoundMap, showIncorrectGuessedCity } from './map.js?v=4';
-import { escapeHtml, numberFmt } from './utils.js?v=4';
+} from '@geosquare/api.js';
+import { playFail, playSuccess } from '@geosquare/audio.js';
+import { drawCities, renderRoundMap, showIncorrectGuessedCity } from '@geosquare/map.js';
+import { escapeHtml, numberFmt } from '@geosquare/utils.js';
 
 
 const SIDE_MISSION_ACKNOWLEDGEMENT_MS = 2500;

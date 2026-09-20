@@ -1,6 +1,6 @@
-import { fetchGameState, fetchPlayerStats, fetchJson } from './api.js?v=4';
-import { gameState } from './state.js?v=4';
-import { escapeHtml, numberFmt, ordinal, parseFormattedInt } from './utils.js?v=4';
+import { fetchGameState, fetchPlayerStats, fetchJson } from '@geosquare/api.js';
+import { gameState } from '@geosquare/state.js';
+import { escapeHtml, numberFmt, ordinal, parseFormattedInt } from '@geosquare/utils.js';
 
 const SHARE_FORMAT_DETAILED = 'detailed';
 const SHARE_FORMAT_DISCORD = 'discord';

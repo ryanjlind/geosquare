@@ -1,4 +1,4 @@
-import { initGame } from './game.js?v=10';
+import { initGame } from '@geosquare/game.js';
 
 window.addEventListener('error', event => {
 	console.error('Uncaught JavaScript error:', event.error || event.message);

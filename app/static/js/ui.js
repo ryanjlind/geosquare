@@ -1,4 +1,4 @@
-import { numberFmt, abbreviateNumber, escapeHtml, parseFormattedInt } from './utils.js?v=4';
+import { numberFmt, abbreviateNumber, escapeHtml, parseFormattedInt } from '@geosquare/utils.js';
 
 const MIN_ROUND_CITY_COLUMN_WIDTH = 125;
 

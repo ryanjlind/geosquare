@@ -1,4 +1,4 @@
-import { fetchJson } from './api.js?v=4';
+import { fetchJson } from '@geosquare/api.js';
 
 let authCallbacks = {
     onAuthSuccess: null,

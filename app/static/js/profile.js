@@ -1,5 +1,5 @@
-import { numberFmt, abbreviateNumber, abbreviatePopulationForDisplay, escapeHtml } from './utils.js?v=4';
-import { fetchJson } from './api.js?v=4';
+import { numberFmt, abbreviateNumber, abbreviatePopulationForDisplay, escapeHtml } from '@geosquare/utils.js';
+import { fetchJson } from '@geosquare/api.js';
 
 let historyOffset = 0;
 let historyHasMore = false;

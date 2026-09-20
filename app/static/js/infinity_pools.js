@@ -1,5 +1,5 @@
-import { fetchJson } from './api.js?v=4';
-import { numberFmt } from './utils.js?v=4';
+import { fetchJson } from '@geosquare/api.js';
+import { numberFmt } from '@geosquare/utils.js';
 
 
 function formatDate(dateString) {

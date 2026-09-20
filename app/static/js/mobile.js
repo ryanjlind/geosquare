@@ -1,4 +1,4 @@
-import { gameState } from './state.js?v=4';
+import { gameState } from '@geosquare/state.js';
 
 (function () {
     function isMobile() {
