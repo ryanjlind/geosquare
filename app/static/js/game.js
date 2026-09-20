@@ -264,7 +264,14 @@ export async function handlePass() {
     }, gameState.currentRound);
     adjustPopulationDisplay();
 
-    drawCities([largestCity]);
+    drawCities([{
+        ...largestCity,
+        label: largestCity.city_name,
+        pixel_size: 8,
+        color: Cesium.Color.WHITE,
+        outline_color: Cesium.Color.BLACK,
+        outline_width: 2,
+    }]);
     playFail();
 
     clearGuessInput();
