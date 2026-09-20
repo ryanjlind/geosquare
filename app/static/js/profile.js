@@ -58,7 +58,7 @@ function formatBestRound(bestRound) {
     }
 
     const city = bestRound.city_name ? escapeHtml(bestRound.city_name) : '—';
-    const score = formatScoreWithPenalty(bestRound.score, bestRound.expansion_level ?? 0);
+    const score = formatScoreWithPenalty(bestRound.score, bestRound.expansion_level);
     return `Round ${bestRound.round_number} · ${city} · ${score} pts`;
 }
 
@@ -121,16 +121,16 @@ function renderRegionPerformance(summaryRows, detailRows) {
     if (!tbody) return;
 
     const grouped = {};
-    (detailRows || []).forEach((row) => {
+    detailRows.forEach((row) => {
         if (!grouped[row.region]) {
             grouped[row.region] = [];
         }
         grouped[row.region].push(row);
     });
 
-    tbody.innerHTML = (summaryRows || []).map((row, idx) => {
+    tbody.innerHTML = summaryRows.map((row, idx) => {
         const regionKey = row.region;
-        const regionDetails = grouped[regionKey] || [];
+        const regionDetails = grouped[regionKey];
         const detailId = `region-detail-${idx}`;
 
         const detailRowsHtml = regionDetails.map((d) => `
@@ -141,7 +141,7 @@ function renderRegionPerformance(summaryRows, detailRows) {
                 <td>${d.guessed_population != null ? numberFmt(d.guessed_population) : '—'}</td>
                 <td>${d.top_city_name ? escapeHtml(d.top_city_name) : '—'}</td>
                 <td>${d.top_city_population != null ? numberFmt(d.top_city_population) : '—'}</td>
-                <td>${formatScoreWithPenalty(d.score, d.expansion_level ?? 0)}</td>
+                <td>${formatScoreWithPenalty(d.score, d.expansion_level)}</td>
             </tr>
         `).join('');
 
@@ -189,12 +189,18 @@ function buildHistoryRoundsTable(completedRounds) {
                 <td>${guess ? escapeHtml(guess.city_name || '—') : '—'}</td>
                 <td class="pop-cell">${guess && guess.population != null ? numberFmt(guess.population) : '—'}</td>
                 <td>${guess && guess.rank != null ? numberFmt(guess.rank) : '—'}</td>
-                <td>${formatScoreWithPenalty(round.score, round.expansion_level ?? 0)}</td>
+                <td>${formatScoreWithPenalty(round.score, round.expansion_level)}</td>
             </tr>
         `;
     }).join('');
 
-    const total = completedRounds.reduce((sum, round) => sum + Number(round.score || 0), 0);
+    let total = 0;
+    completedRounds.forEach((round) => {
+        if (typeof round.score !== 'number' || !Number.isFinite(round.score)) {
+            throw new Error('History round score must be a finite number.');
+        }
+        total += round.score;
+    });
 
     return `
         <div class="stats-card">
@@ -261,7 +267,7 @@ function renderHistory(history, append = false) {
             </button>
 
             <div class="profile-history-details">                            
-                ${buildHistoryRoundsTable(game.completed_rounds || [])}            
+                ${buildHistoryRoundsTable(game.completed_rounds)}            
             </div>
         </section>
     `).join('');
@@ -277,7 +283,7 @@ function renderHistory(history, append = false) {
 }
 
 function updateHistoryPagination(pagination, returnedCount) {
-    historyOffset = Number(pagination?.offset || 0) + returnedCount;
+    historyOffset = Number(pagination?.offset) + returnedCount;
     historyHasMore = Boolean(pagination?.has_more);
     document.getElementById('profileHistoryLoadMore').classList.toggle('hidden', !historyHasMore);
 }
@@ -291,7 +297,7 @@ async function loadMoreHistory() {
         if (!response.ok) {
             return;
         }
-        const history = data.history || [];
+        const history = data.history;
         renderHistory(history, true);
         updateHistoryPagination(data.history_pagination, history.length);
     } finally {
@@ -339,18 +345,18 @@ function renderProfile(payload) {
     hideElement('profileLoadingState');    
     showElement('profileContent');
 
-    const username = payload.user?.username || `User ${payload.user?.user_id ?? ''}`.trim();
+    const username = payload.user?.username;
 
     setText('profileUsername', username);
     setText('profileHeroName', username);    
 
     renderSummary(payload.summary);
     renderRegionPerformance(
-        payload.region_performance || [],
-        payload.region_classification_details || []
+        payload.region_performance,
+        payload.region_classification_details
     );
     wireRegionDetailsToggle();
-    const history = payload.history || [];
+    const history = payload.history;
     renderHistory(history);
     updateHistoryPagination(payload.history_pagination, history.length);
     document.getElementById('profileHistoryLoadMore').onclick = loadMoreHistory;

@@ -28,6 +28,7 @@ from app.core.scoring import compute_score
 from app.core.session_service import get_current_session
 from app.core.side_missions.queries import get_side_mission_round
 from app.core.side_missions.service import (
+    ensure_side_mission_assignments,
     get_original_answer_city_id,
     load_side_mission_state,
 )
@@ -206,8 +207,14 @@ def get_infinity_state(
 
         game_id = int(infinity_session.GameId)
         infinity_session_id = int(infinity_session.InfinityPoolSessionId)
-        round_number = int(infinity_session.CurrentRoundNumber)
         daily_session = _require_completed_daily_session(cur, user_id, session_id)
+        ensure_side_mission_assignments(cur, daily_session, infinity_session)
+        infinity_session = get_infinity_session_by_id(
+            cur,
+            user_id,
+            infinity_session_id,
+        )
+        round_number = int(infinity_session.CurrentRoundNumber)
         with _logged_step(
             operation,
             'load_guesses_and_daily_answers',

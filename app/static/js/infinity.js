@@ -660,10 +660,13 @@ async function submitGuess(revealedCity = null, confirmedCityId = null) {
             return;
         }
 
-        const previousRoundScore = infinityState.roundScores[infinityState.currentRound] || 0;
+        const previousRoundScore = infinityState.roundScores[infinityState.currentRound];
         const previousTotalScore = infinityState.totalScore;
         const previousMission = currentSideMission();
-        const previousNamedTargets = new Set(previousMission?.progress.named || []);
+        const previousNamedTargets = new Set();
+        if (previousMission !== undefined) {
+            previousMission.progress.named.forEach(name => previousNamedTargets.add(name));
+        }
         infinityState.roundScores[infinityState.currentRound] = data.round_score;
         infinityState.totalScore = data.total_score;
         infinityState.sideMissions = data.side_missions.missions;
@@ -693,17 +696,22 @@ async function submitGuess(revealedCity = null, confirmedCityId = null) {
         renderScores(previousRoundScore, previousTotalScore);
         renderSideMission();
         const acceptedNames = data.guesses.map(acceptedGuess => acceptedGuess.city).join(', ');
-        const awardedScore = data.guesses.reduce(
-            (total, acceptedGuess) => total + acceptedGuess.score,
-            0,
-        );
+        let awardedScore = 0;
+        data.guesses.forEach(acceptedGuess => {
+            awardedScore += acceptedGuess.score;
+        });
         const duplicateText = data.duplicates.length
             ? `<br>${escapeHtml(data.duplicates.join(', '))} already in your pool.`
             : '';
         const mission = currentSideMission();
-        const newlyNamedTargets = mission?.progress.named.filter(
-            name => !previousNamedTargets.has(name),
-        ) || [];
+        const newlyNamedTargets = [];
+        if (mission !== undefined) {
+            mission.progress.named.forEach(name => {
+                if (!previousNamedTargets.has(name)) {
+                    newlyNamedTargets.push(name);
+                }
+            });
+        }
         const scoreFeedback = isReveal
             ? `<b>${escapeHtml(acceptedNames)}</b> revealed`
             : `<b>${escapeHtml(acceptedNames)}</b> +${numberFmt(awardedScore)}${duplicateText}`;
@@ -870,6 +878,10 @@ function setSideMissionAvailability(availability) {
     console.info('side_missions: availability evaluated', availability);
     infinityState.sideMissionsAvailable = availability.available;
     document.getElementById('sideMissionsInvite').classList.toggle(
+        'hidden',
+        !availability.available,
+    );
+    document.getElementById('statsSideMissionsInvite').classList.toggle(
         'hidden',
         !availability.available,
     );

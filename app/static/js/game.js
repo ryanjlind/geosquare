@@ -43,7 +43,7 @@ import { initFeedback } from './feedback.js?v=4';
 import { initAuth, resolveAuthConflict } from './auth.js?v=4';
 import { expandSquareRequest } from './api.js?v=4';
 import { drawSquare } from './map.js?v=4';
-import { initInfinityMode, isInfinityModeActive, unlockInfinityMode } from './infinity.js?v=9';
+import { initInfinityMode, isInfinityModeActive, unlockInfinityMode } from './infinity.js?v=10';
 
 let endGameRounds = [];
 
@@ -161,6 +161,7 @@ async function enterEndGameGlobe() {
     if (!response.ok) {
         throw new Error(data.error || 'Failed to refresh post-game availability.');
     }
+    Object.assign(gameState, data);
     unlockInfinityMode(data.side_missions);
     setGuessControlsEnabled(false);
     setGuessBoxVisible(false);
@@ -304,18 +305,18 @@ export async function submitGuess(confirmedCityId = null) {
                 guess,
                 round: gameState.currentRound,
                 candidates: data.candidates,
-                nearbyCity: data.nearby_city || null
+                nearbyCity: data.nearby_city
             };
 
             if (typeof showGuessConfirmationModal === "function") {
-                showGuessConfirmationModal(data.candidates, data.nearby_city || null);
+                showGuessConfirmationModal(data.candidates, data.nearby_city);
             }
 
             return;
         }
 
         if (data.correct) {
-            const expansionLevel = data.expansion_level || 0;
+            const expansionLevel = data.expansion_level;
 
             let expansionText = "";
 
@@ -359,8 +360,8 @@ export async function submitGuess(confirmedCityId = null) {
     } catch (err) {
         await postClientLog('submit_guess_error', {
             round: gameState.currentRound,
-            message: err?.message || String(err),
-            stack: err?.stack || null
+            message: err?.message,
+            stack: err?.stack
         });
         throw err;
     } finally {

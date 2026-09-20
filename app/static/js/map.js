@@ -26,14 +26,14 @@ export async function initCesium() {
         if (arcGisImageryProvider.errorEvent) {
             arcGisImageryProvider.errorEvent.addEventListener(function (error) {
                 postClientLog('arcgis_provider_error', {
-                    message: error?.message || null,
-                    timesRetried: error?.timesRetried ?? null,
-                    retry: error?.retry ?? null,
-                    x: error?.x ?? null,
-                    y: error?.y ?? null,
-                    level: error?.level ?? null,
-                    providerErrorMessage: error?.error?.message || null,
-                    providerErrorStack: error?.error?.stack || null
+                    message: error?.message,
+                    timesRetried: error?.timesRetried,
+                    retry: error?.retry,
+                    x: error?.x,
+                    y: error?.y,
+                    level: error?.level,
+                    providerErrorMessage: error?.error?.message,
+                    providerErrorStack: error?.error?.stack
                 });
             });
         }
@@ -65,15 +65,15 @@ export async function initCesium() {
 
         window.geoViewer.scene.renderError.addEventListener(function (scene, error) {
             postClientLog('cesium_render_error', {
-                message: error?.message || String(error),
-                stack: error?.stack || null
+                message: error?.message,
+                stack: error?.stack
             });
             window.geoViewer.useDefaultRenderLoop = true;
         });
     } catch (error) {
         await postClientLog('init_cesium_failed', {
             message: error?.message || String(error),
-            stack: error?.stack || null
+                stack: error?.stack
         });
         throw error;
     }
@@ -107,7 +107,7 @@ export function drawSquare(data, options = {}) {
         });
 
         const entity = window.geoViewer.entities.add({
-            name: `Round ${data.round_number || ''}`.trim(),
+            name: `Round ${data.round_number}`,
             rectangle: {
                 coordinates: rect,
                 height: 0,
@@ -216,9 +216,9 @@ export function drawCities(cities) {
         window.geoViewer.entities.add({
             position: Cesium.Cartesian3.fromDegrees(city.longitude, city.latitude),
             point: {
-                pixelSize: city.pixel_size || 6,
-                color: city.color || Cesium.Color.CYAN,
-                outlineColor: city.outline_color || Cesium.Color.BLACK,
+                pixelSize: city.pixel_size,
+                color: city.color,
+                outlineColor: city.outline_color,
                 outlineWidth: city.outline_width ?? 1,
             },
             label: {
@@ -310,7 +310,7 @@ export async function renderAllSquares(rounds, options = {}) {
             if (round.player_guess && round.player_guess.latitude != null && round.player_guess.longitude != null) {
                 drawCities([{
                     city_name: round.player_guess.city_name,
-                    label: `${round.player_guess.city_name} (${numberFmt(round.player_guess.population || 0)})`,
+                    label: `${round.player_guess.city_name} (${numberFmt(round.player_guess.population)})`,
                     latitude: round.player_guess.latitude,
                     longitude: round.player_guess.longitude,
                     pixel_size: 8,

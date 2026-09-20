@@ -272,6 +272,10 @@
                 <span>Wade into the Infinity Pool and find every city you can.</span>
                 <button id="statsInfinityInviteBtn" type="button">Enter Infinity Pool</button>
             </div>
+            <div id="statsSideMissionsInvite" class="infinity-invite side-missions-invite stats-side-missions-invite hidden">
+                <strong>Side missions unlocked!</strong>
+                <span>Eligible Infinity Pool squares have a new objective.</span>
+            </div>
             <div id="statsTodayRoundsCard" class="stats-card">
                 <div class="stats-section-title">Today&apos;s Rounds</div>
                 <table id="statsTodayRoundsTable" class="stats-rounds-table">
@@ -386,7 +390,7 @@
         };
     </script>
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
-    <script type="module" src="{{ url_for('static', filename='js/app.js', v=9) }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/app.js', v=10) }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/mobile.js', v=6) }}"></script>
     <script>
         window.addEventListener("load", () => {

@@ -14,7 +14,7 @@ async function collectUserAgentData() {
         ]);
     } catch (error) {
         return {
-            error: error?.message || String(error),
+            error: error?.message,
         };
     }
 }
@@ -67,7 +67,7 @@ function collectCesiumDiagnostics() {
         : null;
 
     return {
-        version: window.Cesium?.VERSION || null,
+        version: window.Cesium?.VERSION,
         cameraHeight: viewer.camera.positionCartographic.height,
         canvas: {
             width: canvas.width,
@@ -80,7 +80,7 @@ function collectCesiumDiagnostics() {
         },
         imagery: {
             layerCount: viewer.imageryLayers.length,
-            providerReady: imageryLayer?.imageryProvider?.ready ?? null,
+            providerReady: imageryLayer?.imageryProvider?.ready,
         },
         webgl: collectWebGlDiagnostics(canvas),
     };

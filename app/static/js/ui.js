@@ -173,7 +173,7 @@ export function addRoundRow(result, roundNumber) {
         <td><span class="round-city">${escapeHtml(result.city)}</span></td>
         <td class="pop-cell" data-population="${result.population}">${numberFmt(result.population)}</td>
         <td>${result.rank}</td>
-        <td>${formatScoreWithPenalty(result.score ?? 0, result.expansion_level ?? 0)}</td>
+        <td>${formatScoreWithPenalty(result.score, result.expansion_level)}</td>
     `;
 
     tbody.appendChild(tr);
@@ -223,15 +223,18 @@ export function restoreSavedState(state) {
     clearRoundTable();
     clearGuessFeedback();
 
-    for (const round of (state.completed_rounds || [])) {
+    if (!Array.isArray(state.completed_rounds)) {
+        throw new Error('state.completed_rounds must be an array.');
+    }
+    for (const round of state.completed_rounds) {
         const guess = round.guesses && round.guesses.length ? round.guesses[0] : null;
 
         addRoundRow({
             city: guess ? guess.city_name : '—',
-            population: guess ? (guess.population ?? 0) : 0,
+            population: guess ? guess.population : undefined,
             rank: guess ? (guess.rank ?? '—') : '—',
-            score: round.score ?? 0,
-            expansion_level: round.expansion_level ?? 0,
+            score: round.score,
+            expansion_level: round.expansion_level,
         }, round.round_number);
     }
 

@@ -29,9 +29,9 @@ export function setAuthUi(isAuthenticated) {
 
 export function initAuth(state, callbacks = {}) {
     authCallbacks = {
-        onAuthSuccess: callbacks.onAuthSuccess || null,
-        onAuthConflict: callbacks.onAuthConflict || null,
-        onAuthError: callbacks.onAuthError || null,
+        onAuthSuccess: callbacks.onAuthSuccess,
+        onAuthConflict: callbacks.onAuthConflict,
+        onAuthError: callbacks.onAuthError,
     };
 
     setAuthUi(state.is_authenticated);
@@ -48,9 +48,9 @@ export async function resolveAuthConflict(action) {
 
     if (!response.ok) {
         if (authCallbacks.onAuthError) {
-            authCallbacks.onAuthError(data.error || 'Unable to resolve login conflict.');
+            authCallbacks.onAuthError(data.error);
         } else {
-            console.log(data.error || 'Unable to resolve login conflict.');
+            console.log(data.error);
         }
         return;
     }
@@ -105,9 +105,9 @@ function wireAuthMessageListener() {
 
         if (event.data.type === 'auth_error') {
             if (authCallbacks.onAuthError) {
-                authCallbacks.onAuthError(event.data.message || 'Login failed.');
+                authCallbacks.onAuthError(event.data.message);
             } else {
-                console.log(event.data.message || 'Login failed.');
+                console.log(event.data.message);
             }
         }
     });

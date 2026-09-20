@@ -82,7 +82,11 @@ export function escapeHtml(value) {
 }
 
 export function parseFormattedInt(value) {
-    return parseInt(String(value).replace(/,/g, ''), 10) || 0;
+    const parsed = parseInt(String(value).replace(/,/g, ''), 10);
+    if (!Number.isFinite(parsed)) {
+        throw new Error(`Invalid integer: ${value}`);
+    }
+    return parsed;
 }
 
 export async function postClientLog(eventType, details) {

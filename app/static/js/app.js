@@ -1,4 +1,4 @@
-import { initGame } from './game.js?v=9';
+import { initGame } from './game.js?v=10';
 
 window.addEventListener('error', event => {
 	console.error('Uncaught JavaScript error:', event.error || event.message);

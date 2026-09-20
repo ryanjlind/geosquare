@@ -389,6 +389,51 @@ def assign_random_side_missions(
 		)
 
 
+def ensure_side_mission_assignments(cur, daily_session, infinity_session):
+	infinity_session_id = int(infinity_session.InfinityPoolSessionId)
+	existing = get_side_mission_rounds(cur, infinity_session_id)
+	if existing:
+		return existing
+
+	completed_rounds = _load_daily_rounds(cur, int(daily_session.SessionId))
+	availability = get_side_mission_availability(
+		cur,
+		daily_session,
+		completed_rounds,
+		int(daily_session.UserId),
+	)
+	if not availability['available']:
+		return ()
+
+	guesses_by_round = _guesses_by_round(get_infinity_guesses(cur, infinity_session_id))
+	assignments = _e2e_mission_assignments()
+	if assignments is None:
+		assign_random_side_missions(
+			cur,
+			infinity_session_id,
+			int(daily_session.GameId),
+			completed_rounds,
+			guesses_by_round,
+		)
+	else:
+		assign_specific_side_missions(
+			cur,
+			infinity_session_id,
+			int(daily_session.GameId),
+			completed_rounds,
+			guesses_by_round,
+			assignments,
+		)
+	assigned_missions = get_side_mission_rounds(cur, infinity_session_id)
+	if assigned_missions:
+		update_current_round(
+			cur,
+			infinity_session_id,
+			int(assigned_missions[0].RoundNumber),
+		)
+	return assigned_missions
+
+
 def start_side_missions(user_id: int, session_id: int | None) -> tuple[dict, int]:
 	started_at = perf_counter()
 	_logger.info('start_side_missions: started user_id=%s session_id=%s', user_id, session_id)
@@ -414,36 +459,14 @@ def start_side_missions(user_id: int, session_id: int | None) -> tuple[dict, int
 			infinity_session = get_infinity_session(cur, user_id, int(daily_session.GameId))
 			if infinity_session is None:
 				infinity_session = create_infinity_session(cur, user_id, int(daily_session.GameId))
+			assigned_missions = ensure_side_mission_assignments(
+				cur,
+				daily_session,
+				infinity_session,
+			)
+			if not assigned_missions:
+				raise LookupError('No Side Mission assignments were created.')
 			infinity_session_id = int(infinity_session.InfinityPoolSessionId)
-			existing = get_side_mission_rounds(cur, infinity_session_id)
-			if not existing:
-				guesses_by_round = _guesses_by_round(get_infinity_guesses(cur, infinity_session_id))
-				assignments = _e2e_mission_assignments()
-				if assignments is None:
-					assign_random_side_missions(
-						cur,
-						infinity_session_id,
-						int(daily_session.GameId),
-						completed_rounds,
-						guesses_by_round,
-					)
-				else:
-					assign_specific_side_missions(
-						cur,
-						infinity_session_id,
-						int(daily_session.GameId),
-						completed_rounds,
-						guesses_by_round,
-						assignments,
-					)
-				assigned_missions = get_side_mission_rounds(cur, infinity_session_id)
-				if not assigned_missions:
-					raise LookupError('No Side Mission assignments were created.')
-				update_current_round(
-					cur,
-					infinity_session_id,
-					int(assigned_missions[0].RoundNumber),
-				)
 			state = load_side_mission_state(cur, daily_session, infinity_session)
 			conn.commit()
 	except Exception:

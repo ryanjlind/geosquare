@@ -14,14 +14,43 @@ let shareSource = {
     total: 0,
 };
 
+function requireArray(value, path) {
+    if (!Array.isArray(value)) {
+        throw new Error(`${path} must be an array.`);
+    }
+    return value;
+}
+
+function requireNumber(value, path) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new Error(`${path} must be a finite number.`);
+    }
+    return value;
+}
+
+function requireString(value, path) {
+    if (typeof value !== 'string') {
+        throw new Error(`${path} must be a string.`);
+    }
+    return value;
+}
+
+function sumRoundPoints(rounds, path) {
+    let total = 0;
+    rounds.forEach((round, index) => {
+        total += requireNumber(round.points, `${path}[${index}].points`);
+    });
+    return total;
+}
+
 function toShareRound(result, roundNumber) {
-    const score = Number(result.score ?? result.points ?? 0) || 0;
-    const expansionLevel = Number(result.expansion_level ?? 0) || 0;
+    const score = requireNumber(result.score ?? result.points, 'share result score');
+    const expansionLevel = requireNumber(result.expansion_level, 'share result expansion level');
     const expansionPenalty = expansionLevel > 0 ? `-${expansionLevel * 20}%` : '';
 
     return {
-        round: Number(roundNumber) || 0,
-        city: result.city ?? result.city_name ?? '—',
+        round: requireNumber(roundNumber, 'share round number'),
+        city: requireString(result.city ?? result.city_name, 'share city'),
         population: result.population,
         rank: result.rank ?? '—',
         points: score,
@@ -30,8 +59,7 @@ function toShareRound(result, roundNumber) {
 }
 
 function recomputeShareTotal() {
-    shareSource.total = Array.from(shareSource.rounds.values())
-        .reduce((sum, round) => sum + (round.points || 0), 0);
+    shareSource.total = sumRoundPoints(Array.from(shareSource.rounds.values()), 'share rounds');
 }
 
 function getShareRoundsSorted() {
@@ -57,23 +85,23 @@ function formatShareRank(rank) {
 
 export function hydrateShareFromState(state) {
     shareSource = {
-        gameDate: state?.game_date || '',
+        gameDate: requireString(state?.game_date, 'state.game_date'),
         rounds: new Map(),
         total: 0,
     };
 
-    for (const round of (state?.completed_rounds || [])) {
+    for (const round of requireArray(state?.completed_rounds, 'state.completed_rounds')) {
         const guess = round.guesses && round.guesses.length ? round.guesses[0] : null;
 
         shareSource.rounds.set(
-            Number(round.round_number) || 0,
+            requireNumber(round.round_number, 'state.completed_rounds round number'),
             {
-                round: round.round_number ?? 0,
-                city: guess ? guess.city_name : '—',
+                round: requireNumber(round.round_number, 'state.completed_rounds round number'),
+                city: guess ? requireString(guess.city_name, 'state completed guess city') : '—',
                 population: guess ? guess.population : null,
-                rank: guess ? (guess.rank ?? '—') : '—',
-                points: round.score ?? 0,
-                expansionPenalty: (round.expansion_level ?? 0) > 0 ? `-${(round.expansion_level ?? 0) * 20}%` : '',
+                rank: guess ? requireNumber(guess.rank, 'state completed guess rank') : '—',
+                points: requireNumber(round.score, 'state completed round score'),
+                expansionPenalty: requireNumber(round.expansion_level, 'state completed expansion level') > 0 ? `-${round.expansion_level * 20}%` : '',
             }
         );
     }
@@ -92,15 +120,15 @@ export function isShareReady() {
 }
 
 function buildShareSummaryText({ gameDate, total, solved, totalRounds, rounds, isPerfect }) {
-    const roundLines = (rounds || []).map((round) => {
+    const roundLines = requireArray(rounds, 'share rounds').map((round) => {
         const city = round.city && round.city !== '—' ? round.city : 'Pass';
         const penalty = round.expansionPenalty ? ` ${round.expansionPenalty}` : '';
         return `${getRoundMarker(round)} R${round.round}  ${city} · ${numberFmt(round.population)} · ${formatShareRank(round.rank)} · ${numberFmt(round.points)} pts${penalty}`;
     });
 
     return [
-        `GeoSquare ${gameDate || ''}`.trim(),
-        `${numberFmt(total || 0)} points | ${solved}/${totalRounds} solved`,
+        `GeoSquare ${requireString(gameDate, 'share game date')}`.trim(),
+        `${numberFmt(requireNumber(total, 'share total'))} points | ${solved}/${totalRounds} solved`,
         ...roundLines,
         getShareUrl(),
     ].join('\n');
@@ -115,8 +143,8 @@ function buildDiscordShareText({ gameDate, total, solved, totalRounds, rounds, i
     });
 
     return [
-        `GeoSquare ${gameDate || ''}`.trim(),
-        `${numberFmt(total || 0)} points | ${solved}/${totalRounds} solved`,
+        `GeoSquare ${requireString(gameDate, 'share game date')}`.trim(),
+        `${numberFmt(requireNumber(total, 'share total'))} points | ${solved}/${totalRounds} solved`,
         ...roundLines,
         getShareUrl(),
     ].join('\n');
@@ -126,8 +154,8 @@ function buildCompactShareText({ gameDate, total, solved, totalRounds, rounds })
     const resultGrid = rounds.map(getRoundMarker).join(' ');
 
     return [
-        `GeoSquare ${gameDate || ''}`.trim(),
-        `${numberFmt(total || 0)} points | ${solved}/${totalRounds} solved`,
+        `GeoSquare ${requireString(gameDate, 'share game date')}`.trim(),
+        `${numberFmt(requireNumber(total, 'share total'))} points | ${solved}/${totalRounds} solved`,
         resultGrid,
         'Can you beat me?',
         getShareUrl(),
@@ -138,10 +166,10 @@ function getShareText(format) {
     const rounds = getShareRoundsSorted();
     const totalRounds = rounds.length;
     const solved = rounds.filter((round) => round.points > 0).length;
-    const total = shareSource.total || 0;
+    const total = requireNumber(shareSource.total, 'share total');
     const isPerfect = totalRounds > 0 && solved === totalRounds;
     const shareData = {
-        gameDate: shareSource.gameDate || '',
+        gameDate: requireString(shareSource.gameDate, 'share game date'),
         total,
         solved,
         totalRounds,
@@ -175,17 +203,17 @@ async function copyTextToClipboard(text) {
 }
 
 export function buildRoundsFromState(state) {
-    return (state.completed_rounds || []).map((round) => {
+    return requireArray(state.completed_rounds, 'state.completed_rounds').map((round) => {
         const guess = round.guesses && round.guesses.length ? round.guesses[0] : null;
-        const expansionLevel = round.expansion_level ?? 0;
+        const expansionLevel = requireNumber(round.expansion_level, 'round expansion level');
         const expansionPenalty = expansionLevel > 0 ? `-${expansionLevel * 20}%` : '';
 
         return {
-            round: round.round_number ?? 0,
+            round: requireNumber(round.round_number, 'round number'),
             city: guess ? guess.city_name : '—',
-            population: guess ? (guess.population ?? 0) : 0,
+            population: guess ? guess.population : 0,
             rank: guess ? (guess.rank ?? '—') : '—',
-            points: round.score ?? 0,
+            points: requireNumber(round.score, 'round score'),
             expansionPenalty,
         };
     });
@@ -208,8 +236,8 @@ export function syncStatsUsernameUi(state) {
 
     row.classList.remove('hidden');
 
-    text.textContent = state.username || '';
-    input.value = state.username || '';
+    text.textContent = state.username;
+    input.value = state.username;
 }
 
 export function wireStatsOverlay() {
@@ -296,7 +324,7 @@ export function wireStatsOverlay() {
             });
 
             if (!saveResponse.ok) {
-                message.textContent = saveData?.error || 'Unable to save username';
+                message.textContent = saveData?.error;
                 return;
             }
 
@@ -386,11 +414,11 @@ function renderSharePreview() {
     preview.replaceChildren();
     header.className = 'share-card-header';
     appendPreviewElement(header, 'share-card-brand', 'GeoSquare');
-    appendPreviewElement(header, 'share-card-date', shareSource.gameDate || '');
+    appendPreviewElement(header, 'share-card-date', shareSource.gameDate);
     preview.appendChild(header);
 
     summary.className = 'share-card-summary';
-    appendPreviewElement(summary, 'share-card-score', numberFmt(shareSource.total || 0));
+    appendPreviewElement(summary, 'share-card-score', numberFmt(requireNumber(shareSource.total, 'share total')));
     appendPreviewElement(summary, 'share-card-solved', `${solved}/${rounds.length} solved`);
     preview.appendChild(summary);
 
@@ -524,7 +552,7 @@ export function showStatsOverlay() {
 
 export function renderStatsChart(stats) {
     const svg = document.getElementById('statsChart');
-    const chartPoints = stats.graph_points || [];
+    const chartPoints = requireArray(stats.graph_points, 'stats.graph_points');
 
     const width = 640;
     const height = 220;
@@ -545,7 +573,7 @@ export function renderStatsChart(stats) {
     }
 
     const maxSolved = 5;
-    const maxPoints = Math.max(...chartPoints.map(p => Number(p.points) || 0), 1);
+    const maxPoints = Math.max(...chartPoints.map((point, index) => requireNumber(point.points, `stats.graph_points[${index}].points`)), 1);
 
     const xFor = (index) => {
         if (chartPoints.length === 1) {
@@ -558,19 +586,19 @@ export function renderStatsChart(stats) {
     const yPoints = (value) => topPad + ((maxPoints - value) / maxPoints) * innerHeight;
 
     const solvedLine = chartPoints
-        .map((p, i) => `${xFor(i)},${ySolved(Number(p.solved) || 0)}`)
+        .map((point, index) => `${xFor(index)},${ySolved(requireNumber(point.solved, `stats.graph_points[${index}].solved`))}`)
         .join(' ');
 
     const pointsLine = chartPoints
-        .map((p, i) => `${xFor(i)},${yPoints(Number(p.points) || 0)}`)
+        .map((point, index) => `${xFor(index)},${yPoints(requireNumber(point.points, `stats.graph_points[${index}].points`))}`)
         .join(' ');
 
     const solvedDots = chartPoints
-        .map((p, i) => `<circle cx="${xFor(i)}" cy="${ySolved(Number(p.solved) || 0)}" r="4.5" fill="#8fd3ff"></circle>`)
+        .map((point, index) => `<circle cx="${xFor(index)}" cy="${ySolved(requireNumber(point.solved, `stats.graph_points[${index}].solved`))}" r="4.5" fill="#8fd3ff"></circle>`)
         .join('');
 
     const pointsDots = chartPoints
-        .map((p, i) => `<circle cx="${xFor(i)}" cy="${yPoints(Number(p.points) || 0)}" r="3.5" fill="#ffd166"></circle>`)
+        .map((point, index) => `<circle cx="${xFor(index)}" cy="${yPoints(requireNumber(point.points, `stats.graph_points[${index}].points`))}" r="3.5" fill="#ffd166"></circle>`)
         .join('');
 
     const perfectMarkers = chartPoints
@@ -579,7 +607,7 @@ export function renderStatsChart(stats) {
                 return '';
             }
 
-            return `<circle cx="${xFor(i)}" cy="${ySolved(Number(p.solved) || 0)}" r="7" fill="none" stroke="#4cff88" stroke-width="2"></circle>`;
+            return `<circle cx="${xFor(i)}" cy="${ySolved(requireNumber(p.solved, `stats.graph_points[${i}].solved`))}" r="7" fill="none" stroke="#4cff88" stroke-width="2"></circle>`;
         })
         .join('');
 
@@ -623,15 +651,15 @@ export function renderStatsChart(stats) {
 }
 
 function buildTodayRoundsFromCompletedRounds(completedRounds) {
-        return (completedRounds || []).map((round) => {
+        return requireArray(completedRounds, 'completed rounds').map((round) => {
             const guess = round.guesses && round.guesses.length ? round.guesses[0] : null;
 
             return {
-                round: round.round_number ?? 0,
+                round: requireNumber(round.round_number, 'completed round number'),
                 city: guess ? guess.city_name : '—',
-                population: guess ? (guess.population ?? 0) : 0,
+                population: guess ? guess.population : 0,
                 rank: guess ? (guess.rank ?? '—') : '—',
-                points: round.score ?? 0
+                points: requireNumber(round.score, 'completed round score')
             };
         });
     }
@@ -650,7 +678,7 @@ function renderTodayRoundsTable(rounds, total) {
         </tr>
     `).join('');
 
-    totalEl.textContent = numberFmt(total || 0);
+    totalEl.textContent = numberFmt(requireNumber(total, 'today total'));
 }
 
 export function renderStatsOverlay(stats, todaySummary) {
@@ -663,19 +691,19 @@ export function renderStatsOverlay(stats, todaySummary) {
 
     document.getElementById('statsGameDate').textContent = todaySummary.gameDate || '—';
     document.getElementById('statsTodaySolved').textContent = `${solved} / ${totalRounds}`;
-    document.getElementById('statsTodayPoints').textContent = numberFmt(todaySummary.total || 0);
+    document.getElementById('statsTodayPoints').textContent = numberFmt(requireNumber(todaySummary.total, 'today total'));
     document.getElementById('statsTodayBestRound').innerHTML = todaySummary.bestRound
         ? `${escapeHtml(todaySummary.bestRound.city)} · R${todaySummary.bestRound.round} · ${numberFmt(todaySummary.bestRound.points)}${todaySummary.bestRound.expansionPenalty ? ` <span class="stats-expansion-penalty">[${escapeHtml(todaySummary.bestRound.expansionPenalty)}]</span>` : ''}`
         : '—';
 
-    renderTodayRoundsTable(todaySummary.rounds || [], todaySummary.total || 0);
+    renderTodayRoundsTable(requireArray(todaySummary.rounds, 'today rounds'), requireNumber(todaySummary.total, 'today total'));
 
-    document.getElementById('statsGamesPlayed').textContent = numberFmt(stats.games_played || 0);
-    document.getElementById('statsGameStreak').textContent = numberFmt(stats.current_streak || 0);
-    document.getElementById('statsAveragePoints').textContent = numberFmt(stats.average_score || 0);
-    document.getElementById('statsPerfectDays').textContent = `${numberFmt(stats.perfect_days || 0)} / ${numberFmt(stats.games_played || 0)}`;
-    document.getElementById('statsPerfectStreak').textContent = numberFmt(stats.perfect_streak || 0);
-    document.getElementById('statsBestPoints').textContent = numberFmt(stats.best_score || 0);
+    document.getElementById('statsGamesPlayed').textContent = numberFmt(requireNumber(stats.games_played, 'stats.games_played'));
+    document.getElementById('statsGameStreak').textContent = numberFmt(requireNumber(stats.current_streak, 'stats.current_streak'));
+    document.getElementById('statsAveragePoints').textContent = numberFmt(requireNumber(stats.average_score, 'stats.average_score'));
+    document.getElementById('statsPerfectDays').textContent = `${numberFmt(requireNumber(stats.perfect_days, 'stats.perfect_days'))} / ${numberFmt(requireNumber(stats.games_played, 'stats.games_played'))}`;
+    document.getElementById('statsPerfectStreak').textContent = numberFmt(requireNumber(stats.perfect_streak, 'stats.perfect_streak'));
+    document.getElementById('statsBestPoints').textContent = numberFmt(requireNumber(stats.best_score, 'stats.best_score'));
     document.getElementById('statsBestPointsDate').textContent = stats.best_score_game_date || '—';
 
     renderStatsChart(stats);
@@ -685,7 +713,7 @@ export function renderEndGameFeedbackFromState(state) {
     const rounds = buildRoundsFromState(state);
     const solved = rounds.filter((round) => round.points > 0).length;
     const totalRounds = rounds.length;
-    const total = rounds.reduce((sum, round) => sum + (round.points || 0), 0);
+    const total = sumRoundPoints(rounds, 'completed rounds');
     const isPerfect = totalRounds > 0 && solved === totalRounds;
 
     const feedback = document.getElementById('guessFeedback');
@@ -722,7 +750,7 @@ export async function showEndGameSummary() {
         }
     }
 
-    const total = rounds.reduce((sum, r) => sum + (r.points || 0), 0);
+    const total = sumRoundPoints(rounds, 'completed rounds');
     const totalRounds = rounds.length;
     const isPerfect = totalRounds > 0 && solved === totalRounds;
 

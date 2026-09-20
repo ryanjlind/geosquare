@@ -382,6 +382,16 @@
     margin: 14px 0;
 }
 
+.stats-side-missions-invite {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .stats-side-missions-invite:not(.hidden) {
+        display: flex;
+    }
+}
+
 @keyframes infinity-chip-arrive {
     0% { opacity: 0; transform: translateY(10px) scale(0.82); }
     65% { opacity: 1; transform: translateY(-2px) scale(1.04); }

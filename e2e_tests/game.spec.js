@@ -168,48 +168,20 @@ async function enterInfinity(page, projectName) {
   expect(response.ok()).toBe(true);
   const state = await response.json();
   expect(state.unlocked).toBe(true);
-  await expect(page.locator('#infinityPanel')).toBeVisible();
-  await expect(page.locator('#guessInput')).toBeEnabled();
-  await expect(page.locator('#guessBtn')).toBeEnabled();
-  await expect(page.locator('#meta')).toContainText(`Square ${state.current_round} of 5`);
-  progress(projectName, `Infinity Pool square ${state.current_round} ready`);
-  return state;
-}
-
-async function startSideMissions(page, projectName) {
-  progress(projectName, 'starting Side Missions');
-  await page.locator('#statsCloseBtn').click();
-  if (projectName === 'webkit-mobile') {
-    await page.locator('#mobileMenuBtn').click();
-    await expect(page.locator('#sidebar')).toHaveClass(/mobile-open/);
-  }
-  const startResponsePromise = page.waitForResponse((response) => (
-    response.url().endsWith('/api/side-missions/start')
-    && response.request().method() === 'POST'
-  ));
-  const stateResponsePromise = page.waitForResponse((response) => (
-    response.url().includes('/api/infinity-state')
-    && response.request().method() === 'GET'
-  ));
-  await page.locator('#sideMissionsInviteBtn').click();
-  const startResponse = await startResponsePromise;
-  expect(startResponse.ok()).toBe(true);
-  const startData = await startResponse.json();
-  expect(startData.side_missions.missions.map(({ round_number, mission_id }) => ({
+  expect(state.side_missions.missions.map(({ round_number, mission_id }) => ({
     round_number,
     mission_id,
   }))).toEqual(fixture.side_missions.map(({ round_number, mission_id }) => ({
     round_number,
     mission_id,
   })));
-
-  const stateResponse = await stateResponsePromise;
-  expect(stateResponse.ok()).toBe(true);
-  const state = await stateResponse.json();
-  expect(state.current_round).toBe(2);
+  await expect(page.locator('#infinityPanel')).toBeVisible();
+  await expect(page.locator('#guessInput')).toBeEnabled();
+  await expect(page.locator('#guessBtn')).toBeEnabled();
+  await expect(page.locator('#meta')).toContainText(`Square ${state.current_round} of 5`);
   await expect(page.locator('#sideMissionPanel')).toBeVisible();
-  progress(projectName, 'Side Missions ready on square 2');
-  return { state, missions: startData.side_missions.missions };
+  progress(projectName, `Infinity Pool square ${state.current_round} ready`);
+  return state;
 }
 
 async function selectInfinityRound(page, roundNumber, infinityPoolSessionId, projectName) {
@@ -483,12 +455,15 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
   expect(state.completed_rounds).toHaveLength(5);
   expect(state.completed_rounds.filter((round) => round.round_status === 'Passed')).toHaveLength(1);
 
-  const sideMissionStart = await startSideMissions(page, projectName);
-  const infinityState = sideMissionStart.state;
+  if (projectName === 'webkit-mobile') {
+    await expect(page.locator('#statsSideMissionsInvite')).toBeVisible();
+  }
+  const infinityState = await enterInfinity(page, projectName);
+  expect(infinityState.current_round).toBe(2);
   let latestResult = await completeSideMission(
     page,
     SIDE_MISSIONS_BY_ROUND[2],
-    sideMissionStart.missions.find((mission) => mission.round_number === 2),
+    infinityState.side_missions.missions.find((mission) => mission.round_number === 2),
     infinityState.infinity_pool_session_id,
     projectName,
   );
