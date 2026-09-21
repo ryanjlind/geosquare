@@ -300,23 +300,22 @@ def _score_candidate(guess_name: str, row) -> tuple[float, str, str, str, str]:
 
 
 def _suggestion(row) -> dict:
-    province = next(
-        (
-            value.strip()
-            for value in (row.ProvinceCodes or '').split(',')
-            if value.strip()
-        ),
-        '',
-    )
-    if len(province) > 10:
-        province = ''
+    province = None
+    if row.ProvinceCodes is not None:
+        for value in row.ProvinceCodes.split(','):
+            stripped_value = value.strip()
+            if stripped_value:
+                province = stripped_value
+                break
+    if province is not None and len(province) > 10:
+        province = None
 
     return {
         "city_id": int(row.CityId),
         "city": row.CityName,
         "country_code": row.CountryCode,
         "country_name": get_country_name(row.CountryCode),
-        "province": province or None,
+        "province": province,
     }
 
 
@@ -371,12 +370,14 @@ def find_matching_city(
         province_filtered_rows = []
 
         for r in rows:
-            province_codes_raw = r.ProvinceCodes or ''
-            province_codes = {
-                code.strip().upper()
-                for code in province_codes_raw.split(',')
-                if code.strip()
-            }
+            if r.ProvinceCodes is None:
+                province_codes = set()
+            else:
+                province_codes = {
+                    code.strip().upper()
+                    for code in r.ProvinceCodes.split(',')
+                    if code.strip()
+                }
 
             if precision_filter in province_codes:
                 province_filtered_rows.append(r)
@@ -390,7 +391,7 @@ def find_matching_city(
         else:
             country_filtered_rows = [
                 r for r in rows
-                if (r.CountryCode or '').upper() == precision_filter
+                if r.CountryCode is not None and r.CountryCode.upper() == precision_filter
             ]
             candidate_rows = country_filtered_rows
             summary_parts.append(
@@ -448,7 +449,11 @@ def find_matching_city(
     surviving_candidates.sort(
         key=lambda candidate: (
             normalize_place_name(candidate[1].CityName),
-            (candidate[1].CountryCode or '').upper(),
+            (
+                (0, candidate[1].CountryCode.upper())
+                if candidate[1].CountryCode is not None
+                else (1,)
+            ),
             int(candidate[1].CityId),
         )
     )

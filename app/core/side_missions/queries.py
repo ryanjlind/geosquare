@@ -36,14 +36,8 @@ def get_side_mission_round(cur, infinity_session_id: int, round_number: int):
 	return cur.fetchone()
 
 
-def insert_side_mission_round(
-	cur,
-	infinity_session_id: int,
-	round_number: int,
-	mission_id: str,
-	is_complete: bool,
-) -> None:
-	cur.execute(
+def insert_side_mission_rounds(cur, rounds: list[tuple]) -> None:
+	cur.executemany(
 		"""
 		INSERT INTO dbo.SideMissionRounds (
 			InfinityPoolSessionId,
@@ -57,17 +51,17 @@ def insert_side_mission_round(
 			CASE WHEN ? = 1 THEN SYSUTCDATETIME() ELSE NULL END
 		)
 		""",
-		(infinity_session_id, round_number, mission_id, int(is_complete)),
+		rounds,
 	)
 
 
-def complete_side_mission_round(cur, side_mission_round_id: int) -> None:
-	cur.execute(
+def complete_side_mission_rounds(cur, side_mission_round_ids: list[int]) -> None:
+	cur.executemany(
 		"""
 		UPDATE dbo.SideMissionRounds
 		SET CompletedAt = SYSUTCDATETIME()
 		WHERE SideMissionRoundId = ?
 		  AND CompletedAt IS NULL
 		""",
-		(side_mission_round_id,),
+		[(side_mission_round_id,) for side_mission_round_id in side_mission_round_ids],
 	)

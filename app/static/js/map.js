@@ -6,11 +6,6 @@ import { expandSquareRequest } from '@geosquare/api.js';
 let expansionEntity = null;
 let currentBounds = null;
 let baseSquareEntity = null;
-let difficultyEntities = [];
-
-const EASY_CITY_MIN_POPULATION = 1_000_000;
-const EASY_CITY_DOT_MIN_SIZE = 6;
-const EASY_CITY_DOT_MAX_SIZE = 10;
 const DEFAULT_GLOBE_ZOOM_HEIGHT = 10_000_000;
 
 export async function initCesium() {
@@ -523,56 +518,5 @@ export async function handleExpand() {
     } finally {
         btn.disabled = false;
         btn.classList.remove('pressed');
-    }
-}
-
-// ── Difficulty visual aids ─────────────────────────────────────────────────
-
-export function clearDifficultyLayer() {
-    difficultyEntities.forEach((e) => window.geoViewer.entities.remove(e));
-    difficultyEntities = [];
-}
-
-function _populationDotSize(population, minPopulation, maxPopulation) {
-    if (maxPopulation <= minPopulation) {
-        return Math.round((EASY_CITY_DOT_MIN_SIZE + EASY_CITY_DOT_MAX_SIZE) / 2);
-    }
-
-    const minLog = Math.log10(minPopulation);
-    const maxLog = Math.log10(maxPopulation);
-    const popLog = Math.log10(population);
-    const t = (popLog - minLog) / (maxLog - minLog);
-    return EASY_CITY_DOT_MIN_SIZE + (EASY_CITY_DOT_MAX_SIZE - EASY_CITY_DOT_MIN_SIZE) * t;
-}
-
-export async function renderDifficultyLayer(squareData, level) {
-    clearDifficultyLayer();
-
-    // First easy level: show large-city dots only.
-    if (level < 2) {
-        return;
-    }
-
-    const qualifying = squareData.cities.filter((city) => city.population >= EASY_CITY_MIN_POPULATION);
-    if (!qualifying.length) {
-        return;
-    }
-
-    const minPop = Math.min(...qualifying.map((c) => c.population));
-    const maxPop = Math.max(...qualifying.map((c) => c.population));
-
-    for (const city of qualifying) {
-        const dot = window.geoViewer.entities.add({
-            position: Cesium.Cartesian3.fromDegrees(city.longitude, city.latitude),
-            point: {
-                pixelSize: _populationDotSize(city.population, minPop, maxPop),
-                color: Cesium.Color.BLACK,
-                outlineColor: Cesium.Color.WHITE,
-                outlineWidth: 1,
-                disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            }
-        });
-
-        difficultyEntities.push(dot);
     }
 }

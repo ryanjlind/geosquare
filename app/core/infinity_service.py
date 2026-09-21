@@ -20,8 +20,8 @@ from app.core.infinity_queries import (
     get_infinity_scores,
     get_infinity_session,
     get_infinity_session_by_id,
-    infinity_guess_exists,
-    insert_infinity_guess,
+    get_infinity_guess_city_ids,
+    insert_infinity_guesses,
     update_current_round,
 )
 from app.core.guess_resolution import resolve_city_guess
@@ -489,25 +489,25 @@ def submit_infinity_guess(
             infinity_session_id,
             round_number,
         )
+        with _logged_step(
+            operation,
+            'check_duplicates',
+            candidate_count=len(matched_rows),
+            infinity_session_id=infinity_session_id,
+            round_number=round_number,
+        ):
+            duplicate_city_ids = get_infinity_guess_city_ids(
+                cur,
+                infinity_session_id,
+                round_number,
+            )
+        guesses_to_insert = []
         for matched in matched_rows:
             city_id = int(matched.CityId)
             if city_id == original_answer_city_id:
                 duplicate_cities.append(matched.CityName)
                 continue
-            with _logged_step(
-                operation,
-                'check_duplicate',
-                city_id=city_id,
-                infinity_session_id=infinity_session_id,
-                round_number=round_number,
-            ):
-                duplicate = infinity_guess_exists(
-                    cur,
-                    infinity_session_id,
-                    round_number,
-                    city_id,
-                )
-            if duplicate:
+            if city_id in duplicate_city_ids:
                 duplicate_cities.append(matched.CityName)
                 continue
 
@@ -515,23 +515,16 @@ def submit_infinity_guess(
                 ranked_cities,
                 int(matched.Population),
             )
-            with _logged_step(
-                operation,
-                'insert_guess',
-                city_id=city_id,
-                infinity_session_id=infinity_session_id,
-                round_number=round_number,
-            ):
-                insert_infinity_guess(
-                    cur,
-                    infinity_session_id,
-                    round_number,
-                    square_id,
-                    city_id,
-                    matched.CityName,
-                    int(matched.Population),
-                    score,
-                )
+            guesses_to_insert.append((
+                infinity_session_id,
+                round_number,
+                square_id,
+                city_id,
+                matched.CityName,
+                int(matched.Population),
+                score,
+            ))
+            duplicate_city_ids.add(city_id)
             added_guesses.append({
                 'city': matched.CityName,
                 'city_id': city_id,
@@ -542,6 +535,15 @@ def submit_infinity_guess(
                 'rank': int(matched.PopRank),
                 'score': score,
             })
+        if guesses_to_insert:
+            with _logged_step(
+                operation,
+                'insert_guesses',
+                guess_count=len(guesses_to_insert),
+                infinity_session_id=infinity_session_id,
+                round_number=round_number,
+            ):
+                insert_infinity_guesses(cur, guesses_to_insert)
 
         if not added_guesses:
             return {

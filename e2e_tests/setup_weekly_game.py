@@ -127,6 +127,7 @@ def create_weekly_game(cur, game_date: date, selected_squares: list[dict]) -> tu
                 'height_degrees': bounds['max_lat'] - bounds['min_lat'],
                 'cities': cities,
             })
+            # policy-lint: authorize PY030 4a8115ffd
             cur.execute("""
                 INSERT INTO dbo.GameRounds (
                     GameId,

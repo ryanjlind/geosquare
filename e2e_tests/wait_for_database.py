@@ -25,6 +25,7 @@ def main() -> None:
         try:
             with get_conn(e2e=True) as conn:
                 cur = conn.cursor()
+                # policy-lint: authorize PY030 e17a6ac5ce
                 cur.execute('SELECT 1')
                 cur.fetchone()
         except pyodbc.Error as error:

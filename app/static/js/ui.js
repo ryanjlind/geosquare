@@ -37,15 +37,6 @@ export function renderSidebar(data) {
     clearGuessFeedback();
 }
 
-export function setDifficultyVisible(visible) {
-    const row = document.getElementById('difficultyRow');
-    if (visible) {
-        row.classList.remove('hidden');
-    } else {
-        row.classList.add('hidden');
-    }
-}
-
 export function clearRoundTable() {
     document.querySelector('#roundTable tbody').replaceChildren();
     document.getElementById('totalPoints').textContent = '0';

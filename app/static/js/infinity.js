@@ -304,7 +304,6 @@ function setPoolLayout() {
     document.getElementById('roundTable').classList.add('hidden');
     document.getElementById('infinityPanel').classList.remove('hidden');
     document.getElementById('sideMissionsInvite').classList.add('hidden');
-    document.getElementById('difficultyRow').classList.add('hidden');
     document.getElementById('passBtn').style.display = 'none';
     document.getElementById('expandBtn').style.display = 'none';
     document.getElementById('previousBtn').style.display = 'inline-block';

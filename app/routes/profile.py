@@ -9,7 +9,7 @@ from app.core.profile_service import (
     get_profile_region_details_payload,
 )
 from app.core.logging import info as log_info
-from app.helpers.session import get_user_id_from_cookie
+from app.core.session_service import get_request_user_id
 
 
 profile_bp = Blueprint('profile', __name__)
@@ -29,7 +29,7 @@ def infinity_pools_page():
 def profile_data():
     request_start = perf_counter()
     log_info('[profile] /api/profile started')
-    user_id = get_user_id_from_cookie()
+    user_id = get_request_user_id()
     payload_start = perf_counter()
     response_body, status_code = get_profile_payload(user_id)
     log_info(
@@ -62,7 +62,7 @@ def profile_history():
     except ValueError:
         return jsonify({'error': 'offset must be an integer.'}), 400
 
-    user_id = get_user_id_from_cookie()
+    user_id = get_request_user_id()
     response_body, status_code = get_profile_history_payload(user_id, offset)
     response = jsonify(response_body)
     response.status_code = status_code
@@ -75,7 +75,7 @@ def profile_history():
 
 @profile_bp.route('/api/profile/region-details')
 def profile_region_details():
-    user_id = get_user_id_from_cookie()
+    user_id = get_request_user_id()
     region = request.args['region']
     response_body, status_code = get_profile_region_details_payload(user_id, region)
     response = jsonify(response_body)
@@ -85,7 +85,7 @@ def profile_region_details():
 
 @profile_bp.route('/api/profile/infinity-pools')
 def infinity_pools_data():
-    user_id = get_user_id_from_cookie()
+    user_id = get_request_user_id()
     response_body, status_code = get_infinity_pools_payload(user_id)
     response = jsonify(response_body)
     response.status_code = status_code

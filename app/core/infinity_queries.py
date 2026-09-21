@@ -136,36 +136,25 @@ def get_infinity_guesses(cur, infinity_session_id: int):
     return cur.fetchall()
 
 
-def infinity_guess_exists(
+def get_infinity_guess_city_ids(
     cur,
     infinity_session_id: int,
     round_number: int,
-    city_id: int,
-) -> bool:
+) -> set[int]:
     cur.execute(
         """
-        SELECT TOP 1 1
+        SELECT CityId
         FROM dbo.InfinityPoolGuesses
         WHERE InfinityPoolSessionId = ?
           AND RoundNumber = ?
-          AND CityId = ?
         """,
-        (infinity_session_id, round_number, city_id),
+        (infinity_session_id, round_number),
     )
-    return cur.fetchone() is not None
+    return {int(row.CityId) for row in cur.fetchall()}
 
 
-def insert_infinity_guess(
-    cur,
-    infinity_session_id: int,
-    round_number: int,
-    square_id: int,
-    city_id: int,
-    city_name: str,
-    population: int,
-    score: int,
-) -> None:
-    cur.execute(
+def insert_infinity_guesses(cur, guesses: list[tuple]) -> None:
+    cur.executemany(
         """
         INSERT INTO dbo.InfinityPoolGuesses (
             InfinityPoolSessionId,
@@ -179,15 +168,7 @@ def insert_infinity_guess(
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, SYSUTCDATETIME())
         """,
-        (
-            infinity_session_id,
-            round_number,
-            square_id,
-            city_id,
-            city_name,
-            population,
-            score,
-        ),
+        guesses,
     )
 
 

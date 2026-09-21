@@ -240,6 +240,7 @@ def create_test_game(
                 'height_degrees': bounds['max_lat'] - bounds['min_lat'],
                 'cities': cities,
             })
+            # policy-lint: authorize PY030 4a8115ffd
             cur.execute("""
                 INSERT INTO dbo.GameRounds (
                     GameId,

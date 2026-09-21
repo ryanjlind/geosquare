@@ -1,4 +1,3 @@
-from collections import defaultdict
 from contextlib import contextmanager
 from datetime import date, timedelta
 from time import perf_counter
@@ -202,15 +201,17 @@ def get_infinity_pools_payload(user_id: int | None) -> tuple[dict, int]:
     pools_by_id = {}
     for row in rows:
         infinity_session_id = int(row.InfinityPoolSessionId)
-        pool = pools_by_id.setdefault(infinity_session_id, {
-            'infinity_pool_session_id': infinity_session_id,
-            'game_date': row.GameDate.isoformat(),
-            'current_round': int(row.CurrentRoundNumber),
-            'started_at': row.StartedAt.isoformat(),
-            'updated_at': row.UpdatedAt.isoformat(),
-            'total_score': 0,
-            'squares': [],
-        })
+        if infinity_session_id not in pools_by_id:
+            pools_by_id[infinity_session_id] = {
+                'infinity_pool_session_id': infinity_session_id,
+                'game_date': row.GameDate.isoformat(),
+                'current_round': int(row.CurrentRoundNumber),
+                'started_at': row.StartedAt.isoformat(),
+                'updated_at': row.UpdatedAt.isoformat(),
+                'total_score': 0,
+                'squares': [],
+            }
+        pool = pools_by_id[infinity_session_id]
         round_score = int(row.RoundScore)
         pool['total_score'] += round_score
         pool['squares'].append({
@@ -446,12 +447,14 @@ def _get_completed_round_rows_for_sessions(cur, session_ids: list[int]):
 
 def _build_completed_rounds_by_session(rows) -> dict[int, list[dict]]:
     start = perf_counter()
-    rounds_by_session = defaultdict(dict)
+    rounds_by_session = {}
 
     for row in rows:
         session_id = int(row.SessionId)
         round_number = int(row.RoundNumber)
 
+        if session_id not in rounds_by_session:
+            rounds_by_session[session_id] = {}
         if round_number not in rounds_by_session[session_id]:
             rounds_by_session[session_id][round_number] = {
                 'session_round_id': int(row.SessionRoundId),

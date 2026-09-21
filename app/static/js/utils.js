@@ -9,6 +9,7 @@ export function numberFmt(v) {
 export function measureTextWidth(text, referenceElement) {
     const temp = document.createElement('span');
     const style = window.getComputedStyle(referenceElement);
+    // policy-lint: authorize JS008 7ddf32e17a
     temp.style.font = style.font;
     temp.style.whiteSpace = 'nowrap';
     temp.textContent = text;

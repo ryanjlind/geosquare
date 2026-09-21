@@ -1,8 +1,14 @@
 # core/session_service.py
 
+import os
+
+from flask import current_app, request
+from itsdangerous import URLSafeSerializer
+
+from app.constants import COOKIE_MAX_AGE_SECONDS, COOKIE_NAME
+from app.core.db import get_conn
 from app.core.game_queries import get_today_game, create_session
 from app.core.user_queries import create_user, get_user_by_id
-from app.helpers.session import get_session_id_from_cookie, get_user_id_from_cookie
 
 
 def _require_today_game(cur):
@@ -48,22 +54,80 @@ def get_current_session(cur, user_id: int, session_id: int | None):
     return create_session(cur, user_id, game_id)
 
 
-def resolve_request_identity(cur):
-    cookie_user_id = get_user_id_from_cookie()
-    cookie_session_id = get_session_id_from_cookie()
+def resolve_request_identity():
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cookie_identity = _get_identity_from_cookie()
+        cookie_user_id = (
+            cookie_identity.get('user_id')
+            if cookie_identity is not None
+            else None
+        )
+        cookie_session_id = (
+            cookie_identity.get('session_id')
+            if cookie_identity is not None
+            else None
+        )
 
-    if cookie_user_id is not None:
-        user = get_user_by_id(cur, cookie_user_id)
-    else:
-        user = None
+        if cookie_user_id is not None:
+            user = get_user_by_id(cur, cookie_user_id)
+        else:
+            user = None
 
-    if user is None:
-        user = create_user(cur)
+        if user is None:
+            user = create_user(cur)
 
-    user_id = int(user.UserId)
-    session = get_current_session(cur, user_id, cookie_session_id)
+        user_id = int(user.UserId)
+        session = get_current_session(cur, user_id, cookie_session_id)
 
-    return {
-        "user_id": user_id,
-        "session_id": int(session.SessionId) if session else None,
-    }
+        return {
+            "user_id": user_id,
+            "session_id": int(session.SessionId) if session else None,
+        }
+
+
+def _get_identity_from_cookie() -> dict | None:
+    raw = request.cookies.get(COOKIE_NAME)
+    if raw is None:
+        return None
+
+    signer = URLSafeSerializer(current_app.config['SECRET_KEY'], salt='geosquare-session')
+    is_valid, data = signer.loads_unsafe(raw)
+    if not is_valid or not isinstance(data, dict):
+        return None
+
+    identity = {}
+    if data.get('user_id') is not None:
+        identity['user_id'] = int(data['user_id'])
+    if data.get('session_id') is not None:
+        identity['session_id'] = int(data['session_id'])
+    return identity
+
+
+def get_request_user_id():
+    identity = _get_identity_from_cookie()
+    if identity is None:
+        return None
+    return identity.get('user_id')
+
+
+def attach_request_session_cookie(response, user_id: int, session_id: int | None):
+    is_local = os.getenv('LOCAL_AUTH_BYPASS', '').lower() in ('1', 'true', 'yes')
+    signer = URLSafeSerializer(current_app.config['SECRET_KEY'], salt='geosquare-session')
+    response.set_cookie(
+        COOKIE_NAME,
+        signer.dumps({
+            'user_id': int(user_id),
+            'session_id': int(session_id) if session_id is not None else None,
+        }),
+        max_age=COOKIE_MAX_AGE_SECONDS,
+        httponly=True,
+        secure=not is_local,
+        samesite='Lax',
+    )
+    return response
+
+
+def clear_request_session_cookie(response):
+    response.delete_cookie(COOKIE_NAME)
+    return response

@@ -23,10 +23,9 @@ from app.core.session_service import get_current_session
 from app.core.side_missions.deck import SIDE_MISSION_DECK
 from app.core.side_missions.framework import SideMissionContext
 from app.core.side_missions.queries import (
-	complete_side_mission_round,
-	get_side_mission_round,
+	complete_side_mission_rounds,
 	get_side_mission_rounds,
-	insert_side_mission_round,
+	insert_side_mission_rounds,
 )
 
 
@@ -227,20 +226,39 @@ def get_side_mission_availability(
 ) -> dict:
 	game_id = int(daily_session.GameId)
 	infinity_session = get_infinity_session(cur, user_id, game_id)
-	mission_rows = (
-		get_side_mission_rounds(cur, int(infinity_session.InfinityPoolSessionId))
-		if infinity_session is not None
-		else ()
-	)
-	guesses_by_round = _guesses_by_round(())
-	contexts_by_round = {}
-	if mission_rows or not _availability_precheck_reasons(daily_session, completed_rounds):
+	if infinity_session is None:
+		precheck_reasons = _availability_precheck_reasons(daily_session, completed_rounds)
+		if precheck_reasons:
+			return {
+				'available': False,
+				'reasons': precheck_reasons,
+			}
 		contexts_by_round = _load_round_contexts(
 			cur,
 			game_id,
 			completed_rounds,
-			guesses_by_round,
+			{},
 		)
+		return _evaluate_side_mission_availability(
+			daily_session,
+			completed_rounds,
+			contexts_by_round,
+			False,
+		)
+
+	mission_rows = get_side_mission_rounds(
+		cur,
+		int(infinity_session.InfinityPoolSessionId),
+	)
+	guesses_by_round = _guesses_by_round(
+		get_infinity_guesses(cur, int(infinity_session.InfinityPoolSessionId))
+	)
+	contexts_by_round = _load_round_contexts(
+		cur,
+		game_id,
+		completed_rounds,
+		guesses_by_round,
+	)
 	return _evaluate_side_mission_availability(
 		daily_session,
 		completed_rounds,
@@ -297,17 +315,33 @@ def _build_side_mission_state(
 		daily_session_id,
 		infinity_session_id,
 	)
-	missions = []
+	mission_states = []
+	completed_ids = []
 	for mission_row in mission_rows:
 		round_number = int(mission_row.RoundNumber)
 		context = contexts_by_round[round_number]
 		progress = SIDE_MISSION_DECK.missions[mission_row.MissionId].calculate_progress(context)
 		if progress.is_complete and mission_row.CompletedAt is None:
-			complete_side_mission_round(cur, int(mission_row.SideMissionRoundId))
-			mission_row = get_side_mission_round(cur, infinity_session_id, round_number)
+			completed_ids.append(int(mission_row.SideMissionRoundId))
+		mission_states.append((mission_row, context, progress))
+
+	if completed_ids:
+		complete_side_mission_rounds(cur, completed_ids)
+		refreshed_by_round = {
+			int(mission_row.RoundNumber): mission_row
+			for mission_row in get_side_mission_rounds(cur, infinity_session_id)
+		}
+		mission_states = [
+			(refreshed_by_round[int(mission_row.RoundNumber)], context, progress)
+			for mission_row, context, progress in mission_states
+		]
+
+	missions = []
+	for mission_row, context, progress in mission_states:
+		if int(mission_row.SideMissionRoundId) in completed_ids:
 			_logger.info(
 				'side_mission_state: mission completed round=%s mission_id=%s progress=%s/%s',
-				round_number,
+				int(mission_row.RoundNumber),
 				mission_row.MissionId,
 				progress.current,
 				progress.target,
@@ -357,6 +391,7 @@ def assign_specific_side_missions(
 		int(round_data['round_number']): round_data
 		for round_data in completed_rounds
 	}
+	rounds_to_insert = []
 	for round_number, mission_id in assignments.items():
 		if round_number not in completed_by_round:
 			raise ValueError(f'E2E Side Mission round {round_number} does not exist.')
@@ -379,13 +414,12 @@ def assign_specific_side_missions(
 			)
 		mission = SIDE_MISSION_DECK.missions[mission_id]
 		progress = mission.calculate_progress(context)
-		insert_side_mission_round(
-			cur,
+		rounds_to_insert.append((
 			infinity_session_id,
 			round_number,
 			mission_id,
-			progress.is_complete,
-		)
+			int(progress.is_complete),
+		))
 		_logger.info(
 			'start_side_missions: assigned fixed round=%s mission_id=%s initial_progress=%s/%s',
 			round_number,
@@ -393,6 +427,8 @@ def assign_specific_side_missions(
 			progress.current,
 			progress.target,
 		)
+	if rounds_to_insert:
+		insert_side_mission_rounds(cur, rounds_to_insert)
 
 
 def assign_random_side_missions(
@@ -402,6 +438,7 @@ def assign_random_side_missions(
 	contexts_by_round: dict[int, SideMissionContext],
 ) -> None:
 	randomizer = random.SystemRandom()
+	rounds_to_insert = []
 	for completed_round in completed_rounds:
 		round_number = int(completed_round['round_number'])
 		round_reasons = _round_ineligibility_reasons(completed_round)
@@ -422,13 +459,12 @@ def assign_random_side_missions(
 			continue
 		mission = randomizer.choice(eligible_missions)
 		progress = mission.calculate_progress(context)
-		insert_side_mission_round(
-			cur,
+		rounds_to_insert.append((
 			infinity_session_id,
 			round_number,
 			mission.mission_id,
-			progress.is_complete,
-		)
+			int(progress.is_complete),
+		))
 		_logger.info(
 			'start_side_missions: assigned round=%s mission_id=%s initial_progress=%s/%s',
 			round_number,
@@ -436,6 +472,8 @@ def assign_random_side_missions(
 			progress.current,
 			progress.target,
 		)
+	if rounds_to_insert:
+		insert_side_mission_rounds(cur, rounds_to_insert)
 
 
 def ensure_side_mission_assignments(cur, daily_session, infinity_session):
@@ -477,6 +515,7 @@ def ensure_side_mission_assignments(cur, daily_session, infinity_session):
 			contexts_by_round,
 			assignments,
 		)
+	# policy-lint: authorize PY030 5f018957a6
 	assigned_missions = get_side_mission_rounds(cur, infinity_session_id)
 	if assigned_missions:
 		update_current_round(
@@ -499,40 +538,58 @@ def start_side_missions(user_id: int, session_id: int | None) -> tuple[dict, int
 			completed_rounds = _load_daily_rounds(cur, int(daily_session.SessionId))
 			game_id = int(daily_session.GameId)
 			infinity_session = get_infinity_session(cur, user_id, game_id)
-			assigned_missions = (
-				get_side_mission_rounds(cur, int(infinity_session.InfinityPoolSessionId))
-				if infinity_session is not None
-				else ()
-			)
-			guesses_by_round = (
-				_guesses_by_round(
-					get_infinity_guesses(cur, int(infinity_session.InfinityPoolSessionId))
+			if infinity_session is None:
+				precheck_reasons = _availability_precheck_reasons(daily_session, completed_rounds)
+				if precheck_reasons:
+					return {
+						'error': 'Side missions are unavailable for this game.',
+						'reasons': precheck_reasons,
+					}, 403
+				contexts_by_round = _load_round_contexts(
+					cur,
+					game_id,
+					completed_rounds,
+					{},
 				)
-				if infinity_session is not None
-				else _guesses_by_round(())
-			)
-			contexts_by_round = {}
-			if assigned_missions or not _availability_precheck_reasons(daily_session, completed_rounds):
+				availability = _evaluate_side_mission_availability(
+					daily_session,
+					completed_rounds,
+					contexts_by_round,
+					False,
+				)
+				if not availability['available']:
+					return {
+						'error': 'Side missions are unavailable for this game.',
+						'reasons': availability['reasons'],
+					}, 403
+				infinity_session = create_infinity_session(cur, user_id, game_id)
+				assigned_missions = get_side_mission_rounds(
+					cur,
+					int(infinity_session.InfinityPoolSessionId),
+				)
+			else:
+				infinity_session_id = int(infinity_session.InfinityPoolSessionId)
+				assigned_missions = get_side_mission_rounds(cur, infinity_session_id)
+				guesses_by_round = _guesses_by_round(
+					get_infinity_guesses(cur, infinity_session_id)
+				)
 				contexts_by_round = _load_round_contexts(
 					cur,
 					game_id,
 					completed_rounds,
 					guesses_by_round,
 				)
-			availability = _evaluate_side_mission_availability(
-				daily_session,
-				completed_rounds,
-				contexts_by_round,
-				bool(assigned_missions),
-			)
-			if not availability['available']:
-				return {
-					'error': 'Side missions are unavailable for this game.',
-					'reasons': availability['reasons'],
-				}, 403
-
-			if infinity_session is None:
-				infinity_session = create_infinity_session(cur, user_id, game_id)
+				availability = _evaluate_side_mission_availability(
+					daily_session,
+					completed_rounds,
+					contexts_by_round,
+					bool(assigned_missions),
+				)
+				if not availability['available']:
+					return {
+						'error': 'Side missions are unavailable for this game.',
+						'reasons': availability['reasons'],
+					}, 403
 			if not assigned_missions:
 				infinity_session_id = int(infinity_session.InfinityPoolSessionId)
 				assignments = _e2e_mission_assignments()
@@ -551,6 +608,7 @@ def start_side_missions(user_id: int, session_id: int | None) -> tuple[dict, int
 						contexts_by_round,
 						assignments,
 					)
+				# policy-lint: authorize PY030 5f018957a6
 				assigned_missions = get_side_mission_rounds(cur, infinity_session_id)
 				if assigned_missions:
 					update_current_round(

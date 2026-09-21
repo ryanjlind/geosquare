@@ -91,14 +91,18 @@ SOVEREIGN_COUNTRY_CODES = {
 
 
 def get_country_name(country_code: str | None) -> str:
-    code = (country_code or '').upper()
+    if country_code is None:
+        raise ValueError('Country code is required.')
+    code = country_code.upper()
     if code not in COUNTRY_NAMES:
         raise ValueError(f'Unknown country code: {country_code!r}')
     return COUNTRY_NAMES[code]
 
 
 def get_sovereign_country_code(country_code: str | None) -> str:
-    code = (country_code or '').upper()
+    if country_code is None:
+        raise ValueError('Country code is required.')
+    code = country_code.upper()
     if code not in COUNTRY_NAMES:
         raise ValueError(f'Unknown country code: {country_code!r}')
     if code in SOVEREIGN_COUNTRY_CODES:

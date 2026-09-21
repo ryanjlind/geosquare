@@ -16,7 +16,6 @@ from app.core.game_queries import (
     get_square_id_for_round,
     get_base_square_id_for_round,
     get_capital_city_in_bounds,
-    upsert_session_round_difficulty,
     increment_session_total_score,
     insert_correct_guess,
     find_exact_city_in_expansions,
@@ -299,38 +298,6 @@ def _get_all_daily_square_data(cur, session) -> dict[int, dict]:
     )
     return results
 
-def set_round_difficulty(payload: dict, user_id: int, session_id: int | None):
-    if "round_number" not in payload:
-        return {"error": "round_number is required."}, 400
-    if "level" not in payload:
-        return {"error": "level is required."}, 400
-
-    round_number = int(payload["round_number"])
-    level = int(payload["level"])
-
-    if not 1 <= level <= 5:
-        return {"error": "level must be between 1 and 5."}, 400
-
-    with get_conn() as conn:
-        cur = conn.cursor()
-
-        session = get_current_session(cur, user_id, session_id)
-        if not session:
-            return {"error": "No game found for today."}, 404
-
-        session_id = int(session.SessionId)
-        game_id = int(session.GameId)
-
-        square_row = get_square_id_for_round(cur, game_id, round_number)
-        if not square_row:
-            return {"error": "Round not found."}, 404
-
-        upsert_session_round_difficulty(cur, session_id, round_number, int(square_row.SquareId), level)
-        conn.commit()
-
-    return {"ok": True, "stored_level": level}, 200
-
-
 def submit_guess(payload: dict, user_id: int, session_id: int | None):
     t0 = perf_counter()
 
@@ -366,20 +333,6 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None):
         square_id, expansion_level = _resolve_square(cur, session_id, game_id, round_number)
         if square_id is None:
             return {"error": "No square found for that round."}, 404
-
-        if existing_round is None:
-            upsert_session_round_difficulty(
-                cur,
-                session_id,
-                round_number,
-                square_id,
-                1,
-            )
-            existing_round = get_session_round(cur, session_id, round_number)
-            if existing_round is None:
-                raise RuntimeError(
-                    f"Failed to initialize session {session_id} round {round_number}."
-                )
 
         rows = get_ranked_square_cities(cur, square_id)
 
@@ -427,14 +380,13 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None):
         matched = result["row"]
 
         population = int(matched.Population)
-        difficulty_level = int(existing_round.DifficultyLevel)
         score = compute_score(rows, population)
         expansion_level = int(expansion_level)
         score = int(score * (1 - (expansion_level * 0.2)))
-        score = math.ceil(score / (1 + (difficulty_level - 1) * 0.25))
 
         set_round_completed(cur, session_id, round_number, square_id, score)
 
+    # policy-lint: authorize PY030 2794b6f
         session_round = get_session_round(cur, session_id, round_number)
         session_round_id = int(session_round.SessionRoundId)
 
@@ -895,7 +847,9 @@ def get_all_daily_square_data_preview(game_date: str):
             round_num = int(r.RoundNumber)
             level = int(r.ExpansionLevel)
 
-            rounds_map.setdefault(round_num, []).append({
+            if round_num not in rounds_map:
+                rounds_map[round_num] = []
+            rounds_map[round_num].append({
                 "square_id": int(r.SquareId),
                 "round_number": round_num,
                 "expansion_level": level,
