@@ -444,7 +444,7 @@ export function showGuessConfirmationModal(candidates, nearbyCity) {
     const modal = document.getElementById('guessConflictModal');
     const list = document.getElementById('guessConflictList');
 
-    list.innerHTML = '';
+    list.replaceChildren();
 
     const title = document.createElement('div');
     title.className = 'modal-title';

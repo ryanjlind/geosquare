@@ -23,7 +23,7 @@ from app.core.infinity_queries import (
     insert_infinity_guess,
     update_current_round,
 )
-from app.core.matching import find_matching_city
+from app.core.guess_resolution import resolve_city_guess
 from app.core.scoring import compute_score
 from app.core.session_service import get_current_session
 from app.core.side_missions.queries import get_side_mission_round
@@ -422,13 +422,6 @@ def submit_infinity_guess(
                 or int(matched_rows[0].Population) != int(unnamed_cities[0].Population)
             ):
                 return {'error': 'Reveal city must be the largest unnamed city.'}, 409
-        elif confirmed_city_id is not None:
-            matched_rows = [
-                city for city in ranked_cities
-                if int(city.CityId) == int(confirmed_city_id)
-            ]
-            if not matched_rows:
-                return {'error': 'Invalid confirmation selection.'}, 400
         else:
             with _logged_step(
                 operation,
@@ -449,14 +442,17 @@ def submit_infinity_guess(
                 infinity_session_id=infinity_session_id,
                 round_number=round_number,
             ) as details:
-                result = find_matching_city(
+                result = resolve_city_guess(
                     ranked_cities,
-                    guess_text,
+                    guess_text=guess_text,
+                    confirmed_city_id=confirmed_city_id,
                     nearby_exact_match=nearby_exact_match,
-                    current_expansion_level=0,
+                    expansion_level=0,
                 )
                 details['result_type'] = result.get('type')
             result_type = result.get('type')
+            if result_type == 'invalid_confirmation':
+                return {'error': 'Invalid confirmation selection.'}, 400
             if result_type == 'no_match':
                 response = {'ok': True, 'correct': False, 'score': 0}
                 if 'nearby_exact_match' in result:

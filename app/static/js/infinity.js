@@ -527,7 +527,7 @@ function renderRound() {
         : 'inline-block';
     previousButton.disabled = infinityState.currentRound === 1;
     nextButton.disabled = infinityState.currentRound === infinityState.roundCount;
-    document.getElementById('guessFeedback').innerHTML = '';
+    document.getElementById('guessFeedback').replaceChildren();
     document.getElementById('guessInput').value = '';
     if (!document.getElementById('guessInput').disabled) {
         document.getElementById('guessInput').focus();

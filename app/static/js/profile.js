@@ -118,7 +118,7 @@ function renderSummary(summary) {
     
 }
 
-function renderRegionPerformance(summaryRows, detailRows) {
+function renderRegionSummary(summaryRows) {
     const summaryBody = document.getElementById('profileRegionSummaryTableBody');
     summaryBody.innerHTML = summaryRows.map((row) => `
         <tr>
@@ -129,23 +129,25 @@ function renderRegionPerformance(summaryRows, detailRows) {
         </tr>
     `).join('');
 
-    if (detailRows === null) {
-        return;
-    }
 
+i}
+
+function renderRegionPerformance(summaryRows, detailRows) {
     const tbody = document.getElementById('profileRegionTableBody');
 
-    const grouped = {};
+    const grouped = Object.fromEntries(
+        summaryRows.map((row) => [row.region, []])
+    );
     detailRows.forEach((row) => {
-        if (!grouped[row.region]) {
-            grouped[row.region] = [];
+        if (!Object.hasOwn(grouped, row.region)) {
+            throw new Error(`Unexpected region detail: ${row.region}`);
         }
         grouped[row.region].push(row);
     });
 
     tbody.innerHTML = summaryRows.map((row, idx) => {
         const regionKey = row.region;
-        const regionDetails = grouped[regionKey] || [];
+        const regionDetails = grouped[regionKey];
         const detailId = `region-detail-${idx}`;
 
         const detailRowsHtml = regionDetails.map((d) => `
@@ -360,7 +362,7 @@ function renderProfile(payload) {
 
     renderSummary(payload.summary);
     regionPerformanceSummary = payload.region_performance;
-    renderRegionPerformance(regionPerformanceSummary, null);
+    renderRegionSummary(regionPerformanceSummary);
     wireRegionDetailsToggle();
     const history = payload.history;
     renderHistory(history);

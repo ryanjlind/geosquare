@@ -47,12 +47,12 @@ export function setDifficultyVisible(visible) {
 }
 
 export function clearRoundTable() {
-    document.querySelector('#roundTable tbody').innerHTML = '';
+    document.querySelector('#roundTable tbody').replaceChildren();
     document.getElementById('totalPoints').textContent = '0';
 }
 
 export function clearGuessFeedback() {
-    document.getElementById('guessFeedback').innerHTML = '';
+    document.getElementById('guessFeedback').replaceChildren();
 }
 
 export function setGuessFeedback(html) {

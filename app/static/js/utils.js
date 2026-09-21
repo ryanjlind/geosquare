@@ -110,7 +110,10 @@ const clientErrorReports = new Map();
 const CLIENT_ERROR_REPORT_INTERVAL_MS = 60_000;
 
 export async function postRateLimitedClientError(eventType, details) {
-    const message = String(details?.message || '');
+    if (!details || typeof details.message !== 'string') {
+        throw new TypeError('Client error details.message must be a string.');
+    }
+    const message = details.message;
     const key = `${eventType}:${message}`;
     const now = Date.now();
     const previous = clientErrorReports.get(key);
@@ -120,7 +123,10 @@ export async function postRateLimitedClientError(eventType, details) {
         return;
     }
 
-    const suppressedCount = previous?.suppressedCount || 0;
+    let suppressedCount = 0;
+    if (previous) {
+        suppressedCount = previous.suppressedCount;
+    }
     clientErrorReports.set(key, {
         lastReportedAt: now,
         suppressedCount: 0,

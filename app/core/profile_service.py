@@ -836,6 +836,7 @@ def _get_region_performance(cur, user_id: int) -> tuple[list[dict], list[dict]]:
 
 def _get_region_classification_details(cur, user_id: int) -> list[dict]:
     start = perf_counter()
+    log_info(f'[profile] _get_region_classification_details started user_id={user_id}')
     cur.execute(
         """
         WITH CompletedRounds AS (
@@ -921,6 +922,10 @@ def _get_region_classification_details(cur, user_id: int) -> list[dict]:
         })
 
     _log_profile_duration('_get_region_classification_details', start)
+    log_info(
+        '[profile] _get_region_classification_details completed '
+        f'user_id={user_id} detail_count={len(details)}'
+    )
     return details
 
 

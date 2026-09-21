@@ -33,7 +33,7 @@ from app.core.game_queries import (
     set_round_passed,
     
 )
-from app.core.matching import find_matching_city
+from app.core.guess_resolution import resolve_city_guess
 from app.core.scoring import compute_score
 from app.core.session_service import get_current_session
 from app.core.side_missions.service import get_side_mission_availability
@@ -45,46 +45,55 @@ from app.core.game_mappers import (
 )
 from app.helpers.date import get_effective_game_date
 
-def get_reveal_cities_for_square(square_id: int, excluded_city: dict | None = None) -> list[dict]:
-    with get_conn() as conn:
-        cur = conn.cursor()
-
-        params = [square_id]
-        sql = """
-            SELECT TOP 5
-                gsc.CityName,
-                gsc.CountryCode,
-                gsc.Latitude,
-                gsc.Longitude,
-                gsc.Population
-            FROM dbo.GameSquareCities gsc
-            JOIN dbo.GeoCities gc
-                ON gc.CityId = gsc.CityId
-            WHERE gsc.SquareId = ?
-            AND gc.IsActive = 1
-            AND gc.FeatureCode <> 'PPLX'
-        """
-
-        if excluded_city:
-            sql += " AND gsc.CityId <> ? AND gsc.Population < ?"
-            params.append(excluded_city['city_id'])
-            params.append(excluded_city['population'])
-
-        sql += " ORDER BY gc.NotorietyScore DESC, gsc.Population DESC"
-
-        cur.execute(sql, params)
-        rows = cur.fetchall()
-
-        return [
-            {
+def _get_reveal_cities_for_squares(cur, square_ids, excluded_cities) -> dict[int, list[dict]]:
+    started_at = perf_counter()
+    log_debug(
+        f'_get_reveal_cities_for_squares: started square_count={len(square_ids)}'
+    )
+    placeholders = ', '.join('?' for _ in square_ids)
+    cur.execute(
+        f"""
+        SELECT
+            gsc.SquareId,
+            gsc.CityId,
+            gsc.CityName,
+            gsc.CountryCode,
+            gsc.Latitude,
+            gsc.Longitude,
+            gsc.Population
+        FROM dbo.GameSquareCities gsc
+        INNER JOIN dbo.GeoCities gc
+            ON gc.CityId = gsc.CityId
+        WHERE gsc.SquareId IN ({placeholders})
+          AND gc.IsActive = 1
+          AND gc.FeatureCode <> 'PPLX'
+        ORDER BY gsc.SquareId, gc.NotorietyScore DESC, gsc.Population DESC
+        """,
+        *square_ids,
+    )
+    reveals = {square_id: [] for square_id in square_ids}
+    for row in cur.fetchall():
+        square_id = int(row.SquareId)
+        excluded_city = excluded_cities.get(square_id)
+        if excluded_city and (
+            int(row.CityId) == int(excluded_city['city_id'])
+            or int(row.Population) >= int(excluded_city['population'])
+        ):
+            continue
+        if len(reveals[square_id]) < 5:
+            reveals[square_id].append({
                 'city_name': row.CityName,
                 'country_code': row.CountryCode,
                 'latitude': float(row.Latitude),
                 'longitude': float(row.Longitude),
                 'population': int(row.Population),
-            }
-            for row in rows
-        ]
+            })
+    log_debug(
+        '_get_reveal_cities_for_squares: completed '
+        f'square_count={len(square_ids)} reveal_count={sum(len(items) for items in reveals.values())} '
+        f'elapsed_ms={(perf_counter() - started_at) * 1000.0:.1f}'
+    )
+    return reveals
 
 def _resolve_square(cur, session_id, game_id, round_number):
     square = get_active_session_square(cur, session_id, round_number)
@@ -135,12 +144,157 @@ def get_daily_square_data(user_id: int, session_id: int | None, round_number: in
             float(row.MaxLat), float(row.MaxLon),
         )
         return result
-        result['capital_city'] = get_capital_city_in_bounds(
-            cur,
-            float(row.MinLat), float(row.MinLon),
-            float(row.MaxLat), float(row.MaxLon),
+
+
+def _get_all_daily_square_data(cur, session) -> dict[int, dict]:
+    started_at = perf_counter()
+    log_debug(
+        f'_get_all_daily_square_data: started session_id={int(session.SessionId)}'
+    )
+    cur.execute(
+        """
+        WITH ActiveSquares AS (
+            SELECT
+                gsr.RoundNumber,
+                gsr.SquareId,
+                ROW_NUMBER() OVER (
+                    PARTITION BY gsr.RoundNumber
+                    ORDER BY gsr.SessionRoundId DESC
+                ) AS RowNumber
+            FROM dbo.GameSessionRounds gsr
+            WHERE gsr.SessionId = ?
+        ),
+        SelectedSquares AS (
+            SELECT
+                base.RoundNumber,
+                base.GameId,
+                COALESCE(active.SquareId, base.SquareId) AS SquareId
+            FROM dbo.GameRounds base
+            LEFT JOIN ActiveSquares active
+                ON active.RoundNumber = base.RoundNumber
+                AND active.RowNumber = 1
+            WHERE base.GameId = ?
+              AND base.ExpansionLevel = 0
         )
-        return result
+        SELECT
+            selected.RoundNumber,
+            selected.GameId,
+            round_data.ExpansionLevel,
+            square.SquareId,
+            square.SeedLat,
+            square.SeedLon,
+            square.MinLat,
+            square.MinLon,
+            square.MaxLat,
+            square.MaxLon,
+            square.WidthDegrees,
+            square.HeightDegrees,
+            square.GeneratedAt,
+            city.CityId,
+            city.CityName,
+            city.CountryCode,
+            city.Latitude,
+            city.Longitude,
+            city.Population,
+            CASE WHEN geo.FeatureCode = 'PPLC' THEN 1 ELSE 0 END AS IsCapital,
+            COUNT(city.CityId) OVER (
+                PARTITION BY selected.RoundNumber
+            ) AS TotalCityCount,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM dbo.GameRounds later
+                WHERE later.GameId = selected.GameId
+                  AND later.RoundNumber = selected.RoundNumber
+                  AND later.ExpansionLevel > round_data.ExpansionLevel
+            ) THEN 1 ELSE 0 END AS HasNextExpansion,
+            capital.CityName AS CapitalCityName,
+            capital.CountryCode AS CapitalCountryCode,
+            capital.Latitude AS CapitalLatitude,
+            capital.Longitude AS CapitalLongitude
+        FROM SelectedSquares selected
+        INNER JOIN dbo.GameRounds round_data
+            ON round_data.GameId = selected.GameId
+            AND round_data.RoundNumber = selected.RoundNumber
+            AND round_data.SquareId = selected.SquareId
+        INNER JOIN dbo.GameSquares square
+            ON square.SquareId = selected.SquareId
+        LEFT JOIN dbo.GameSquareCities city
+            ON city.SquareId = selected.SquareId
+        LEFT JOIN dbo.GeoCities geo
+            ON geo.CityId = city.CityId
+            AND geo.IsActive = 1
+        OUTER APPLY (
+            SELECT TOP 1 CityName, CountryCode, Latitude, Longitude
+            FROM dbo.GeoCities
+            WHERE FeatureCode = 'PPCL'
+              AND IsActive = 1
+              AND Latitude BETWEEN square.MinLat AND square.MaxLat
+              AND Longitude BETWEEN square.MinLon AND square.MaxLon
+        ) capital
+        WHERE city.CityId IS NULL OR geo.CityId IS NOT NULL
+        ORDER BY selected.RoundNumber, city.Population DESC, city.CityName ASC
+        """,
+        int(session.SessionId),
+        int(session.GameId),
+    )
+
+    results = {}
+    for row in cur.fetchall():
+        round_number = int(row.RoundNumber)
+        result = results.get(round_number)
+        if result is None:
+            capital_city = None
+            if row.CapitalCityName is not None:
+                capital_city = {
+                    'city_name': row.CapitalCityName,
+                    'country_code': row.CapitalCountryCode,
+                    'latitude': float(row.CapitalLatitude),
+                    'longitude': float(row.CapitalLongitude),
+                }
+            result = {
+                'square_id': int(row.SquareId),
+                'expansion_level': int(row.ExpansionLevel),
+                'has_next_expansion': bool(row.HasNextExpansion),
+                'seed': {'lat': float(row.SeedLat), 'lon': float(row.SeedLon)},
+                'bounds': {
+                    'min_lat': float(row.MinLat),
+                    'min_lon': float(row.MinLon),
+                    'max_lat': float(row.MaxLat),
+                    'max_lon': float(row.MaxLon),
+                },
+                'width_degrees': float(row.WidthDegrees),
+                'height_degrees': float(row.HeightDegrees),
+                'generated_at': row.GeneratedAt.isoformat(),
+                'total_population': 0,
+                'cities': [],
+                'total_city_count': int(row.TotalCityCount),
+                'largest_city': None,
+                'round_number': round_number,
+                'game_id': int(row.GameId),
+                'capital_city': capital_city,
+            }
+            results[round_number] = result
+        if row.CityId is None:
+            continue
+        city = {
+            'city_id': int(row.CityId),
+            'city_name': row.CityName,
+            'country_code': row.CountryCode,
+            'latitude': float(row.Latitude),
+            'longitude': float(row.Longitude),
+            'population': int(row.Population),
+            'is_capital': bool(row.IsCapital),
+        }
+        result['cities'].append(city)
+        result['total_population'] += city['population']
+        if result['largest_city'] is None:
+            result['largest_city'] = city
+    log_debug(
+        '_get_all_daily_square_data: completed '
+        f'session_id={int(session.SessionId)} round_count={len(results)} '
+        f'elapsed_ms={(perf_counter() - started_at) * 1000.0:.1f}'
+    )
+    return results
 
 def set_round_difficulty(payload: dict, user_id: int, session_id: int | None):
     if "round_number" not in payload:
@@ -226,67 +380,48 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None):
 
         rows = get_ranked_square_cities(cur, square_id)
 
-        if confirmed_city_id is not None:
-            matched = None
-            for r in rows:
-                if int(r.CityId) == int(confirmed_city_id):
-                    matched = r
-                    break
-
-            if matched is None:
-                return {"error": "Invalid confirmation selection."}, 400
-
-            result_type = "match"
-        else:
-            nearby_exact_match = find_exact_city_in_expansions(
-                cur,
-                game_id,
-                round_number,
-                expansion_level,
-                guess_text,
-            )
-            result = find_matching_city(
-                rows,
-                guess_text,
-                nearby_exact_match=nearby_exact_match,
-                current_expansion_level=expansion_level,
-            )
-            result_type = result.get("type")
-
-            if result_type == "match":
-                matched = result["row"]
-
-            if result_type == "confirmation_required":
-                response = {
-                    "ok": True,
-                    "requires_confirmation": True,
-                    "candidates": result["suggestions"],
-                    "guess": guess_text,
-                }
-                if "nearby_exact_match" in result:
-                    response["nearby_city"] = _map_nearby_city(
-                        result["nearby_exact_match"]
-                    )
-                return response, 200
-
-            if result_type == "no_match":
-                conn.commit()
-
-                response = {
-                    "ok": True,
-                    "correct": False,
-                    "city": guess_text,
-                    "score": 0,
-                    "total_score": int(session.TotalScore),
-                }
-                if "nearby_exact_match" in result:
-                    response["matched_city"] = _map_nearby_city(
-                        result["nearby_exact_match"]
-                    )
-                return response, 200
-
-            if result_type != "match":
-                return {"error": "Invalid match result."}, 500
+        nearby_exact_match = find_exact_city_in_expansions(
+            cur,
+            game_id,
+            round_number,
+            expansion_level,
+            guess_text,
+        )
+        result = resolve_city_guess(
+            rows,
+            guess_text=guess_text,
+            confirmed_city_id=confirmed_city_id,
+            nearby_exact_match=nearby_exact_match,
+            expansion_level=expansion_level,
+        )
+        result_type = result.get("type")
+        if result_type == 'invalid_confirmation':
+            return {"error": "Invalid confirmation selection."}, 400
+        if result_type == "confirmation_required":
+            response = {
+                "ok": True,
+                "requires_confirmation": True,
+                "candidates": result["suggestions"],
+                "guess": guess_text,
+            }
+            if "nearby_exact_match" in result:
+                response["nearby_city"] = _map_nearby_city(result["nearby_exact_match"])
+            return response, 200
+        if result_type == "no_match":
+            conn.commit()
+            response = {
+                "ok": True,
+                "correct": False,
+                "city": guess_text,
+                "score": 0,
+                "total_score": int(session.TotalScore),
+            }
+            if "nearby_exact_match" in result:
+                response["matched_city"] = _map_nearby_city(result["nearby_exact_match"])
+            return response, 200
+        if result_type != "match":
+            return {"error": "Invalid match result."}, 500
+        matched = result["row"]
 
         population = int(matched.Population)
         difficulty_level = int(existing_round.DifficultyLevel)
@@ -590,43 +725,79 @@ def get_all_daily_square_data(user_id: int, session_id: int | None):
         t_map = time.perf_counter()
         print(f"build completed_by_round: {t_map - t_completed:.6f}s")
 
-        game_id = int(session.GameId)
-        base_square_ids = {}
-        for rn in range(1, 6):
-            sq_id = get_base_square_id_for_round(cur, game_id, rn)
-            if sq_id is not None:
-                base_square_ids[rn] = sq_id
+        cur.execute(
+            """
+            SELECT RoundNumber, SquareId
+            FROM dbo.GameRounds
+            WHERE GameId = ?
+              AND ExpansionLevel = 0
+            """,
+            int(session.GameId),
+        )
+        base_square_ids = {
+            int(row.RoundNumber): int(row.SquareId)
+            for row in cur.fetchall()
+        }
+
+        t_square_batch_start = time.perf_counter()
+        square_data_by_round = _get_all_daily_square_data(cur, session)
+        t_square_batch_end = time.perf_counter()
+        print(
+            'all rounds: get_daily_square_data batch '
+            f'{t_square_batch_end - t_square_batch_start:.6f}s'
+        )
+
+        round_data = []
+        for round_number in range(1, 6):
+            base = square_data_by_round[round_number]
+            completed_round = completed_by_round.get(round_number)
+            guess = (
+                completed_round['guesses'][0]
+                if completed_round and completed_round.get('guesses')
+                else None
+            )
+            excluded_city = (
+                {
+                    'city_id': guess['city_id'],
+                    'population': guess['population'],
+                }
+                if guess
+                else None
+            )
+            if round_number not in base_square_ids:
+                raise RuntimeError(
+                    f'Missing base square for game {int(session.GameId)} round {round_number}.'
+                )
+            reveal_square_id = base_square_ids[round_number]
+            round_data.append((round_number, base, guess, reveal_square_id, excluded_city))
+
+        t_reveal_batch_start = time.perf_counter()
+        reveal_cities_by_square = _get_reveal_cities_for_squares(
+            cur,
+            {reveal_square_id for _, _, _, reveal_square_id, _ in round_data},
+            {
+                reveal_square_id: excluded_city
+                for _, _, _, reveal_square_id, excluded_city in round_data
+            },
+        )
+        t_reveal_batch_end = time.perf_counter()
+        print(
+            'all rounds: get_reveal_cities_for_square batch '
+            f'{t_reveal_batch_end - t_reveal_batch_start:.6f}s'
+        )
 
     rounds = []
     t_after_db = time.perf_counter()
     print(f"db block total: {t_after_db - t0:.6f}s")
 
-    for round_number in range(1, 6):
+    for round_number, base, guess, reveal_square_id, _ in round_data:
         t_round_start = time.perf_counter()
         print(f"round {round_number}: start")
 
-        base = get_daily_square_data(user_id, session_id, round_number)
         t_base = time.perf_counter()
         print(f"round {round_number}: get_daily_square_data {t_base - t_round_start:.6f}s")
 
-        completed_round = completed_by_round.get(round_number)
-        guess = None
-
-        if completed_round and completed_round.get("guesses"):
-            guess = completed_round["guesses"][0]
-
-        excluded_city = None
-        if guess:
-            excluded_city = {
-                "city_id": guess["city_id"],
-                "population": guess["population"],
-            }
-
-        reveal_square_id = base_square_ids[round_number] if round_number in base_square_ids else base["square_id"]
-        reveal_cities = get_reveal_cities_for_square(
-            reveal_square_id,
-            excluded_city=excluded_city,
-        )
+        reveal_cities = reveal_cities_by_square[reveal_square_id]
         t_reveal = time.perf_counter()
         print(f"round {round_number}: get_reveal_cities_for_square {t_reveal - t_base:.6f}s")
 
