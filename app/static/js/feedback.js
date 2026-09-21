@@ -86,7 +86,7 @@ function collectCesiumDiagnostics() {
     };
 }
 
-async function collectDiagnostics() {
+export async function collectDiagnostics() {
     const visualViewport = window.visualViewport;
 
     return {
