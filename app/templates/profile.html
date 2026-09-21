@@ -165,6 +165,20 @@
 
                 <div class="stats-divider"></div>
 
+                <section class="profile-history-section">
+                    <div class="profile-history-header">
+                        <div class="stats-section-title">Game History</div>
+                    </div>
+
+                    <div id="profileHistoryList" class="profile-history-list"></div>
+                    <button id="profileHistoryLoadMore" class="profile-history-load-more hidden" type="button">Load more</button>
+                </section>
+            </div>
+
+            <div id="profileLoadingState" class="profile-message">Loading profile...</div>
+        </main>
+    </div>
+
     <script type="importmap">{{ {'imports': js_import_map()}|tojson }}</script>
     <script type="module" src="{{ asset_url('js/profile.js') }}"></script>
     <script type="module" src="{{ asset_url('js/mobile.js') }}"></script>
