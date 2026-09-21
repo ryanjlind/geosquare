@@ -286,6 +286,11 @@ def get_completed_round_rows(cur, session_id: int):
                     ORDER BY c.Population DESC, c.CityName ASC
                 ) AS PopRank
             FROM dbo.GameSquareCities c
+            INNER JOIN (
+                SELECT DISTINCT SquareId
+                FROM CompletedRounds
+            ) completed_squares
+                ON completed_squares.SquareId = c.SquareId
         )
         SELECT
             completed.SessionRoundId,
