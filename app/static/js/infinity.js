@@ -171,10 +171,13 @@ function validateSideMissionState(sideMissions, path) {
             mission.progress.acknowledgements,
             `${missionPath}.progress.acknowledgements`,
         );
-        mission.progress.named.forEach(name => requireString(
-            mission.progress.acknowledgements[name],
-            `${missionPath}.progress.acknowledgements[${name}]`,
-        ));
+        Object.entries(mission.progress.acknowledgements).forEach(([name, acknowledgement]) => {
+            requireString(name, `${missionPath}.progress.acknowledgements key`);
+            requireString(
+                acknowledgement,
+                `${missionPath}.progress.acknowledgements[${name}]`,
+            );
+        });
         if (mission.completed_at !== null && typeof mission.completed_at !== 'string') {
             throw new Error(`Invalid Infinity response: ${missionPath}.completed_at must be a string or null.`);
         }
