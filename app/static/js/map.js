@@ -1,4 +1,5 @@
 import { postClientLog, postRateLimitedClientError, numberFmt } from '@geosquare/utils.js';
+import { collectDiagnostics } from '@geosquare/feedback.js';
 import { gameState } from '@geosquare/state.js';
 import { expandSquareRequest } from '@geosquare/api.js';
 
@@ -63,10 +64,11 @@ export async function initCesium() {
         window.geoViewer.scene.screenSpaceCameraController.minimumZoomDistance = 150000;
         window.geoViewer.scene.screenSpaceCameraController.maximumZoomDistance = DEFAULT_GLOBE_ZOOM_HEIGHT;
 
-        window.geoViewer.scene.renderError.addEventListener(function (scene, error) {
-            postRateLimitedClientError('cesium_render_error', {
+        window.geoViewer.scene.renderError.addEventListener(async function (scene, error) {
+            await postRateLimitedClientError('cesium_render_error', {
                 message: error?.message,
-                stack: error?.stack
+                stack: error?.stack,
+                diagnostics: await collectDiagnostics(),
             });
             window.geoViewer.useDefaultRenderLoop = true;
         });

@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from datetime import date, timedelta
 from time import perf_counter
 
-from app.core.country_names import get_country_name
+from app.core.country_names import get_country_name, get_sovereign_country_code
 from app.core.db import get_conn
 from app.core.infinity_queries import get_started_infinity_pools
 from app.helpers.logging import info as log_info
@@ -537,14 +537,12 @@ def _get_strongest_country(cur, user_id: int) -> dict | None:
             WHERE gs.UserId = ?
               AND gs.CompletedAt IS NOT NULL
         )
-        SELECT TOP 1
+        SELECT
             CountryCode,
             COUNT(*) AS GuessCount,
-            AVG(CAST(GuessScore AS float)) AS AverageScore,
             SUM(GuessScore) AS TotalScore
         FROM ResolvedGuesses
         GROUP BY CountryCode
-        ORDER BY AVG(CAST(GuessScore AS float)) DESC, COUNT(*) DESC, CountryCode ASC
         """,
         (user_id,),
     )
@@ -552,18 +550,37 @@ def _get_strongest_country(cur, user_id: int) -> dict | None:
         f'[profile] _get_strongest_country.execute completed in '
         f'{perf_counter() - execute_start:.3f}s'
     )
-    row = _fetchone_with_timing(cur, '_get_strongest_country')
+    rows = _fetchall_with_timing(cur, '_get_strongest_country')
 
-    if not row:
+    if not rows:
         _log_profile_duration('_get_strongest_country', start)
         return None
 
+    sovereign_stats = {}
+    for row in rows:
+        country_code = get_sovereign_country_code(row.CountryCode)
+        if country_code not in sovereign_stats:
+            sovereign_stats[country_code] = {
+                'guess_count': 0,
+                'total_score': 0,
+            }
+        sovereign_stats[country_code]['guess_count'] += int(row.GuessCount)
+        sovereign_stats[country_code]['total_score'] += int(row.TotalScore)
+
+    country_code, stats = min(
+        sovereign_stats.items(),
+        key=lambda item: (
+            -(item[1]['total_score'] / item[1]['guess_count']),
+            -item[1]['guess_count'],
+            item[0],
+        ),
+    )
     result = {
-        'country_code': row.CountryCode,
-        'country_name': get_country_name(row.CountryCode),
-        'guess_count': int(row.GuessCount),
-        'average_score': round(float(row.AverageScore), 2),
-        'total_score': int(row.TotalScore),
+        'country_code': country_code,
+        'country_name': get_country_name(country_code),
+        'guess_count': stats['guess_count'],
+        'average_score': round(stats['total_score'] / stats['guess_count'], 2),
+        'total_score': stats['total_score'],
     }
     _log_profile_duration('_get_strongest_country', start)
     return result
