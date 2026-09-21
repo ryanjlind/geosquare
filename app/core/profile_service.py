@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from datetime import date, timedelta
 from time import perf_counter
 
+from app.core.country_names import get_country_name
 from app.core.db import get_conn
 from app.core.infinity_queries import get_started_infinity_pools
 from app.helpers.logging import info as log_info
@@ -559,6 +560,7 @@ def _get_strongest_country(cur, user_id: int) -> dict | None:
 
     result = {
         'country_code': row.CountryCode,
+        'country_name': get_country_name(row.CountryCode),
         'guess_count': int(row.GuessCount),
         'average_score': round(float(row.AverageScore), 2),
         'total_score': int(row.TotalScore),
@@ -618,6 +620,7 @@ def _get_most_obscure_city(cur, user_id: int) -> dict | None:
         'city_id': int(row.CityId),
         'city_name': row.CityName,
         'country_code': row.CountryCode,
+        'country_name': get_country_name(row.CountryCode),
         'population': int(row.Population),
         'notoriety_score': float(row.NotorietyScore),
     }
@@ -681,6 +684,7 @@ def _get_most_used_city(cur, user_id: int) -> dict | None:
         'city_id': int(row.CityId),
         'city_name': row.CityName,
         'country_code': row.CountryCode,
+        'country_name': get_country_name(row.CountryCode),
         'population': int(row.Population),
         'times_used': int(row.TimesUsed),
     }

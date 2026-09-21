@@ -76,7 +76,7 @@ function renderSummary(summary) {
     setText('statsPerfectStreak', numberFmt(summary.current_perfect_streak));
 
     if (summary.strongest_country) {
-        setText('statsStrongestCountry', summary.strongest_country.country_code);
+        setText('statsStrongestCountry', summary.strongest_country.country_name);
         setText(
             'statsStrongestCountryMeta',
             `${numberFmt(summary.strongest_country.average_score)} avg pts · ${numberFmt(summary.strongest_country.guess_count)} guesses`
@@ -89,7 +89,7 @@ function renderSummary(summary) {
     if (summary.most_obscure_city) {
         setText(
             'statsMostObscureCity',
-            `${summary.most_obscure_city.city_name}, ${summary.most_obscure_city.country_code}`
+            `${summary.most_obscure_city.city_name}, ${summary.most_obscure_city.country_name}`
         );
         setText(
             'statsMostObscureCityMeta',
@@ -103,7 +103,7 @@ function renderSummary(summary) {
     if (summary.most_used_city) {
         setText(
             'statsMostUsedCity',
-            `${summary.most_used_city.city_name}, ${summary.most_used_city.country_code}`
+            `${summary.most_used_city.city_name}, ${summary.most_used_city.country_name}`
         );
         setText(
             'statsMostUsedCityMeta',
