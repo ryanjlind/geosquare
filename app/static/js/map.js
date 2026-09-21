@@ -1,4 +1,4 @@
-import { postClientLog, numberFmt } from '@geosquare/utils.js';
+import { postClientLog, postRateLimitedClientError, numberFmt } from '@geosquare/utils.js';
 import { gameState } from '@geosquare/state.js';
 import { expandSquareRequest } from '@geosquare/api.js';
 
@@ -25,7 +25,7 @@ export async function initCesium() {
 
         if (arcGisImageryProvider.errorEvent) {
             arcGisImageryProvider.errorEvent.addEventListener(function (error) {
-                postClientLog('arcgis_provider_error', {
+                postRateLimitedClientError('arcgis_provider_error', {
                     message: error?.message,
                     timesRetried: error?.timesRetried,
                     retry: error?.retry,
@@ -64,7 +64,7 @@ export async function initCesium() {
         window.geoViewer.scene.screenSpaceCameraController.maximumZoomDistance = DEFAULT_GLOBE_ZOOM_HEIGHT;
 
         window.geoViewer.scene.renderError.addEventListener(function (scene, error) {
-            postClientLog('cesium_render_error', {
+            postRateLimitedClientError('cesium_render_error', {
                 message: error?.message,
                 stack: error?.stack
             });

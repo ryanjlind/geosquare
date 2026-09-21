@@ -36,6 +36,7 @@ from app.core.user import is_username_available, set_username
 from app.helpers.session import attach_session_cookie, COOKIE_NAME, get_user_id_from_cookie, get_session_id_from_cookie
 from app.core.db import get_conn
 from app.core.feedback_service import send_feedback_email
+from app.core.log_events import write_log_event
 from app.helpers.logging import debug as log_debug
 
 main_bp = Blueprint("main", __name__)
@@ -73,16 +74,34 @@ def client_log():
     if not isinstance(payload, dict):
         return jsonify({"ok": False, "error": "Invalid JSON payload"}), 400
 
+    event_type = payload.get("event_type")
+    if not isinstance(event_type, str) or not event_type:
+        return jsonify({"ok": False, "error": "event_type is required"}), 400
+
+    details = payload.get("details")
+    if details is not None and not isinstance(details, dict):
+        return jsonify({"ok": False, "error": "details must be an object"}), 400
+
+    ip_address = request.headers.get("X-Forwarded-For") or request.remote_addr
+    user_agent = request.headers.get("User-Agent")
+    referer = request.headers.get("Referer")
+
     log_record = {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-        "ip": request.headers.get("X-Forwarded-For") or request.remote_addr,
-        "user_agent": request.headers.get("User-Agent"),
-        "referer": request.headers.get("Referer"),
+        "ip": ip_address,
+        "user_agent": user_agent,
+        "referer": referer,
         "payload": payload,
     }
 
+    write_log_event(
+        event_type=event_type,
+        details=details,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        referer=referer,
+    )
     current_app.logger.error(json.dumps(log_record, ensure_ascii=False))
-    print(f"CLIENT_LOG_RECEIVED: {json.dumps(log_record, ensure_ascii=False)}", flush=True)
     return jsonify({"ok": True})
 
 

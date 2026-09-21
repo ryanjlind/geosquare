@@ -105,3 +105,29 @@ export async function postClientLog(eventType, details) {
         console.error('Failed to send client log', err);
     }
 }
+
+const clientErrorReports = new Map();
+const CLIENT_ERROR_REPORT_INTERVAL_MS = 60_000;
+
+export async function postRateLimitedClientError(eventType, details) {
+    const message = String(details?.message || '');
+    const key = `${eventType}:${message}`;
+    const now = Date.now();
+    const previous = clientErrorReports.get(key);
+
+    if (previous && now - previous.lastReportedAt < CLIENT_ERROR_REPORT_INTERVAL_MS) {
+        previous.suppressedCount += 1;
+        return;
+    }
+
+    const suppressedCount = previous?.suppressedCount || 0;
+    clientErrorReports.set(key, {
+        lastReportedAt: now,
+        suppressedCount: 0,
+    });
+
+    await postClientLog(eventType, {
+        ...details,
+        suppressed_count_since_last_report: suppressedCount,
+    });
+}
