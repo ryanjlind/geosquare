@@ -6,6 +6,7 @@ from app.core.profile_service import (
     get_infinity_pools_payload,
     get_profile_history_payload,
     get_profile_payload,
+    get_profile_region_details_payload,
 )
 from app.helpers.logging import info as log_info
 from app.helpers.session import get_user_id_from_cookie
@@ -69,6 +70,15 @@ def profile_history():
         f'[profile] /api/profile/history completed in '
         f'{perf_counter() - request_start:.3f}s status={status_code}'
     )
+    return response
+
+
+@profile_bp.route('/api/profile/region-details')
+def profile_region_details():
+    user_id = get_user_id_from_cookie()
+    response_body, status_code = get_profile_region_details_payload(user_id)
+    response = jsonify(response_body)
+    response.status_code = status_code
     return response
 
 

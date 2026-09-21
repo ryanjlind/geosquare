@@ -132,9 +132,24 @@
                 <section class="profile-analysis-section">
                     <div class="profile-history-header">
                         <div class="stats-section-title">Regional Performance</div>
+                        <button id="profileRegionDetailsToggle" type="button">Show square classification detail</button>
                     </div>
 
                     <div class="stats-card">
+                        <table class="stats-rounds-table">
+                            <thead>
+                                <tr>
+                                    <th>Region</th>
+                                    <th>Squares</th>
+                                    <th>Completion Rate</th>
+                                    <th>Average Points</th>
+                                </tr>
+                            </thead>
+                            <tbody id="profileRegionSummaryTableBody"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="profileRegionDetailsWrap" class="stats-card hidden">
                         <table class="stats-rounds-table">
                             <thead>
                                 <tr>

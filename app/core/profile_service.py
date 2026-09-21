@@ -115,7 +115,7 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
         most_obscure_city = _get_most_obscure_city(cur, user_id)
         most_used_city = _get_most_used_city(cur, user_id)
         strongest_country = _get_strongest_country(cur, user_id)
-        region_performance, region_classification_details = _get_region_performance(cur, user_id)
+        region_performance = _get_region_performance(cur, user_id)
 
         summary = _build_summary(
             lifetime_games,
@@ -139,7 +139,6 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
         },
         'summary': summary,
         'region_performance': region_performance,
-        'region_classification_details': region_classification_details,
         'history': history,
         'history_pagination': {
             'offset': 0,
@@ -147,6 +146,18 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
             'has_more': len(sessions) > HISTORY_PAGE_SIZE,
         },
     }, 200
+
+
+def get_profile_region_details_payload(user_id: int | None) -> tuple[dict, int]:
+    if user_id is None:
+        return {'error': 'No profile found.'}, 404
+
+    with _profile_stage('get_profile_region_details_payload'):
+        with get_conn() as conn:
+            cur = conn.cursor()
+            details = _get_region_classification_details(cur, user_id)
+
+    return {'region_classification_details': details}, 200
 
 
 def get_profile_history_payload(user_id: int | None, offset: int) -> tuple[dict, int]:
@@ -744,37 +755,18 @@ def _get_region_performance(cur, user_id: int) -> tuple[list[dict], list[dict]]:
     cur.execute(
         """
         SELECT
-            g.GameDate,
-            gsr.RoundNumber,
             gsr.Score,
-            gg.CityName AS GuessedCity,
-            gg.Population AS GuessedPopulation,
-            topcity.CityName AS TopCityName,
-            topcity.Population AS TopCityPopulation,
             gsq.MinLat,
             gsq.MinLon,
             gsq.MaxLat,
             gsq.MaxLon
         FROM dbo.GameSessions gs
-        INNER JOIN dbo.Games g
-            ON g.GameId = gs.GameId
         INNER JOIN dbo.GameSessionRounds gsr
             ON gsr.SessionId = gs.SessionId
-        LEFT JOIN dbo.GameGuesses gg
-            ON gg.SessionRoundId = gsr.SessionRoundId
         INNER JOIN dbo.GameSquares gsq
             ON gsq.SquareId = gsr.SquareId
-        OUTER APPLY (
-            SELECT TOP 1
-                gsc.CityName,
-                gsc.Population
-            FROM dbo.GameSquareCities gsc
-            WHERE gsc.SquareId = gsr.SquareId
-            ORDER BY gsc.Population DESC, gsc.CityName ASC
-        ) topcity
         WHERE gs.UserId = ?
             AND gs.CompletedAt IS NOT NULL
-        ORDER BY g.GameDate DESC, gsr.RoundNumber ASC
         """,
         (user_id,),
     )
@@ -794,8 +786,6 @@ def _get_region_performance(cur, user_id: int) -> tuple[list[dict], list[dict]]:
         }
         for region in REGION_ORDER
     }
-
-    details = []
 
     for row in rows:
         min_lat = float(row.MinLat)
@@ -820,18 +810,6 @@ def _get_region_performance(cur, user_id: int) -> tuple[list[dict], list[dict]]:
         if score > 0:
             buckets[region]['solved_count'] += 1
 
-        details.append({
-            'game_date': row.GameDate.isoformat(),
-            'round_number': int(row.RoundNumber),
-            'region': region,
-            'score': score,
-            'solved': score > 0,
-            'guessed_city': row.GuessedCity,
-            'guessed_population': int(row.GuessedPopulation) if row.GuessedPopulation is not None else None,
-            'top_city_name': row.TopCityName,
-            'top_city_population': int(row.TopCityPopulation) if row.TopCityPopulation is not None else None,
-        })
-
     summary = []
     for region in REGION_ORDER:
         region_data = buckets[region]
@@ -853,8 +831,97 @@ def _get_region_performance(cur, user_id: int) -> tuple[list[dict], list[dict]]:
     )
 
     _log_profile_duration('_get_region_performance', start)
-    return summary, details
-    return summary, details
+    return summary
+
+
+def _get_region_classification_details(cur, user_id: int) -> list[dict]:
+    start = perf_counter()
+    cur.execute(
+        """
+        WITH CompletedRounds AS (
+            SELECT
+                g.GameDate,
+                gsr.RoundNumber,
+                gsr.Score,
+                gsr.SquareId,
+                gg.CityName AS GuessedCity,
+                gg.Population AS GuessedPopulation,
+                gsq.MinLat,
+                gsq.MinLon,
+                gsq.MaxLat,
+                gsq.MaxLon
+            FROM dbo.GameSessions gs
+            INNER JOIN dbo.Games g
+                ON g.GameId = gs.GameId
+            INNER JOIN dbo.GameSessionRounds gsr
+                ON gsr.SessionId = gs.SessionId
+            LEFT JOIN dbo.GameGuesses gg
+                ON gg.SessionRoundId = gsr.SessionRoundId
+            INNER JOIN dbo.GameSquares gsq
+                ON gsq.SquareId = gsr.SquareId
+            WHERE gs.UserId = ?
+                AND gs.CompletedAt IS NOT NULL
+        ),
+        RankedTopCities AS (
+            SELECT
+                gsc.SquareId,
+                gsc.CityName,
+                gsc.Population,
+                ROW_NUMBER() OVER (
+                    PARTITION BY gsc.SquareId
+                    ORDER BY gsc.Population DESC, gsc.CityName ASC
+                ) AS CityRank
+            FROM dbo.GameSquareCities gsc
+            INNER JOIN (
+                SELECT DISTINCT SquareId
+                FROM CompletedRounds
+            ) squares
+                ON squares.SquareId = gsc.SquareId
+        )
+        SELECT
+            rounds.GameDate,
+            rounds.RoundNumber,
+            rounds.Score,
+            rounds.GuessedCity,
+            rounds.GuessedPopulation,
+            topcity.CityName AS TopCityName,
+            topcity.Population AS TopCityPopulation,
+            rounds.MinLat,
+            rounds.MinLon,
+            rounds.MaxLat,
+            rounds.MaxLon
+        FROM CompletedRounds rounds
+        LEFT JOIN RankedTopCities topcity
+            ON topcity.SquareId = rounds.SquareId
+            AND topcity.CityRank = 1
+        ORDER BY rounds.GameDate DESC, rounds.RoundNumber ASC
+        """,
+        (user_id,),
+    )
+    rows = _fetchall_with_timing(cur, '_get_region_classification_details')
+
+    details = []
+    for row in rows:
+        region = _classify_region(
+            float(row.MinLat),
+            float(row.MinLon),
+            float(row.MaxLat),
+            float(row.MaxLon),
+        )
+        details.append({
+            'game_date': row.GameDate.isoformat(),
+            'round_number': int(row.RoundNumber),
+            'region': region,
+            'score': int(row.Score),
+            'solved': int(row.Score) > 0,
+            'guessed_city': row.GuessedCity,
+            'guessed_population': int(row.GuessedPopulation) if row.GuessedPopulation is not None else None,
+            'top_city_name': row.TopCityName,
+            'top_city_population': int(row.TopCityPopulation) if row.TopCityPopulation is not None else None,
+        })
+
+    _log_profile_duration('_get_region_classification_details', start)
+    return details
 
 
 def _build_summary(

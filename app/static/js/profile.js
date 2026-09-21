@@ -3,6 +3,9 @@ import { fetchJson } from '@geosquare/api.js';
 
 let historyOffset = 0;
 let historyHasMore = false;
+let regionPerformanceSummary = [];
+let regionClassificationDetails = null;
+let regionClassificationDetailsRequest = null;
 
 function setText(id, value) {
     const el = document.getElementById(id);
@@ -116,6 +119,20 @@ function renderSummary(summary) {
 }
 
 function renderRegionPerformance(summaryRows, detailRows) {
+    const summaryBody = document.getElementById('profileRegionSummaryTableBody');
+    summaryBody.innerHTML = summaryRows.map((row) => `
+        <tr>
+            <td>${escapeHtml(row.region)}</td>
+            <td>${numberFmt(row.square_count)}</td>
+            <td>${numberFmt(row.completion_rate)}%</td>
+            <td>${numberFmt(row.average_points)}</td>
+        </tr>
+    `).join('');
+
+    if (detailRows === null) {
+        return;
+    }
+
     const tbody = document.getElementById('profileRegionTableBody');
 
     const grouped = {};
@@ -128,7 +145,7 @@ function renderRegionPerformance(summaryRows, detailRows) {
 
     tbody.innerHTML = summaryRows.map((row, idx) => {
         const regionKey = row.region;
-        const regionDetails = grouped[regionKey];
+        const regionDetails = grouped[regionKey] || [];
         const detailId = `region-detail-${idx}`;
 
         const detailRowsHtml = regionDetails.map((d) => `
@@ -342,10 +359,8 @@ function renderProfile(payload) {
     setText('profileHeroName', username);    
 
     renderSummary(payload.summary);
-    renderRegionPerformance(
-        payload.region_performance,
-        payload.region_classification_details
-    );
+    regionPerformanceSummary = payload.region_performance;
+    renderRegionPerformance(regionPerformanceSummary, null);
     wireRegionDetailsToggle();
     const history = payload.history;
     renderHistory(history);
@@ -394,10 +409,24 @@ function wireRegionDetailsToggle() {
     const button = document.getElementById('profileRegionDetailsToggle');
     const wrap = document.getElementById('profileRegionDetailsWrap');
 
-    button.onclick = () => {
+    button.onclick = async () => {
         const isHidden = wrap.classList.contains('hidden');
 
         if (isHidden) {
+            if (regionClassificationDetails === null) {
+                if (regionClassificationDetailsRequest === null) {
+                    regionClassificationDetailsRequest = fetchJson('/api/profile/region-details');
+                }
+
+                const { response, data } = await regionClassificationDetailsRequest;
+                if (!response.ok) {
+                    throw new Error('Unable to load region classification detail.');
+                }
+
+                regionClassificationDetails = data.region_classification_details;
+                renderRegionPerformance(regionPerformanceSummary, regionClassificationDetails);
+            }
+
             wrap.classList.remove('hidden');
             button.textContent = 'Hide square classification detail';
             return;
