@@ -70,7 +70,7 @@ MISSION_COPY = {
 	},
 	'diplomat': {
 		'name': 'Diplomat',
-		'prompt': 'Your named a city in {country_name}. Can you name three other cities there?',
+		'prompt': 'You named a city in {country_name}. Can you name three other cities there?',
 	},
 	'bigger_fish': {
 		'name': 'Bigger Fish',
@@ -94,12 +94,12 @@ MISSION_COPY = {
 	},
 	'okily_dokily': {
 		'name': 'Okily-Dokily',
-		'prompt': 'Can you name the nearest neighbour of {city_name}?',
+		'prompt': 'Can you name the nearest neighbor of {city_name}?',
 	},
 	'compass_sweep': {
 		'name': 'Compass Sweep',
 		'prompt': (
-			'Can you name three additional cities, where at least one is each of north, south, east, and west of {city_name}?'
+			'Can you name four additional cities: one each north, south, east, and west of {city_name}?'
 		),
 	},
 }

@@ -33,7 +33,7 @@ class MissionProgress:
 EligibilityCheck = Callable[[SideMissionContext], bool]
 PromptBuilder = Callable[[SideMissionContext], str]
 ProgressCalculator = Callable[[SideMissionContext], MissionProgress]
-AcknowledgementBuilder = Callable[[str], str]
+AcknowledgementBuilder = Callable[[str], str | None]
 
 
 @dataclass(frozen=True)

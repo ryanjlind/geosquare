@@ -74,6 +74,27 @@ def _distance_km(first: dict, second: dict) -> float:
 	return 6371.0 * 2 * asin(sqrt(haversine))
 
 
+def _compass_direction_order(answer: dict, city: dict) -> tuple[str, ...]:
+	latitude_delta = float(city['latitude']) - float(answer['latitude'])
+	longitude_delta = float(city['longitude']) - float(answer['longitude'])
+	latitude_distance = abs(radians(latitude_delta)) * 6371.0
+	middle_latitude = radians((float(city['latitude']) + float(answer['latitude'])) / 2)
+	longitude_distance = (
+		abs(radians(longitude_delta))
+		* 6371.0
+		* cos(middle_latitude)
+	)
+	vertical_direction = 'north' if latitude_delta > 0 else 'south'
+	horizontal_direction = 'east' if longitude_delta > 0 else 'west'
+	if latitude_delta == 0:
+		return (horizontal_direction,)
+	if longitude_delta == 0:
+		return (vertical_direction,)
+	if longitude_distance > latitude_distance:
+		return horizontal_direction, vertical_direction
+	return vertical_direction, horizontal_direction
+
+
 class AnswerStartsThreeCityNameChain:
 	def __call__(self, context: SideMissionContext) -> bool:
 		answer_letters = _normalized_name_letters(context.answer['city_name'])
@@ -169,18 +190,35 @@ class AnswerHasNearestNeighbor:
 
 class AnswerHasCitiesInEveryDirection:
 	def __call__(self, context: SideMissionContext) -> bool:
-		return all(
-			any(
-				{
-					'north': city['latitude'] > context.answer['latitude'],
-					'south': city['latitude'] < context.answer['latitude'],
-					'east': city['longitude'] > context.answer['longitude'],
-					'west': city['longitude'] < context.answer['longitude'],
-				}[direction]
-				for city in context.cities
-			)
-			for direction in ('north', 'south', 'east', 'west')
+		cities = tuple(
+			city for city in context.cities
+			if int(city['city_id']) != int(context.answer['city_id'])
 		)
+		return self._has_distinct_assignment(
+			context.answer,
+			cities,
+			('north', 'south', 'east', 'west'),
+		)
+
+	def _has_distinct_assignment(
+		self,
+		answer: dict,
+		cities: tuple[dict, ...],
+		remaining_directions: tuple[str, ...],
+	) -> bool:
+		if not remaining_directions:
+			return True
+		for city in cities:
+			for direction in _compass_direction_order(answer, city):
+				if direction in remaining_directions:
+					next_cities = tuple(candidate for candidate in cities if candidate is not city)
+					next_directions = tuple(
+						candidate for candidate in remaining_directions
+						if candidate != direction
+					)
+					if self._has_distinct_assignment(answer, next_cities, next_directions):
+						return True
+		return False
 
 
 class CapitalSweepPrompt:
@@ -204,6 +242,7 @@ class CapitalSweepProgress:
 			int(city['city_id'])
 			for city in context.cities
 			if city['is_capital']
+			and int(city['city_id']) != int(context.answer['city_id'])
 		}
 		found_ids = context.found_city_ids & target_ids
 		return MissionProgress(
@@ -239,11 +278,14 @@ class CountryCoverageProgress:
 		target_countries = {
 			get_sovereign_country_code(city['country_code'])
 			for city in context.cities
+			if get_sovereign_country_code(city['country_code'])
+			!= get_sovereign_country_code(context.answer['country_code'])
 		}
 		found_countries = {
 			get_sovereign_country_code(cities_by_id[city_id]['country_code'])
 			for city_id in context.found_city_ids
 			if city_id in cities_by_id
+			and get_sovereign_country_code(cities_by_id[city_id]['country_code']) in target_countries
 		}
 		return MissionProgress(
 			current=len(found_countries),
@@ -382,13 +424,8 @@ class CompassSweepProgress:
 		found_directions = []
 		for guess in context.guesses:
 			city = cities_by_id[int(guess['city_id'])]
-			for direction in remaining_directions:
-				if {
-					'north': city['latitude'] > context.answer['latitude'],
-					'south': city['latitude'] < context.answer['latitude'],
-					'east': city['longitude'] > context.answer['longitude'],
-					'west': city['longitude'] < context.answer['longitude'],
-				}[direction]:
+			for direction in _compass_direction_order(context.answer, city):
+				if direction in remaining_directions:
 					found_directions.append(direction)
 					remaining_directions.remove(direction)
 					break
@@ -482,6 +519,11 @@ class DiscoveredAcknowledgement:
 		return f'{target_name.upper()} DISCOVERED'
 
 
+class NoAcknowledgement:
+	def __call__(self, target_name: str) -> None:
+		return None
+
+
 ELIGIBILITY_SCENARIOS = {
 	'answer_is_capital': AnswerIsCapital(),
 	'square_has_multiple_capitals': SquareHasMultipleCapitals(),
@@ -513,7 +555,7 @@ MISSIONS = {
 		name=MISSION_COPY['capital_sweep']['name'],
 		build_prompt=CapitalSweepPrompt(),
 		calculate_progress=CapitalSweepProgress(),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 	'country_coverage': SideMissionDefinition(
 		mission_id='country_coverage',
@@ -527,56 +569,56 @@ MISSIONS = {
 		name=MISSION_COPY['north_to_south']['name'],
 		build_prompt=OppositeExtremePrompt('north_to_south'),
 		calculate_progress=ExtremeCityProgress('latitude', 'minimum'),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 	'south_to_north': SideMissionDefinition(
 		mission_id='south_to_north',
 		name=MISSION_COPY['south_to_north']['name'],
 		build_prompt=OppositeExtremePrompt('south_to_north'),
 		calculate_progress=ExtremeCityProgress('latitude', 'maximum'),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 	'east_to_west': SideMissionDefinition(
 		mission_id='east_to_west',
 		name=MISSION_COPY['east_to_west']['name'],
 		build_prompt=OppositeExtremePrompt('east_to_west'),
 		calculate_progress=ExtremeCityProgress('longitude', 'minimum'),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 	'west_to_east': SideMissionDefinition(
 		mission_id='west_to_east',
 		name=MISSION_COPY['west_to_east']['name'],
 		build_prompt=OppositeExtremePrompt('west_to_east'),
 		calculate_progress=ExtremeCityProgress('longitude', 'maximum'),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 	'smallest_to_largest': SideMissionDefinition(
 		mission_id='smallest_to_largest',
 		name=MISSION_COPY['smallest_to_largest']['name'],
 		build_prompt=SmallestToLargestPrompt(),
 		calculate_progress=ThreeLargestCitiesProgress(),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 	'name_chain': SideMissionDefinition(
 		mission_id='name_chain',
 		name=MISSION_COPY['name_chain']['name'],
 		build_prompt=NameChainPrompt(),
 		calculate_progress=ThreeCityNameChainProgress(),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 	'multi_word_sweep': SideMissionDefinition(
 		mission_id='multi_word_sweep',
 		name=MISSION_COPY['multi_word_sweep']['name'],
 		build_prompt=MultiWordCitiesPrompt(),
 		calculate_progress=OtherMultiWordCitiesProgress(),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 	'isolated_neighbors': SideMissionDefinition(
 		mission_id='isolated_neighbors',
 		name=MISSION_COPY['isolated_neighbors']['name'],
 		build_prompt=IsolatedCityPrompt(),
 		calculate_progress=ThreeNearestNeighborsProgress(),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 	'diplomat': SideMissionDefinition(
 		mission_id='diplomat',
@@ -589,7 +631,7 @@ MISSIONS = {
 				== get_sovereign_country_code(context.answer['country_code'])
 			),
 		),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 	'bigger_fish': SideMissionDefinition(
 		mission_id='bigger_fish',
@@ -598,7 +640,7 @@ MISSIONS = {
 		calculate_progress=ThreeTargetCitiesProgress(
 			lambda context, city: int(city['population']) > int(context.answer['population']),
 		),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 	'northbound': SideMissionDefinition(
 		mission_id='northbound',
@@ -607,7 +649,7 @@ MISSIONS = {
 		calculate_progress=ThreeTargetCitiesProgress(
 			lambda context, city: city['latitude'] > context.answer['latitude'],
 		),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 	'southbound': SideMissionDefinition(
 		mission_id='southbound',
@@ -616,7 +658,7 @@ MISSIONS = {
 		calculate_progress=ThreeTargetCitiesProgress(
 			lambda context, city: city['latitude'] < context.answer['latitude'],
 		),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 	'eastbound': SideMissionDefinition(
 		mission_id='eastbound',
@@ -625,7 +667,7 @@ MISSIONS = {
 		calculate_progress=ThreeTargetCitiesProgress(
 			lambda context, city: city['longitude'] > context.answer['longitude'],
 		),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 	'westbound': SideMissionDefinition(
 		mission_id='westbound',
@@ -634,21 +676,21 @@ MISSIONS = {
 		calculate_progress=ThreeTargetCitiesProgress(
 			lambda context, city: city['longitude'] < context.answer['longitude'],
 		),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 	'okily_dokily': SideMissionDefinition(
 		mission_id='okily_dokily',
 		name=MISSION_COPY['okily_dokily']['name'],
 		build_prompt=TargetCitiesPrompt('okily_dokily'),
 		calculate_progress=NearestNeighborProgress(),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 	'compass_sweep': SideMissionDefinition(
 		mission_id='compass_sweep',
 		name=MISSION_COPY['compass_sweep']['name'],
 		build_prompt=TargetCitiesPrompt('compass_sweep'),
 		calculate_progress=CompassSweepProgress(),
-		build_acknowledgement=DiscoveredAcknowledgement(),
+		build_acknowledgement=NoAcknowledgement(),
 	),
 }
 

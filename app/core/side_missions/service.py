@@ -223,8 +223,9 @@ def _mission_payload(mission_row, context: SideMissionContext) -> dict:
 			'target': progress.target,
 			'named': list(progress.named),
 			'acknowledgements': {
-				target_name: mission.build_acknowledgement(target_name)
+				target_name: acknowledgement
 				for target_name in progress.named
+				if (acknowledgement := mission.build_acknowledgement(target_name)) is not None
 			},
 		},
 		'completed_at': (
