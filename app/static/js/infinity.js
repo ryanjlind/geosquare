@@ -306,7 +306,7 @@ function setPoolLayout() {
     document.getElementById('expandBtn').style.display = 'none';
     document.getElementById('previousBtn').style.display = 'inline-block';
     document.getElementById('nextBtn').style.display = 'inline-block';
-    document.getElementById('shareScoreBtn').style.display = 'none';
+    document.getElementById('shareScoreBtn').style.display = 'inline-block';
     document.getElementById('summaryBtn').classList.remove('hidden');
     document.getElementById('postGameActions').style.display = 'grid';
     document.getElementById('guessBox').style.display = 'block';
