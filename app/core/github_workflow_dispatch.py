@@ -3,10 +3,11 @@ import os
 
 import requests
 
-
-GITHUB_API_VERSION = '2022-11-28'
-GITHUB_WORKFLOW_REF = 'main'
-REQUEST_TIMEOUT_SECONDS = 30
+from app.constants import (
+    GITHUB_API_VERSION,
+    GITHUB_REQUEST_TIMEOUT_SECONDS,
+    GITHUB_WORKFLOW_REF,
+)
 
 
 def _required_environment_value(name: str) -> str:
@@ -41,7 +42,7 @@ def dispatch_github_workflow(
             'X-GitHub-Api-Version': GITHUB_API_VERSION,
         },
         json={'ref': GITHUB_WORKFLOW_REF},
-        timeout=REQUEST_TIMEOUT_SECONDS,
+        timeout=GITHUB_REQUEST_TIMEOUT_SECONDS,
     )
     response.raise_for_status()
     return True

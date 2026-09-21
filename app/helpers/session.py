@@ -3,8 +3,7 @@ import os
 from flask import current_app, request
 from itsdangerous import URLSafeSerializer
 
-COOKIE_NAME = 'geosquare_session'
-COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365 * 5
+from app.constants import COOKIE_MAX_AGE_SECONDS, COOKIE_NAME
 
 def get_session_signer():
     return URLSafeSerializer(current_app.config['SECRET_KEY'], salt='geosquare-session')

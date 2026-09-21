@@ -1,25 +1,28 @@
 from functools import lru_cache
-import logging
 
 from rapidfuzz import fuzz
 
+from app.constants import (
+    ADDITIONAL_UNMATCHED_TRAILING_TOKEN_PENALTY,
+    AUTO_ACCEPT_SCORE,
+    FUZZY_ALTERNATE_NAME_PENALTY,
+    FUZZY_LINE_SCORE,
+    NAME_DESCRIPTOR_WEIGHT,
+    NEARBY_FIRST_RING_PENALTY,
+    NEARBY_NOTORIETY_SCALE,
+    NEARBY_RING_PENALTY_DECAY,
+    PHONETIC_TOKEN_SCORE,
+    UNMATCHED_INPUT_TOKEN_PENALTY,
+    UNMATCHED_INTERIOR_TOKEN_PENALTY,
+    UNMATCHED_LEADING_TOKEN_PENALTY,
+    UNMATCHED_TRAILING_TOKEN_PENALTY,
+)
 from app.core.country_names import get_country_name
+from app.core.logging import get_logger
 from app.helpers.text import normalize_place_name
 
+_logger = get_logger('geosquare.matching')
 
-AUTO_ACCEPT_SCORE = 95.0
-FUZZY_LINE_SCORE = 88.5
-PHONETIC_TOKEN_SCORE = 92.0
-FUZZY_ALTERNATE_NAME_PENALTY = 7.5
-UNMATCHED_LEADING_TOKEN_PENALTY = 30.0
-UNMATCHED_INTERIOR_TOKEN_PENALTY = 20.0
-UNMATCHED_TRAILING_TOKEN_PENALTY = 5.0
-ADDITIONAL_UNMATCHED_TRAILING_TOKEN_PENALTY = 15.0
-UNMATCHED_INPUT_TOKEN_PENALTY = 30.0
-NEARBY_FIRST_RING_PENALTY = 15.0
-NEARBY_RING_PENALTY_DECAY = 5.0
-NEARBY_NOTORIETY_SCALE = 10.0
-NAME_DESCRIPTOR_WEIGHT = 0.5
 NAME_CONNECTOR_WORDS = {
     'a', 'aan', 'af', 'ai', 'al', 'ale', 'alla', 'alle', 'am', 'an',
     'and', 'ar', 'as', 'at', 'auf', 'au', 'aux', 'av', 'az', 'bajo',
@@ -56,9 +59,6 @@ NAME_DESCRIPTOR_WORDS = {
     'ste', 'sud', 'sul', 'superior', 'sur', 'upper', 'valley', 'veche',
     'vechi', 'vest', 'west', 'western', 'wielka', 'wielki', 'yeni',
 }
-
-_logger = logging.getLogger('geosquare.matching')
-_logger.setLevel(logging.INFO)
 
 
 def phonetic_key(text: str) -> str:

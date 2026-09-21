@@ -2,7 +2,7 @@ import os
 
 import pyodbc
 
-PRODUCTION_DATABASE_NAME = 'GeoSquare'
+from app.constants import PRODUCTION_DATABASE_NAME
 
 
 def _required_environment_value(name: str) -> str:

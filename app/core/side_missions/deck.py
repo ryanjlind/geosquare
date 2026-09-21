@@ -1,5 +1,9 @@
 from math import asin, cos, radians, sin, sqrt
 
+from app.constants import (
+	NAME_CHAIN_MINIMUM_STEP_POPULATION,
+	SIDE_MISSION_TARGET_COUNT,
+)
 from app.core.country_names import get_country_name, get_sovereign_country_code
 from app.core.side_missions.copy import MISSION_COPY
 from app.core.side_missions.framework import (
@@ -8,10 +12,6 @@ from app.core.side_missions.framework import (
 	SideMissionDeck,
 	SideMissionDefinition,
 )
-
-
-NAME_CHAIN_MINIMUM_STEP_POPULATION = 150_000
-SIDE_MISSION_TARGET_COUNT = 3
 
 
 class AnswerIsCapital:
@@ -691,7 +691,6 @@ MISSIONS = {
 		build_acknowledgement=NoAcknowledgement(),
 	),
 }
-
 
 MISSION_ELIGIBILITY = {
 	'capital_sweep': (

@@ -1,11 +1,10 @@
 import logging
 from types import SimpleNamespace
 from time import perf_counter
+from app.core.logging import debug as log_debug, timing
 
 from app.helpers.date import get_effective_game_date
 from app.helpers.text import strip_accents
-
-_logger = logging.getLogger('geosquare')
 
 def get_base_square_id_for_round(cur, game_id: int, round_number: int):
     cur.execute("""
@@ -253,7 +252,7 @@ def find_exact_city_in_expansions(
 
 def get_completed_round_rows(cur, session_id: int):
     started_at = perf_counter()
-    _logger.debug('get_completed_round_rows: started session_id=%s', session_id)
+    log_debug('get_completed_round_rows: started session_id=%s', session_id)
     cur.execute("""
         WITH CompletedRounds AS (
             SELECT
@@ -325,16 +324,16 @@ def get_completed_round_rows(cur, session_id: int):
         session_round_id = int(row.SessionRoundId)
         if session_round_id in logged_session_round_ids:
             continue
-        _logger.debug(
+        log_debug(
             'get_completed_round_rows: processing session_round_id=%s',
             session_round_id,
         )
         logged_session_round_ids.add(session_round_id)
-    _logger.debug(
-        'get_completed_round_rows: completed session_id=%s row_count=%s elapsed_ms=%.1f',
-        session_id,
-        len(rows),
+    timing(
+        'get_completed_round_rows',
         (perf_counter() - started_at) * 1000.0,
+        details={'session_id': session_id, 'row_count': len(rows)},
+        level=logging.DEBUG,
     )
     return rows
 
@@ -481,7 +480,6 @@ def get_next_expansion_square(cur, game_id: int, round_number: int, current_squa
 
     return cur.fetchone()
 
-# Shared square column selection for get_square_by_id
 _SQUARE_SELECT_COLUMNS = """
     gr.GameId,
     gr.RoundNumber,

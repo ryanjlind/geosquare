@@ -14,11 +14,6 @@ const EASY_CITY_DOT_MAX_SIZE = 10;
 const DEFAULT_GLOBE_ZOOM_HEIGHT = 10_000_000;
 
 export async function initCesium() {
-    await postClientLog('init_cesium_started', {
-        href: window.location.href,
-        userAgent: navigator.userAgent
-    });
-
     try {
         const arcGisImageryProvider = await Cesium.ArcGisMapServerImageryProvider.fromUrl(
             'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer'

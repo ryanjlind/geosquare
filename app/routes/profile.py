@@ -8,7 +8,7 @@ from app.core.profile_service import (
     get_profile_payload,
     get_profile_region_details_payload,
 )
-from app.helpers.logging import info as log_info
+from app.core.logging import info as log_info
 from app.helpers.session import get_user_id_from_cookie
 
 

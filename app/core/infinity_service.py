@@ -1,8 +1,9 @@
 from contextlib import contextmanager
-import logging
 from time import perf_counter
 
+from app.constants import GAME_ROUND_COUNT as ROUND_COUNT
 from app.core.db import get_conn
+from app.core.logging import get_logger
 from app.core.game_mappers import map_completed_rounds, map_square
 from app.core.game_queries import (
     find_exact_city_in_expansions,
@@ -34,9 +35,7 @@ from app.core.side_missions.service import (
 )
 
 
-ROUND_COUNT = 5
-
-_logger = logging.getLogger('geosquare.infinity')
+_logger = get_logger('geosquare.infinity')
 
 
 def _format_log_fields(fields: dict) -> str:

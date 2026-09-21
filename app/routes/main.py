@@ -1,10 +1,8 @@
 import os
 import json
-import logging
-import time
+from time import perf_counter
 
 from flask import Blueprint, jsonify, render_template, request, current_app, url_for, redirect, make_response
-from datetime import datetime, timezone
 
 from app.core.auth import (
     begin_lastlogin_link,
@@ -36,13 +34,9 @@ from app.core.user import is_username_available, set_username
 from app.helpers.session import attach_session_cookie, COOKIE_NAME, get_user_id_from_cookie, get_session_id_from_cookie
 from app.core.db import get_conn
 from app.core.feedback_service import send_feedback_email
-from app.core.log_events import write_log_event
-from app.helpers.logging import debug as log_debug
+from app.core.logging import client_event, exception as log_exception, timing
 
 main_bp = Blueprint("main", __name__)
-
-client_log_logger = logging.getLogger("geosquare.client")
-
 
 def _env_flag(name, default=False):
     raw = os.getenv(name)
@@ -86,22 +80,14 @@ def client_log():
     user_agent = request.headers.get("User-Agent")
     referer = request.headers.get("Referer")
 
-    log_record = {
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-        "ip": ip_address,
-        "user_agent": user_agent,
-        "referer": referer,
-        "payload": payload,
-    }
-
-    write_log_event(
+    client_event(
+        payload=payload,
         event_type=event_type,
         details=details,
         ip_address=ip_address,
         user_agent=user_agent,
         referer=referer,
     )
-    current_app.logger.error(json.dumps(log_record, ensure_ascii=False))
     return jsonify({"ok": True})
 
 
@@ -136,28 +122,43 @@ def all_daily_squares():
 
 @main_bp.route("/api/game-state")
 def game_state():
-    print(f"{time.perf_counter():.9f} game_state: start", flush=True)
+    started_at = perf_counter()
 
+    identity_started_at = perf_counter()
     identity = _identity()
-    print(f"{time.perf_counter():.9f} game_state: identity loaded", flush=True)
+    timing(
+        'game_state.identity',
+        (perf_counter() - identity_started_at) * 1000.0,
+    )
 
     try:
-        print(f"{time.perf_counter():.9f} game_state: before get_game_state_payload call", flush=True)
-
+        payload_started_at = perf_counter()
         body, status = get_game_state_payload(
             identity["user_id"],
             identity["session_id"],
         )
-
-        print(f"{time.perf_counter():.9f} game_state: after get_game_state_payload call", flush=True)
-        print(f"{time.perf_counter():.9f} game_state: payload status={status}", flush=True)
-    except Exception as e:
-        print(f"{time.perf_counter():.9f} game_state: exception in get_game_state_payload: {e}", flush=True)
+        timing(
+            'game_state.get_game_state_payload',
+            (perf_counter() - payload_started_at) * 1000.0,
+            details={'status': status},
+        )
+    except Exception:
+        log_exception('game_state: exception in get_game_state_payload')
         raise
 
+    response_started_at = perf_counter()
     resp = jsonify(body)
     resp.status_code = status
-    print(f"{time.perf_counter():.9f} game_state: response built", flush=True)
+    timing(
+        'game_state.response',
+        (perf_counter() - response_started_at) * 1000.0,
+        details={'status': status},
+    )
+    timing(
+        'game_state.total',
+        (perf_counter() - started_at) * 1000.0,
+        details={'status': status},
+    )
 
     return attach_session_cookie(resp, identity["user_id"], identity["session_id"])
 

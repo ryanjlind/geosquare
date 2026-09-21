@@ -3,10 +3,11 @@ from contextlib import contextmanager
 from datetime import date, timedelta
 from time import perf_counter
 
+from app.constants import HISTORY_PAGE_SIZE
 from app.core.country_names import get_country_name, get_sovereign_country_code
 from app.core.db import get_conn
 from app.core.infinity_queries import get_started_infinity_pools
-from app.helpers.logging import info as log_info
+from app.core.logging import info as log_info
 
 REGION_ORDER = [
     'Nordic Europe',
@@ -28,8 +29,6 @@ REGION_ORDER = [
     'Oceania',
     'Other',
 ]
-HISTORY_PAGE_SIZE = 20
-
 
 def _log_profile_duration(label: str, start: float):
     log_info(f'[profile] {label} took {perf_counter() - start:.3f}s')

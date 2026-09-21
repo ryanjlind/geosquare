@@ -3,9 +3,7 @@ import os
 
 import requests
 
-
-REQUEST_TIMEOUT_SECONDS = 30
-RESEND_API_URL = 'https://api.resend.com/emails'
+from app.constants import FEEDBACK_REQUEST_TIMEOUT_SECONDS, RESEND_API_URL
 
 
 def send_feedback_email(data, screenshots) -> None:
@@ -49,6 +47,6 @@ Diagnostics:
             'text': body,
             'attachments': attachments,
         },
-        timeout=REQUEST_TIMEOUT_SECONDS,
+        timeout=FEEDBACK_REQUEST_TIMEOUT_SECONDS,
     )
     response.raise_for_status()

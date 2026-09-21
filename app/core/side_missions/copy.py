@@ -51,7 +51,8 @@ MISSION_COPY = {
 	'name_chain': {
 		'name': 'Alphabet Ladder',
 		'prompt': (
-			'You named {city_name}. Can you complete a three-city letter-chain, starting with a city beginning with {required_letter}? '			
+			'You named {city_name}. Can you complete a three-city letter-chain, '
+			'starting with a city beginning with {required_letter}? '
 		),
 	},
 	'multi_word_sweep': {
@@ -99,7 +100,8 @@ MISSION_COPY = {
 	'compass_sweep': {
 		'name': 'Compass Sweep',
 		'prompt': (
-			'Can you name four additional cities: one each north, south, east, and west of {city_name}?'
+			'Can you name four additional cities: one each north, south, east, '
+			'and west of {city_name}?'
 		),
 	},
 }

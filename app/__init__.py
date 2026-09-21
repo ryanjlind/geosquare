@@ -3,13 +3,13 @@ import os
 from hashlib import sha256
 from pathlib import Path
 from flask import Flask, Response, request
+from app.constants import STATIC_ASSET_HASH_LENGTH
 from app.routes.daily_dashboard import daily_dashboard_bp
 from app.routes.main import main_bp
 from app.routes.profile import profile_bp
 from app.routes.weekly_e2e import weekly_e2e_bp
 
 
-STATIC_ASSET_HASH_LENGTH = 12
 STATIC_JS_DIRECTORY = Path(__file__).parent / 'static' / 'js'
 
 

@@ -4,10 +4,8 @@ from datetime import datetime, timezone
 from authlib.integrations.flask_client import OAuth
 from flask import current_app, session
 
+from app.constants import LASTLOGIN_PROVIDER
 from app.core.db import get_conn
-
-
-LASTLOGIN_PROVIDER = 'lastlogin'
 
 _oauth = OAuth()
 _lastlogin_client = None
