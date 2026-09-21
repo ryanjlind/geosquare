@@ -4,8 +4,6 @@ import { fetchJson } from '@geosquare/api.js';
 let historyOffset = 0;
 let historyHasMore = false;
 let regionPerformanceSummary = [];
-let regionClassificationDetails = null;
-let regionClassificationDetailsRequest = null;
 
 function setText(id, value) {
     const el = document.getElementById(id);
@@ -121,78 +119,13 @@ function renderSummary(summary) {
 function renderRegionSummary(summaryRows) {
     const summaryBody = document.getElementById('profileRegionSummaryTableBody');
     summaryBody.innerHTML = summaryRows.map((row) => `
-        <tr>
+        <tr class="region-summary-row" data-region="${escapeHtml(row.region)}" role="button" tabindex="0" aria-expanded="false">
             <td>${escapeHtml(row.region)}</td>
             <td>${numberFmt(row.square_count)}</td>
             <td>${numberFmt(row.completion_rate)}%</td>
             <td>${numberFmt(row.average_points)}</td>
         </tr>
     `).join('');
-
-
-i}
-
-function renderRegionPerformance(summaryRows, detailRows) {
-    const tbody = document.getElementById('profileRegionTableBody');
-
-    const grouped = Object.fromEntries(
-        summaryRows.map((row) => [row.region, []])
-    );
-    detailRows.forEach((row) => {
-        if (!Object.hasOwn(grouped, row.region)) {
-            throw new Error(`Unexpected region detail: ${row.region}`);
-        }
-        grouped[row.region].push(row);
-    });
-
-    tbody.innerHTML = summaryRows.map((row, idx) => {
-        const regionKey = row.region;
-        const regionDetails = grouped[regionKey];
-        const detailId = `region-detail-${idx}`;
-
-        const detailRowsHtml = regionDetails.map((d) => `
-            <tr class="region-detail-row">
-                <td>${escapeHtml(d.game_date)}</td>
-                <td>${numberFmt(d.round_number)}</td>
-                <td>${d.guessed_city ? escapeHtml(d.guessed_city) : '—'}</td>
-                <td>${d.guessed_population != null ? numberFmt(d.guessed_population) : '—'}</td>
-                <td>${d.top_city_name ? escapeHtml(d.top_city_name) : '—'}</td>
-                <td>${d.top_city_population != null ? numberFmt(d.top_city_population) : '—'}</td>
-                <td>${formatScoreWithPenalty(d.score, d.expansion_level)}</td>
-            </tr>
-        `).join('');
-
-        return `
-            <tr class="region-summary-row" data-target="${detailId}">
-                <td>${escapeHtml(row.region)}</td>
-                <td>${numberFmt(row.square_count)}</td>
-                <td>${numberFmt(row.completion_rate)}%</td>
-                <td>${numberFmt(row.average_points)}</td>
-            </tr>
-
-            <tr id="${detailId}" class="region-detail-container hidden">
-                <td colspan="4">
-                    <table class="stats-rounds-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Round</th>
-                                <th>Your Guess</th>
-                                <th>Pop.</th>
-                                <th>Largest City</th>
-                                <th>Pop.</th>
-                                <th>Pts</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${detailRowsHtml || '<tr><td colspan="10">No data</td></tr>'}
-                        </tbody>
-                    </table>
-                </td>
-            </tr>
-        `;
-    }).join('');
-
     wireRegionRowToggle();
 }
 
@@ -363,7 +296,6 @@ function renderProfile(payload) {
     renderSummary(payload.summary);
     regionPerformanceSummary = payload.region_performance;
     renderRegionSummary(regionPerformanceSummary);
-    wireRegionDetailsToggle();
     const history = payload.history;
     renderHistory(history);
     updateHistoryPagination(payload.history_pagination, history.length);
@@ -407,47 +339,73 @@ function wireAuthButtons(user) {
     };
 }
 
-function wireRegionDetailsToggle() {
-    const button = document.getElementById('profileRegionDetailsToggle');
-    const wrap = document.getElementById('profileRegionDetailsWrap');
-
-    button.onclick = async () => {
-        const isHidden = wrap.classList.contains('hidden');
-
-        if (isHidden) {
-            if (regionClassificationDetails === null) {
-                if (regionClassificationDetailsRequest === null) {
-                    regionClassificationDetailsRequest = fetchJson('/api/profile/region-details');
-                }
-
-                const { response, data } = await regionClassificationDetailsRequest;
-                if (!response.ok) {
-                    throw new Error('Unable to load region classification detail.');
-                }
-
-                regionClassificationDetails = data.region_classification_details;
-                renderRegionPerformance(regionPerformanceSummary, regionClassificationDetails);
-            }
-
-            wrap.classList.remove('hidden');
-            button.textContent = 'Hide square classification detail';
-            return;
-        }
-
-        wrap.classList.add('hidden');
-        button.textContent = 'Show square classification detail';
-    };
-}
-
 function wireRegionRowToggle() {
     const rows = document.querySelectorAll('.region-summary-row');
 
     rows.forEach((row) => {
-        row.onclick = () => {
-            const targetId = row.getAttribute('data-target');
-            const detail = document.getElementById(targetId);
+        const toggle = async () => {
+            const expanded = row.getAttribute('aria-expanded') === 'true';
+            const existingDetail = row.nextElementSibling;
+            if (expanded) {
+                existingDetail.remove();
+                row.setAttribute('aria-expanded', 'false');
+                return;
+            }
 
-            detail.classList.toggle('hidden');
+            const region = row.dataset.region;
+            const detailRow = document.createElement('tr');
+            detailRow.className = 'region-detail-container';
+            detailRow.innerHTML = '<td colspan="4">Loading classification detail...</td>';
+            row.insertAdjacentElement('afterend', detailRow);
+            row.setAttribute('aria-expanded', 'true');
+
+            const { response, data } = await fetchJson(
+                `/api/profile/region-details?region=${encodeURIComponent(region)}`
+            );
+            if (!response.ok) {
+                throw new Error(`Unable to load classification detail for ${region}.`);
+            }
+
+            detailRow.innerHTML = renderRegionDetailTable(data.region_classification_details);
+        };
+        row.onclick = toggle;
+        row.onkeydown = (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                toggle();
+            }
         };
     });
+}
+
+function renderRegionDetailTable(detailRows) {
+    const rows = detailRows.map((row) => `
+        <tr class="region-detail-row">
+            <td>${escapeHtml(row.game_date)}</td>
+            <td>${numberFmt(row.round_number)}</td>
+            <td>${row.guessed_city ? escapeHtml(row.guessed_city) : '—'}</td>
+            <td>${row.guessed_population != null ? numberFmt(row.guessed_population) : '—'}</td>
+            <td>${row.top_city_name ? escapeHtml(row.top_city_name) : '—'}</td>
+            <td>${row.top_city_population != null ? numberFmt(row.top_city_population) : '—'}</td>
+            <td>${formatScoreWithPenalty(row.score, row.expansion_level)}</td>
+        </tr>
+    `).join('');
+    return `
+        <td colspan="4">
+            <table class="stats-rounds-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Round</th>
+                        <th>Your Guess</th>
+                        <th>Pop.</th>
+                        <th>Largest City</th>
+                        <th>Pop.</th>
+                        <th>Pts</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </td>
+    `;
 }

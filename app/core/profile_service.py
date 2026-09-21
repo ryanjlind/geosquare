@@ -148,14 +148,17 @@ def get_profile_payload(user_id: int | None) -> tuple[dict, int]:
     }, 200
 
 
-def get_profile_region_details_payload(user_id: int | None) -> tuple[dict, int]:
+def get_profile_region_details_payload(
+    user_id: int | None,
+    target_region: str,
+) -> tuple[dict, int]:
     if user_id is None:
         return {'error': 'No profile found.'}, 404
 
     with _profile_stage('get_profile_region_details_payload'):
         with get_conn() as conn:
             cur = conn.cursor()
-            details = _get_region_classification_details(cur, user_id)
+            details = _get_region_classification_details(cur, user_id, target_region)
 
     return {'region_classification_details': details}, 200
 
@@ -834,7 +837,11 @@ def _get_region_performance(cur, user_id: int) -> tuple[list[dict], list[dict]]:
     return summary
 
 
-def _get_region_classification_details(cur, user_id: int) -> list[dict]:
+def _get_region_classification_details(
+    cur,
+    user_id: int,
+    target_region: str,
+) -> list[dict]:
     start = perf_counter()
     log_info(f'[profile] _get_region_classification_details started user_id={user_id}')
     cur.execute(
@@ -909,17 +916,18 @@ def _get_region_classification_details(cur, user_id: int) -> list[dict]:
             float(row.MaxLat),
             float(row.MaxLon),
         )
-        details.append({
-            'game_date': row.GameDate.isoformat(),
-            'round_number': int(row.RoundNumber),
-            'region': region,
-            'score': int(row.Score),
-            'solved': int(row.Score) > 0,
-            'guessed_city': row.GuessedCity,
-            'guessed_population': int(row.GuessedPopulation) if row.GuessedPopulation is not None else None,
-            'top_city_name': row.TopCityName,
-            'top_city_population': int(row.TopCityPopulation) if row.TopCityPopulation is not None else None,
-        })
+        if region == target_region:
+            details.append({
+                'game_date': row.GameDate.isoformat(),
+                'round_number': int(row.RoundNumber),
+                'region': region,
+                'score': int(row.Score),
+                'solved': int(row.Score) > 0,
+                'guessed_city': row.GuessedCity,
+                'guessed_population': int(row.GuessedPopulation) if row.GuessedPopulation is not None else None,
+                'top_city_name': row.TopCityName,
+                'top_city_population': int(row.TopCityPopulation) if row.TopCityPopulation is not None else None,
+            })
 
     _log_profile_duration('_get_region_classification_details', start)
     log_info(

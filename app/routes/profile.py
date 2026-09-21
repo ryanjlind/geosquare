@@ -76,7 +76,8 @@ def profile_history():
 @profile_bp.route('/api/profile/region-details')
 def profile_region_details():
     user_id = get_user_id_from_cookie()
-    response_body, status_code = get_profile_region_details_payload(user_id)
+    region = request.args['region']
+    response_body, status_code = get_profile_region_details_payload(user_id, region)
     response = jsonify(response_body)
     response.status_code = status_code
     return response
