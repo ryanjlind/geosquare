@@ -71,7 +71,8 @@ import { gameState } from '@geosquare/state.js';
         sideMissionPanel,
         guessBox,
         guessFeedback,
-        postGameActions,
+        previousButton,
+        nextButton,
     }) {
         const scrim = document.createElement('div');
         scrim.className = 'mobile-drawer-scrim';
@@ -114,7 +115,11 @@ import { gameState } from '@geosquare/state.js';
         bottomTray.appendChild(sideMissionPanel);
         bottomTray.appendChild(guessBox);
         bottomTray.appendChild(guessFeedback);
-        bottomTray.appendChild(postGameActions);
+        const squareNavigation = document.createElement('div');
+        squareNavigation.id = 'mobileSquareNavigation';
+        bottomTray.appendChild(squareNavigation);
+        squareNavigation.appendChild(previousButton);
+        squareNavigation.appendChild(nextButton);
         bottomTray.appendChild(sideMissionsInvite);
 
         function syncMobileHeroStats() {
@@ -214,7 +219,8 @@ import { gameState } from '@geosquare/state.js';
         const sideMissionsInvite = document.getElementById('sideMissionsInvite');
         const sideMissionPanel = document.getElementById('sideMissionPanel');
         const guessFeedback = document.getElementById('guessFeedback');
-        const postGameActions = document.getElementById('postGameActions');
+        const previousButton = document.getElementById('previousBtn');
+        const nextButton = document.getElementById('nextBtn');
 
         initGameMobile({
             sidebar,
@@ -223,7 +229,8 @@ import { gameState } from '@geosquare/state.js';
             sideMissionPanel,
             guessBox,
             guessFeedback,
-            postGameActions,
+            previousButton,
+            nextButton,
         });
 
         document.body.dataset.mobileInit = 'true';

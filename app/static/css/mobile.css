@@ -73,8 +73,7 @@
     .sidebar h1,
     .sidebar #guessBox,
     .sidebar #guessFeedback,
-    .sidebar #nextBtn,
-    .sidebar #postGameActions {
+    .sidebar #nextBtn {
         display: none;
     }
 
@@ -196,14 +195,16 @@
         min-height: 18px;
     }
 
-    .mobile-bottomtray #postGameActions {
+    .mobile-bottomtray #mobileSquareNavigation {
+        display: flex;
         margin: 8px 0 0 0;
         width: 100%;
         justify-content: center;
+        gap: 8px;
     }
 
-    .mobile-bottomtray #nextBtn,
-    .mobile-bottomtray #shareScoreBtn {
+    .mobile-bottomtray #previousBtn,
+    .mobile-bottomtray #nextBtn {
         height: 40px;
         margin: 0;
         align-self: auto;

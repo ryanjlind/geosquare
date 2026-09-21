@@ -34,6 +34,7 @@ class DashboardData:
     game_date: date
     sessions_started: int
     sessions_completed: int
+    side_missions_completed: int
     average_completed_score: float | None
     registered_users: int
     rounds: tuple[RoundMetric, ...]
@@ -96,6 +97,23 @@ def _collect_dashboard_data(game_date: date) -> DashboardData:
         game_row = cur.fetchone()
         if game_row is None:
             raise RuntimeError(f'No aggregate row returned for game date {game_date.isoformat()}.')
+
+        cur.execute(
+            """
+            SELECT COUNT(mission.SideMissionRoundId) AS SideMissionsCompleted
+            FROM dbo.SideMissionRounds mission
+            INNER JOIN dbo.InfinityPoolSessions pool
+                ON pool.InfinityPoolSessionId = mission.InfinityPoolSessionId
+            INNER JOIN dbo.Games g
+                ON g.GameId = pool.GameId
+            WHERE g.GameDate = ?
+              AND mission.CompletedAt IS NOT NULL
+            """,
+            game_date,
+        )
+        side_mission_row = cur.fetchone()
+        if side_mission_row is None:
+            raise RuntimeError('No Side Mission aggregate row returned.')
 
         cur.execute(
             """
@@ -179,6 +197,7 @@ def _collect_dashboard_data(game_date: date) -> DashboardData:
         game_date=game_date,
         sessions_started=int(game_row.SessionsStarted),
         sessions_completed=int(game_row.SessionsCompleted),
+        side_missions_completed=int(side_mission_row.SideMissionsCompleted),
         average_completed_score=(
             float(game_row.AverageCompletedScore)
             if game_row.AverageCompletedScore is not None
@@ -293,7 +312,8 @@ def _render_dashboard(data: DashboardData) -> str:
           </tr>
           <tr>
             <td class="kpi"><div class="label">Avg. score</div><div class="value">{html.escape(_format_score(data.average_completed_score))}</div></td>
-            <td class="kpi" colspan="2"><div class="label">Registered users</div><div class="value">{data.registered_users:,}</div></td>
+                        <td class="kpi"><div class="label">Side Missions Completed</div><div class="value">{data.side_missions_completed:,}</div></td>
+                        <td class="kpi"><div class="label">Registered users</div><div class="value">{data.registered_users:,}</div></td>
           </tr>
         </table>
       </div>
