@@ -306,15 +306,8 @@ function setPoolLayout() {
     document.getElementById('expandBtn').style.display = 'none';
     document.getElementById('previousBtn').style.display = 'inline-block';
     document.getElementById('nextBtn').style.display = 'inline-block';
-    document.getElementById('shareScoreBtn').style.display = 'inline-block';
-    document.getElementById('summaryBtn').classList.remove('hidden');
-    const infinityActions = document.getElementById('mobileInfinityActions');
-    if (infinityActions) {
-        infinityActions.append(
-            document.getElementById('shareScoreBtn'),
-            document.getElementById('summaryBtn'),
-        );
-    }
+    document.getElementById('shareScoreBtn').style.display = 'none';
+    document.getElementById('summaryBtn').classList.add('hidden');
     document.getElementById('postGameActions').style.display = 'grid';
     document.getElementById('guessBox').style.display = 'block';
     document.getElementById('sideMissionPanel').classList.add('hidden');
@@ -338,13 +331,6 @@ function setDailyLayout() {
     document.getElementById('nextBtn').style.display = 'none';
     document.getElementById('shareScoreBtn').style.display = 'inline-block';
     document.getElementById('summaryBtn').classList.remove('hidden');
-    const infinityActions = document.getElementById('mobileInfinityActions');
-    if (infinityActions) {
-        document.getElementById('postGameActions').append(
-            document.getElementById('shareScoreBtn'),
-            document.getElementById('summaryBtn'),
-        );
-    }
     document.getElementById('sideMissionsInvite').classList.toggle(
         'hidden',
         !infinityState.sideMissionsAvailable,

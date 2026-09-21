@@ -95,22 +95,6 @@
         display: none;
     }
 
-    #mobileInfinityActions {
-        display: none;
-        gap: 8px;
-        margin-top: 12px;
-    }
-
-    .infinity-mode #mobileInfinityActions {
-        display: flex;
-    }
-
-    #mobileInfinityActions #shareScoreBtn,
-    #mobileInfinityActions #summaryBtn {
-        flex: 1 1 0;
-        min-height: 40px;
-    }
-
     .sidebar .sidebar-attribution::before {
         content: '';
         display: block;

@@ -95,6 +95,25 @@ def _compass_direction_order(answer: dict, city: dict) -> tuple[str, ...]:
 	return vertical_direction, horizontal_direction
 
 
+def _match_compass_directions(answer: dict, cities: tuple[dict, ...]) -> dict[str, dict]:
+	direction_to_city = {}
+
+	def assign_city(city: dict, visited_directions: set[str]) -> bool:
+		for direction in _compass_direction_order(answer, city):
+			if direction in visited_directions:
+				continue
+			visited_directions.add(direction)
+			assigned_city = direction_to_city.get(direction)
+			if assigned_city is None or assign_city(assigned_city, visited_directions):
+				direction_to_city[direction] = city
+				return True
+		return False
+
+	for city in cities:
+		assign_city(city, set())
+	return direction_to_city
+
+
 class AnswerStartsThreeCityNameChain:
 	def __call__(self, context: SideMissionContext) -> bool:
 		answer_letters = _normalized_name_letters(context.answer['city_name'])
@@ -194,31 +213,7 @@ class AnswerHasCitiesInEveryDirection:
 			city for city in context.cities
 			if int(city['city_id']) != int(context.answer['city_id'])
 		)
-		return self._has_distinct_assignment(
-			context.answer,
-			cities,
-			('north', 'south', 'east', 'west'),
-		)
-
-	def _has_distinct_assignment(
-		self,
-		answer: dict,
-		cities: tuple[dict, ...],
-		remaining_directions: tuple[str, ...],
-	) -> bool:
-		if not remaining_directions:
-			return True
-		for city in cities:
-			for direction in _compass_direction_order(answer, city):
-				if direction in remaining_directions:
-					next_cities = tuple(candidate for candidate in cities if candidate is not city)
-					next_directions = tuple(
-						candidate for candidate in remaining_directions
-						if candidate != direction
-					)
-					if self._has_distinct_assignment(answer, next_cities, next_directions):
-						return True
-		return False
+		return len(_match_compass_directions(context.answer, cities)) == 4
 
 
 class CapitalSweepPrompt:
@@ -420,19 +415,22 @@ class CompassSweepProgress:
 			int(city['city_id']): city
 			for city in context.cities
 		}
-		remaining_directions = ['north', 'south', 'east', 'west']
-		found_directions = []
-		for guess in context.guesses:
-			city = cities_by_id[int(guess['city_id'])]
-			for direction in _compass_direction_order(context.answer, city):
-				if direction in remaining_directions:
-					found_directions.append(direction)
-					remaining_directions.remove(direction)
-					break
+		guessed_cities = tuple(
+			cities_by_id[int(guess['city_id'])]
+			for guess in context.guesses
+		)
+		found_directions = _match_compass_directions(
+			context.answer,
+			guessed_cities,
+		)
 		return MissionProgress(
 			current=len(found_directions),
 			target=4,
-			named=tuple(direction.title() for direction in found_directions),
+			named=tuple(
+			direction.title()
+			for direction in ('north', 'south', 'east', 'west')
+			if direction in found_directions
+		),
 		)
 
 

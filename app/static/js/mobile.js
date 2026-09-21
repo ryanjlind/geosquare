@@ -116,9 +116,6 @@ import { gameState } from '@geosquare/state.js';
         bottomTray.appendChild(guessFeedback);
         bottomTray.appendChild(postGameActions);
         bottomTray.appendChild(sideMissionsInvite);
-        const infinityActions = document.createElement('div');
-        infinityActions.id = 'mobileInfinityActions';
-        sidebar.appendChild(infinityActions);
 
         function syncMobileHeroStats() {
             const mobileRoundStat = document.getElementById('mobileRoundStat');
