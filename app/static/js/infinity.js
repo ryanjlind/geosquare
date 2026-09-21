@@ -308,6 +308,13 @@ function setPoolLayout() {
     document.getElementById('nextBtn').style.display = 'inline-block';
     document.getElementById('shareScoreBtn').style.display = 'inline-block';
     document.getElementById('summaryBtn').classList.remove('hidden');
+    const infinityActions = document.getElementById('mobileInfinityActions');
+    if (infinityActions) {
+        infinityActions.append(
+            document.getElementById('shareScoreBtn'),
+            document.getElementById('summaryBtn'),
+        );
+    }
     document.getElementById('postGameActions').style.display = 'grid';
     document.getElementById('guessBox').style.display = 'block';
     document.getElementById('sideMissionPanel').classList.add('hidden');
@@ -319,6 +326,10 @@ function setDailyLayout() {
     infinityState.active = false;
     infinityState.mode = 'daily';
     document.body.classList.remove('infinity-mode');
+    const mobilePoints = document.getElementById('mobilePointsStat');
+    if (mobilePoints) {
+        mobilePoints.textContent = document.getElementById('totalPoints').textContent;
+    }
     document.getElementById('roundTable').classList.remove('hidden');
     document.getElementById('infinityPanel').classList.add('hidden');
     document.getElementById('sideMissionPanel').classList.add('hidden');
@@ -327,6 +338,13 @@ function setDailyLayout() {
     document.getElementById('nextBtn').style.display = 'none';
     document.getElementById('shareScoreBtn').style.display = 'inline-block';
     document.getElementById('summaryBtn').classList.remove('hidden');
+    const infinityActions = document.getElementById('mobileInfinityActions');
+    if (infinityActions) {
+        document.getElementById('postGameActions').append(
+            document.getElementById('shareScoreBtn'),
+            document.getElementById('summaryBtn'),
+        );
+    }
     document.getElementById('sideMissionsInvite').classList.toggle(
         'hidden',
         !infinityState.sideMissionsAvailable,
@@ -481,7 +499,6 @@ function renderScores(previousRoundScore = null, previousTotalScore = null) {
         animateNumber(totalElement, previousTotalScore, infinityState.totalScore);
     }
 
-    document.getElementById('totalPoints').textContent = numberFmt(infinityState.totalScore);
     const mobilePoints = document.getElementById('mobilePointsStat');
     if (mobilePoints) {
         mobilePoints.textContent = numberFmt(infinityState.totalScore);

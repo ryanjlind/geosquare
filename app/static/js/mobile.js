@@ -71,8 +71,7 @@ import { gameState } from '@geosquare/state.js';
         sideMissionPanel,
         guessBox,
         guessFeedback,
-        previousButton,
-        nextButton,
+        postGameActions,
     }) {
         const scrim = document.createElement('div');
         scrim.className = 'mobile-drawer-scrim';
@@ -115,12 +114,11 @@ import { gameState } from '@geosquare/state.js';
         bottomTray.appendChild(sideMissionPanel);
         bottomTray.appendChild(guessBox);
         bottomTray.appendChild(guessFeedback);
-        const squareNavigation = document.createElement('div');
-        squareNavigation.id = 'mobileSquareNavigation';
-        bottomTray.appendChild(squareNavigation);
-        squareNavigation.appendChild(previousButton);
-        squareNavigation.appendChild(nextButton);
+        bottomTray.appendChild(postGameActions);
         bottomTray.appendChild(sideMissionsInvite);
+        const infinityActions = document.createElement('div');
+        infinityActions.id = 'mobileInfinityActions';
+        sidebar.appendChild(infinityActions);
 
         function syncMobileHeroStats() {
             const mobileRoundStat = document.getElementById('mobileRoundStat');
@@ -219,8 +217,7 @@ import { gameState } from '@geosquare/state.js';
         const sideMissionsInvite = document.getElementById('sideMissionsInvite');
         const sideMissionPanel = document.getElementById('sideMissionPanel');
         const guessFeedback = document.getElementById('guessFeedback');
-        const previousButton = document.getElementById('previousBtn');
-        const nextButton = document.getElementById('nextBtn');
+        const postGameActions = document.getElementById('postGameActions');
 
         initGameMobile({
             sidebar,
@@ -229,8 +226,7 @@ import { gameState } from '@geosquare/state.js';
             sideMissionPanel,
             guessBox,
             guessFeedback,
-            previousButton,
-            nextButton,
+            postGameActions,
         });
 
         document.body.dataset.mobileInit = 'true';
