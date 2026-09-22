@@ -309,6 +309,8 @@ async function completeSideMission(
   await expect(page.locator('#sideMissionName')).toHaveText(mission.name);
   await expect(page.locator('#sideMissionPrompt')).toHaveText(mission.prompt);
   expect(mission.progress.current).toBe(0);
+  const chips = page.locator('#infinityChips .infinity-chip');
+  const initialCityCount = await chips.count();
 
   let result;
   for (const [index, city] of assignment.targets.entries()) {
@@ -327,6 +329,19 @@ async function completeSideMission(
     expect(updatedMission.progress.current).toBe(index + 1);
     await expect(page.locator('#sideMissionProgress')).toContainText(
       `${index + 1} / ${assignment.targets.length}`,
+    );
+    const expectedCityCount = initialCityCount + index + 1;
+    await expect(chips).toHaveCount(expectedCityCount);
+    await expect(
+      page.locator('#meta .infinity-progress-item').filter({ hasText: 'Cities' }).locator('strong'),
+    ).toContainText(`${expectedCityCount} /`);
+    const chipNames = await page.locator('#infinityChips .infinity-chip-city').allTextContents();
+    expect(chipNames).toContain(city.city_name);
+    await expect(page.locator('#infinityRoundScore')).toHaveText(
+      result.round_score.toLocaleString('en-US'),
+    );
+    await expect(page.locator('#infinityTotalScore')).toHaveText(
+      result.total_score.toLocaleString('en-US'),
     );
     await expect(page.locator('#sideMissionAcknowledgement')).toBeVisible();
   }

@@ -110,12 +110,14 @@ def all_daily_squares():
 @main_bp.route("/api/game-state")
 def game_state():
     started_at = perf_counter()
+    timings_ms = {}
 
     identity_started_at = perf_counter()
     identity = resolve_request_identity()
+    timings_ms['identity'] = (perf_counter() - identity_started_at) * 1000.0
     timing(
         'game_state.identity',
-        (perf_counter() - identity_started_at) * 1000.0,
+        timings_ms['identity'],
     )
 
     try:
@@ -124,9 +126,12 @@ def game_state():
             identity["user_id"],
             identity["session_id"],
         )
+        timings_ms['get_game_state_payload'] = (
+            perf_counter() - payload_started_at
+        ) * 1000.0
         timing(
             'game_state.get_game_state_payload',
-            (perf_counter() - payload_started_at) * 1000.0,
+            timings_ms['get_game_state_payload'],
             details={'status': status},
         )
     except Exception:
@@ -136,15 +141,16 @@ def game_state():
     response_started_at = perf_counter()
     resp = jsonify(body)
     resp.status_code = status
+    timings_ms['response'] = (perf_counter() - response_started_at) * 1000.0
     timing(
         'game_state.response',
-        (perf_counter() - response_started_at) * 1000.0,
+        timings_ms['response'],
         details={'status': status},
     )
     timing(
         'game_state.total',
         (perf_counter() - started_at) * 1000.0,
-        details={'status': status},
+        details={'status': status, 'timings_ms': timings_ms},
     )
 
     return attach_request_session_cookie(resp, identity["user_id"], identity["session_id"])

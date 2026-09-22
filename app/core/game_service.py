@@ -472,20 +472,23 @@ def submit_pass(payload: dict, user_id: int, session_id: int | None):
 
 def get_game_state_payload(user_id: int, session_id: int | None):
     started_at = perf_counter()
+    timings_ms = {}
     log_debug('get_game_state_payload: entered')
     game_date = get_effective_game_date()
 
     connection_started_at = perf_counter()
     with get_conn() as conn:
+        timings_ms['connection'] = (perf_counter() - connection_started_at) * 1000.0
         timing(
             'get_game_state_payload.connection',
-            (perf_counter() - connection_started_at) * 1000.0,
+            timings_ms['connection'],
         )
         cursor_started_at = perf_counter()
         cur = conn.cursor()
+        timings_ms['cursor'] = (perf_counter() - cursor_started_at) * 1000.0
         timing(
             'get_game_state_payload.cursor',
-            (perf_counter() - cursor_started_at) * 1000.0,
+            timings_ms['cursor'],
         )
 
         user_query_started_at = perf_counter()
@@ -498,9 +501,10 @@ def get_game_state_payload(user_id: int, session_id: int | None):
             (user_id,),
         )
         user_row = cur.fetchone()
+        timings_ms['user_query'] = (perf_counter() - user_query_started_at) * 1000.0
         timing(
             'get_game_state_payload.user_query',
-            (perf_counter() - user_query_started_at) * 1000.0,
+            timings_ms['user_query'],
         )
 
         is_authenticated = bool(user_row and user_row.AuthProviderSubject)
@@ -508,9 +512,10 @@ def get_game_state_payload(user_id: int, session_id: int | None):
 
         session_started_at = perf_counter()
         session = get_current_session(cur, user_id, session_id)
+        timings_ms['session'] = (perf_counter() - session_started_at) * 1000.0
         timing(
             'get_game_state_payload.session',
-            (perf_counter() - session_started_at) * 1000.0,
+            timings_ms['session'],
         )
 
         if session is None:
@@ -520,9 +525,12 @@ def get_game_state_payload(user_id: int, session_id: int | None):
         completed = map_completed_rounds(
             get_completed_round_rows(cur, int(session.SessionId))
         )
+        timings_ms['completed_rounds'] = (
+            perf_counter() - completed_rounds_started_at
+        ) * 1000.0
         timing(
             'get_game_state_payload.completed_rounds',
-            (perf_counter() - completed_rounds_started_at) * 1000.0,
+            timings_ms['completed_rounds'],
             details={'count': len(completed)},
         )
 
@@ -536,13 +544,15 @@ def get_game_state_payload(user_id: int, session_id: int | None):
             user_id,
         )
         conn.commit()
+        timings_ms['mapping'] = (perf_counter() - mapping_started_at) * 1000.0
         timing(
             'get_game_state_payload.mapping',
-            (perf_counter() - mapping_started_at) * 1000.0,
+            timings_ms['mapping'],
         )
         timing(
             'get_game_state_payload.total',
             (perf_counter() - started_at) * 1000.0,
+            details={'timings_ms': timings_ms},
         )
 
         return result, 200
@@ -664,29 +674,33 @@ def expand_square(user_id: int, session_id: int, round_number: int):
     
 def get_all_daily_square_data(user_id: int, session_id: int | None):
     started_at = perf_counter()
+    timings_ms = {}
     log_debug(
         f'get_all_daily_square_data: started user_id={user_id} session_id={session_id}'
     )
 
     connection_started_at = perf_counter()
     with get_conn() as conn:
+        timings_ms['connection'] = (perf_counter() - connection_started_at) * 1000.0
         timing(
             'get_all_daily_square_data.connection',
-            (perf_counter() - connection_started_at) * 1000.0,
+            timings_ms['connection'],
         )
 
         cursor_started_at = perf_counter()
         cur = conn.cursor()
+        timings_ms['cursor'] = (perf_counter() - cursor_started_at) * 1000.0
         timing(
             'get_all_daily_square_data.cursor',
-            (perf_counter() - cursor_started_at) * 1000.0,
+            timings_ms['cursor'],
         )
 
         session_started_at = perf_counter()
         session = get_current_session(cur, user_id, session_id)
+        timings_ms['session'] = (perf_counter() - session_started_at) * 1000.0
         timing(
             'get_all_daily_square_data.session',
-            (perf_counter() - session_started_at) * 1000.0,
+            timings_ms['session'],
         )
 
         if session is None:
@@ -695,25 +709,34 @@ def get_all_daily_square_data(user_id: int, session_id: int | None):
 
         completed_rows_started_at = perf_counter()
         rows = get_completed_round_rows(cur, int(session.SessionId))
+        timings_ms['completed_rows'] = (
+            perf_counter() - completed_rows_started_at
+        ) * 1000.0
         timing(
             'get_all_daily_square_data.completed_rows',
-            (perf_counter() - completed_rows_started_at) * 1000.0,
+            timings_ms['completed_rows'],
         )
 
         completed_mapping_started_at = perf_counter()
         completed = map_completed_rounds(rows)
+        timings_ms['completed_mapping'] = (
+            perf_counter() - completed_mapping_started_at
+        ) * 1000.0
         timing(
             'get_all_daily_square_data.completed_mapping',
-            (perf_counter() - completed_mapping_started_at) * 1000.0,
+            timings_ms['completed_mapping'],
         )
 
         completed_index_started_at = perf_counter()
         completed_by_round = {
             int(r["round_number"]): r for r in completed
         }
+        timings_ms['completed_index'] = (
+            perf_counter() - completed_index_started_at
+        ) * 1000.0
         timing(
             'get_all_daily_square_data.completed_index',
-            (perf_counter() - completed_index_started_at) * 1000.0,
+            timings_ms['completed_index'],
         )
 
         cur.execute(
@@ -732,9 +755,10 @@ def get_all_daily_square_data(user_id: int, session_id: int | None):
 
         square_batch_started_at = perf_counter()
         square_data_by_round = _get_all_daily_square_data(cur, session)
+        timings_ms['square_batch'] = (perf_counter() - square_batch_started_at) * 1000.0
         timing(
             'get_all_daily_square_data.square_batch',
-            (perf_counter() - square_batch_started_at) * 1000.0,
+            timings_ms['square_batch'],
         )
 
         round_data = []
@@ -770,15 +794,17 @@ def get_all_daily_square_data(user_id: int, session_id: int | None):
                 for _, _, _, reveal_square_id, excluded_city in round_data
             },
         )
+        timings_ms['reveal_batch'] = (perf_counter() - reveal_batch_started_at) * 1000.0
         timing(
             'get_all_daily_square_data.reveal_batch',
-            (perf_counter() - reveal_batch_started_at) * 1000.0,
+            timings_ms['reveal_batch'],
         )
 
     rounds = []
+    timings_ms['database'] = (perf_counter() - started_at) * 1000.0
     timing(
         'get_all_daily_square_data.database',
-        (perf_counter() - started_at) * 1000.0,
+        timings_ms['database'],
     )
 
     for round_number, base, guess, reveal_square_id, _ in round_data:
@@ -796,15 +822,19 @@ def get_all_daily_square_data(user_id: int, session_id: int | None):
             "reveal_cities": reveal_cities,
         })
 
+        timings_ms[f'round_{round_number}'] = (
+            perf_counter() - round_started_at
+        ) * 1000.0
         timing(
             'get_all_daily_square_data.round',
-            (perf_counter() - round_started_at) * 1000.0,
+            timings_ms[f'round_{round_number}'],
             details={'round_number': round_number},
         )
 
     timing(
         'get_all_daily_square_data.total',
         (perf_counter() - started_at) * 1000.0,
+        details={'timings_ms': timings_ms},
     )
 
     return {"rounds": rounds}, 200

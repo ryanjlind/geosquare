@@ -553,7 +553,7 @@ def start_side_missions(user_id: int, session_id: int | None) -> tuple[dict, int
 					cur,
 					game_id,
 					completed_rounds,
-					{},
+					None,
 				)
 				availability = _evaluate_side_mission_availability(
 					daily_session,

@@ -333,6 +333,7 @@ function setDailyLayout() {
     document.getElementById('nextBtn').style.display = 'none';
     document.getElementById('shareScoreBtn').style.display = 'inline-block';
     document.getElementById('summaryBtn').classList.remove('hidden');
+    document.getElementById('postGameActions').style.display = 'flex';
     document.getElementById('sideMissionsInvite').classList.toggle(
         'hidden',
         !infinityState.sideMissionsAvailable,
