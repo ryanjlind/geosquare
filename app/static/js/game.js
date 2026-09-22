@@ -80,8 +80,8 @@ async function enterEndGameGlobe() {
     unlockInfinityMode(data.side_missions);
     setGuessControlsEnabled(false);
     setGuessBoxVisible(false);
-    setShareButtonReady(isShareReady());
     showNextButton(5);
+    setShareButtonReady(isShareReady());
     await loadEndGameRounds();
     setSelectedRoundRow(5);
 }

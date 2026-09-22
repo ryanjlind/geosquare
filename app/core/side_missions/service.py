@@ -126,14 +126,18 @@ def _load_round_contexts(
 	cur,
 	game_id: int,
 	completed_rounds: list[dict],
-	guesses_by_round: dict[int, tuple[dict, ...]],
+	guesses_by_round: dict[int, tuple[dict, ...]] | None,
 ) -> dict[int, SideMissionContext]:
 	return {
 		int(completed_round['round_number']): _context_for_round(
 			cur,
 			game_id,
 			completed_round,
-			guesses_by_round[int(completed_round['round_number'])],
+			(
+				()
+				if guesses_by_round is None
+				else guesses_by_round[int(completed_round['round_number'])]
+			),
 		)
 		for completed_round in completed_rounds
 		if not _round_ineligibility_reasons(completed_round)
@@ -237,7 +241,7 @@ def get_side_mission_availability(
 			cur,
 			game_id,
 			completed_rounds,
-			{},
+			None,
 		)
 		return _evaluate_side_mission_availability(
 			daily_session,
