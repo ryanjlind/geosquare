@@ -23,7 +23,7 @@ def _write_client_event(
     user_agent: str | None,
     referer: str | None,
 ) -> None:
-    with get_conn() as conn:
+    with get_conn(for_logging=True) as conn:
         cur = conn.cursor()
         cur.execute(
             """
@@ -55,7 +55,7 @@ def _write_slow_event(
     duration_milliseconds: float,
     details: dict | None,
 ) -> None:
-    with get_conn() as conn:
+    with get_conn(for_logging=True) as conn:
         cur = conn.cursor()
         cur.execute(
             """

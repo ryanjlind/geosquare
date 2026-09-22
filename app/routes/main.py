@@ -114,10 +114,14 @@ def game_state():
 
     identity_started_at = perf_counter()
     identity = resolve_request_identity()
-    timings_ms['identity'] = (perf_counter() - identity_started_at) * 1000.0
+    identity_elapsed_ms = (perf_counter() - identity_started_at) * 1000.0
+    timings_ms['identity'] = {
+        'total': identity_elapsed_ms,
+        **identity['timings_ms'],
+    }
     timing(
         'game_state.identity',
-        timings_ms['identity'],
+        identity_elapsed_ms,
     )
 
     try:

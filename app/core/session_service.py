@@ -1,6 +1,7 @@
 # core/session_service.py
 
 import os
+from time import perf_counter
 
 from flask import current_app, request
 from itsdangerous import URLSafeSerializer
@@ -18,46 +19,66 @@ def _require_today_game(cur):
     return int(row.GameId)
 
 
-def get_current_session(cur, user_id: int, session_id: int | None):
+def get_current_session(
+    cur,
+    user_id: int,
+    session_id: int | None,
+    *,
+    timings_ms: dict[str, float] | None = None,
+):
+    today_game_started_at = perf_counter()
     game_id = _require_today_game(cur)
+    if timings_ms is not None:
+        timings_ms['today_game'] = (perf_counter() - today_game_started_at) * 1000.0
     if game_id is None:
         return None
 
-    if session_id is not None:
+    session_started_at = perf_counter()
+    try:
+        if session_id is not None:
+            cur.execute(
+                """
+                SELECT SessionId, GameId, UserId, CompletedAt, TotalScore
+                FROM GameSessions
+                WHERE SessionId = ?
+                """,
+                (session_id,),
+            )
+            row = cur.fetchone()
+            if row and int(row.UserId) == user_id and int(row.GameId) == game_id:
+                return row
+
         cur.execute(
             """
             SELECT SessionId, GameId, UserId, CompletedAt, TotalScore
             FROM GameSessions
-            WHERE SessionId = ?
+            WHERE UserId = ? AND GameId = ?
+            ORDER BY
+                CASE WHEN CompletedAt IS NOT NULL THEN 0 ELSE 1 END,
+                StartedAt DESC
             """,
-            (session_id,),
+            (user_id, game_id),
         )
         row = cur.fetchone()
-        if row and int(row.UserId) == user_id and int(row.GameId) == game_id:
+        if row:
             return row
 
-    cur.execute(
-        """
-        SELECT SessionId, GameId, UserId, CompletedAt, TotalScore
-        FROM GameSessions
-        WHERE UserId = ? AND GameId = ?
-        ORDER BY
-            CASE WHEN CompletedAt IS NOT NULL THEN 0 ELSE 1 END,
-            StartedAt DESC
-        """,
-        (user_id, game_id),
-    )
-    row = cur.fetchone()
-    if row:
-        return row
-
-    return create_session(cur, user_id, game_id)
+        return create_session(cur, user_id, game_id)
+    finally:
+        if timings_ms is not None:
+            timings_ms['session'] = (perf_counter() - session_started_at) * 1000.0
 
 
 def resolve_request_identity():
+    timings_ms = {}
+    connection_started_at = perf_counter()
     with get_conn() as conn:
+        timings_ms['connection'] = (perf_counter() - connection_started_at) * 1000.0
         cur = conn.cursor()
+
+        cookie_started_at = perf_counter()
         cookie_identity = _get_identity_from_cookie()
+        timings_ms['cookie'] = (perf_counter() - cookie_started_at) * 1000.0
         cookie_user_id = (
             cookie_identity.get('user_id')
             if cookie_identity is not None
@@ -69,6 +90,7 @@ def resolve_request_identity():
             else None
         )
 
+        user_started_at = perf_counter()
         if cookie_user_id is not None:
             user = get_user_by_id(cur, cookie_user_id)
         else:
@@ -76,13 +98,20 @@ def resolve_request_identity():
 
         if user is None:
             user = create_user(cur)
+        timings_ms['user'] = (perf_counter() - user_started_at) * 1000.0
 
         user_id = int(user.UserId)
-        session = get_current_session(cur, user_id, cookie_session_id)
+        session = get_current_session(
+            cur,
+            user_id,
+            cookie_session_id,
+            timings_ms=timings_ms,
+        )
 
         return {
             "user_id": user_id,
             "session_id": int(session.SessionId) if session else None,
+            "timings_ms": timings_ms,
         }
 
 

@@ -1,8 +1,13 @@
 import os
+import threading
 
 import pyodbc
 
 from app.constants import PRODUCTION_DATABASE_NAME
+
+
+_connection_cache = threading.local()
+_connection_lock = threading.Lock()
 
 
 def _required_environment_value(name: str) -> str:
@@ -37,10 +42,38 @@ def _connect(database: str, *, environment_prefix: str = 'SQL'):
     return pyodbc.connect(conn_str)
 
 
-def get_conn(*, e2e: bool = False):
+def get_conn(*, e2e: bool = False, for_logging: bool = False):
     database_target = os.getenv('DATABASE_TARGET')
     if e2e or database_target == 'e2e':
-        return _connect(_e2e_database_name(), environment_prefix='E2E_SQL')
-    if database_target not in (None, 'sql'):
-        raise RuntimeError("DATABASE_TARGET must be 'sql' or 'e2e'.")
-    return _connect(_required_environment_value('SQL_DATABASE'))
+        database = _e2e_database_name()
+        environment_prefix = 'E2E_SQL'
+    else:
+        if database_target not in (None, 'sql'):
+            raise RuntimeError("DATABASE_TARGET must be 'sql' or 'e2e'.")
+        database = _required_environment_value('SQL_DATABASE')
+        environment_prefix = 'SQL'
+
+    cache_key = (environment_prefix, database, for_logging)
+    connections = getattr(_connection_cache, 'connections', None)
+    if connections is None:
+        connections = {}
+        _connection_cache.connections = connections
+
+    conn = connections.get(cache_key)
+    if conn is not None:
+        try:
+            cur = conn.cursor()
+            cur.execute('SELECT 1')
+            cur.fetchone()
+            cur.close()
+            return conn
+        except pyodbc.Error:
+            try:
+                conn.close()
+            finally:
+                del connections[cache_key]
+
+    with _connection_lock:
+        conn = _connect(database, environment_prefix=environment_prefix)
+    connections[cache_key] = conn
+    return conn
