@@ -2,13 +2,29 @@ import json
 import logging
 import os
 import re
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from time import perf_counter
 
 from app.constants import DEVELOPMENT_ENVIRONMENT, SLOW_EVENT_THRESHOLD_MILLISECONDS
 from app.core.db import get_conn
 
 
 _logger = logging.getLogger('geosquare')
+_timing_stack: ContextVar[tuple['TimingNode', ...]] = ContextVar(
+    'timing_stack',
+    default=(),
+)
+
+
+@dataclass
+class TimingNode:
+    event_name: str
+    duration_milliseconds: float = 0.0
+    details: dict | None = None
+    children: list['TimingNode'] = field(default_factory=list)
 
 
 def _is_local() -> bool:
@@ -95,6 +111,64 @@ def _persist_slow_event(
         _logger.exception('Failed to write slow event to database: %s', event_name)
 
 
+def _timing_details(node: TimingNode) -> dict | None:
+    if node.details is None:
+        details = {}
+    else:
+        details = dict(node.details)
+    if node.children:
+        details['timings'] = [
+            {
+                'event_name': child.event_name,
+                'duration_milliseconds': child.duration_milliseconds,
+                'details': _timing_details(child),
+            }
+            for child in node.children
+        ]
+    if not details:
+        return None
+    return details
+
+
+def _record_timing(node: TimingNode, level: int, *, emit_log: bool) -> None:
+    stack = _timing_stack.get()
+    if stack:
+        stack[-1].children.append(node)
+    details = _timing_details(node)
+    if emit_log:
+        _logger.log(
+            level,
+            '%s elapsed_ms=%.1f details=%s',
+            node.event_name,
+            node.duration_milliseconds,
+            json.dumps(details, ensure_ascii=False),
+        )
+    _persist_slow_event(
+        event_name=node.event_name,
+        duration_milliseconds=node.duration_milliseconds,
+        details=details,
+    )
+
+
+@contextmanager
+def timing_scope(
+    event_name: str,
+    *,
+    details: dict | None = None,
+    level: int = logging.INFO,
+):
+    node = TimingNode(event_name=event_name, details=details)
+    stack = _timing_stack.get()
+    token = _timing_stack.set((*stack, node))
+    started_at = perf_counter()
+    try:
+        yield node
+    finally:
+        node.duration_milliseconds = (perf_counter() - started_at) * 1000.0
+        _timing_stack.reset(token)
+        _record_timing(node, level, emit_log=True)
+
+
 def _embedded_timing(message: str) -> tuple[str, float] | None:
     milliseconds_match = re.search(r'elapsed_ms=([0-9]+(?:\.[0-9]+)?)', message)
     if milliseconds_match is not None:
@@ -123,10 +197,14 @@ class UnifiedLogger:
         if embedded_timing is None:
             return
         event_name, duration_milliseconds = embedded_timing
-        _persist_slow_event(
-            event_name=event_name,
-            duration_milliseconds=duration_milliseconds,
-            details={'logger': self.name, 'message': rendered_message},
+        _record_timing(
+            TimingNode(
+                event_name=event_name,
+                duration_milliseconds=duration_milliseconds,
+                details={'logger': self.name, 'message': rendered_message},
+            ),
+            level,
+            emit_log=False,
         )
 
     def debug(self, message: str, *args, **kwargs) -> None:
@@ -210,15 +288,12 @@ def timing(
     details: dict | None = None,
     level: int = logging.INFO,
 ) -> None:
-    _logger.log(
+    _record_timing(
+        TimingNode(
+            event_name=event_name,
+            duration_milliseconds=duration_milliseconds,
+            details=details,
+        ),
         level,
-        '%s elapsed_ms=%.1f details=%s',
-        event_name,
-        duration_milliseconds,
-        json.dumps(details, ensure_ascii=False),
-    )
-    _persist_slow_event(
-        event_name=event_name,
-        duration_milliseconds=duration_milliseconds,
-        details=details,
+        emit_log=True,
     )

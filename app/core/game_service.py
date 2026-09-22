@@ -4,7 +4,7 @@ import math
 from time import perf_counter
 
 from app.core.db import get_conn
-from app.core.logging import debug as log_debug, timing
+from app.core.logging import debug as log_debug, timing, timing_scope
 from app.core.game_queries import (
     complete_session,
     get_completed_round_rows,
@@ -471,91 +471,57 @@ def submit_pass(payload: dict, user_id: int, session_id: int | None):
 
 
 def get_game_state_payload(user_id: int, session_id: int | None):
-    started_at = perf_counter()
-    timings_ms = {}
     log_debug('get_game_state_payload: entered')
     game_date = get_effective_game_date()
 
-    connection_started_at = perf_counter()
-    with get_conn() as conn:
-        timings_ms['connection'] = (perf_counter() - connection_started_at) * 1000.0
-        timing(
-            'get_game_state_payload.connection',
-            timings_ms['connection'],
-        )
-        cursor_started_at = perf_counter()
-        cur = conn.cursor()
-        timings_ms['cursor'] = (perf_counter() - cursor_started_at) * 1000.0
-        timing(
-            'get_game_state_payload.cursor',
-            timings_ms['cursor'],
-        )
+    with timing_scope('get_game_state_payload.connection'):
+        connection_context = get_conn()
+    with connection_context as conn:
+        with timing_scope('get_game_state_payload.cursor'):
+            cur = conn.cursor()
 
-        user_query_started_at = perf_counter()
-        cur.execute(
-            """
-            SELECT AuthProviderSubject, Username
-            FROM Users
-            WHERE UserId = ?
-            """,
-            (user_id,),
-        )
-        user_row = cur.fetchone()
-        timings_ms['user_query'] = (perf_counter() - user_query_started_at) * 1000.0
-        timing(
-            'get_game_state_payload.user_query',
-            timings_ms['user_query'],
-        )
+        with timing_scope('get_game_state_payload.user_query'):
+            cur.execute(
+                """
+                SELECT AuthProviderSubject, Username
+                FROM Users
+                WHERE UserId = ?
+                """,
+                (user_id,),
+            )
+            user_row = cur.fetchone()
 
         is_authenticated = bool(user_row and user_row.AuthProviderSubject)
         username = user_row.Username if user_row else None
 
-        session_started_at = perf_counter()
-        session = get_current_session(cur, user_id, session_id)
-        timings_ms['session'] = (perf_counter() - session_started_at) * 1000.0
-        timing(
-            'get_game_state_payload.session',
-            timings_ms['session'],
-        )
+        with timing_scope('get_game_state_payload.session'):
+            session = get_current_session(cur, user_id, session_id)
 
         if session is None:
-            return {"error": "No game found for today."}, 404, timings_ms
+            return {"error": "No game found for today."}, 404
 
-        completed_rounds_started_at = perf_counter()
-        completed = map_completed_rounds(
-            get_completed_round_rows(cur, int(session.SessionId))
-        )
-        timings_ms['completed_rounds'] = (
-            perf_counter() - completed_rounds_started_at
-        ) * 1000.0
-        timing(
+        completed_details = {}
+        with timing_scope(
             'get_game_state_payload.completed_rounds',
-            timings_ms['completed_rounds'],
-            details={'count': len(completed)},
-        )
+            details=completed_details,
+        ):
+            completed = map_completed_rounds(
+                get_completed_round_rows(cur, int(session.SessionId))
+            )
+            completed_details['count'] = len(completed)
 
-        mapping_started_at = perf_counter()
-        result = map_game_state(session, completed, is_authenticated, username)
-        result["game_date"] = game_date
-        result["side_missions"] = get_side_mission_availability(
-            cur,
-            session,
-            completed,
-            user_id,
-        )
-        conn.commit()
-        timings_ms['mapping'] = (perf_counter() - mapping_started_at) * 1000.0
-        timing(
-            'get_game_state_payload.mapping',
-            timings_ms['mapping'],
-        )
-        timing(
-            'get_game_state_payload.total',
-            (perf_counter() - started_at) * 1000.0,
-            details={'timings_ms': timings_ms},
-        )
+        with timing_scope('get_game_state_payload.mapping'):
+            result = map_game_state(session, completed, is_authenticated, username)
+            result["game_date"] = game_date
+            result["side_missions"] = get_side_mission_availability(
+                cur,
+                session,
+                completed,
+                user_id,
+            )
+            conn.commit()
 
-        return result, 200, timings_ms
+        return result, 200
 
 
 def get_player_stats_payload(user_id: int):
@@ -673,171 +639,110 @@ def expand_square(user_id: int, session_id: int, round_number: int):
         }, 200
     
 def get_all_daily_square_data(user_id: int, session_id: int | None):
-    started_at = perf_counter()
-    timings_ms = {}
-    log_debug(
-        f'get_all_daily_square_data: started user_id={user_id} session_id={session_id}'
-    )
-
-    connection_started_at = perf_counter()
-    with get_conn() as conn:
-        timings_ms['connection'] = (perf_counter() - connection_started_at) * 1000.0
-        timing(
-            'get_all_daily_square_data.connection',
-            timings_ms['connection'],
+    with timing_scope('get_all_daily_square_data.total'):
+        log_debug(
+            f'get_all_daily_square_data: started user_id={user_id} '
+            f'session_id={session_id}'
         )
 
-        cursor_started_at = perf_counter()
-        cur = conn.cursor()
-        timings_ms['cursor'] = (perf_counter() - cursor_started_at) * 1000.0
-        timing(
-            'get_all_daily_square_data.cursor',
-            timings_ms['cursor'],
-        )
+        with timing_scope('get_all_daily_square_data.database'):
+            with timing_scope('get_all_daily_square_data.connection'):
+                connection_context = get_conn()
+            with connection_context as conn:
+                with timing_scope('get_all_daily_square_data.cursor'):
+                    cur = conn.cursor()
 
-        session_started_at = perf_counter()
-        session = get_current_session(cur, user_id, session_id)
-        timings_ms['session'] = (perf_counter() - session_started_at) * 1000.0
-        timing(
-            'get_all_daily_square_data.session',
-            timings_ms['session'],
-        )
+                with timing_scope('get_all_daily_square_data.session'):
+                    session = get_current_session(cur, user_id, session_id)
 
-        if session is None:
-            log_debug('get_all_daily_square_data: no session')
-            return {"error": "No game found for today."}, 404
+                if session is None:
+                    log_debug('get_all_daily_square_data: no session')
+                    return {"error": "No game found for today."}, 404
 
-        completed_rows_started_at = perf_counter()
-        rows = get_completed_round_rows(cur, int(session.SessionId))
-        timings_ms['completed_rows'] = (
-            perf_counter() - completed_rows_started_at
-        ) * 1000.0
-        timing(
-            'get_all_daily_square_data.completed_rows',
-            timings_ms['completed_rows'],
-        )
+                with timing_scope('get_all_daily_square_data.completed_rows'):
+                    rows = get_completed_round_rows(cur, int(session.SessionId))
 
-        completed_mapping_started_at = perf_counter()
-        completed = map_completed_rounds(rows)
-        timings_ms['completed_mapping'] = (
-            perf_counter() - completed_mapping_started_at
-        ) * 1000.0
-        timing(
-            'get_all_daily_square_data.completed_mapping',
-            timings_ms['completed_mapping'],
-        )
+                with timing_scope('get_all_daily_square_data.completed_mapping'):
+                    completed = map_completed_rounds(rows)
 
-        completed_index_started_at = perf_counter()
-        completed_by_round = {
-            int(r["round_number"]): r for r in completed
-        }
-        timings_ms['completed_index'] = (
-            perf_counter() - completed_index_started_at
-        ) * 1000.0
-        timing(
-            'get_all_daily_square_data.completed_index',
-            timings_ms['completed_index'],
-        )
+                with timing_scope('get_all_daily_square_data.completed_index'):
+                    completed_by_round = {
+                        int(r["round_number"]): r for r in completed
+                    }
 
-        cur.execute(
-            """
-            SELECT RoundNumber, SquareId
-            FROM dbo.GameRounds
-            WHERE GameId = ?
-              AND ExpansionLevel = 0
-            """,
-            int(session.GameId),
-        )
-        base_square_ids = {
-            int(row.RoundNumber): int(row.SquareId)
-            for row in cur.fetchall()
-        }
-
-        square_batch_started_at = perf_counter()
-        square_data_by_round = _get_all_daily_square_data(cur, session)
-        timings_ms['square_batch'] = (perf_counter() - square_batch_started_at) * 1000.0
-        timing(
-            'get_all_daily_square_data.square_batch',
-            timings_ms['square_batch'],
-        )
-
-        round_data = []
-        for round_number in range(1, 6):
-            base = square_data_by_round[round_number]
-            completed_round = completed_by_round.get(round_number)
-            guess = (
-                completed_round['guesses'][0]
-                if completed_round and completed_round.get('guesses')
-                else None
-            )
-            excluded_city = (
-                {
-                    'city_id': guess['city_id'],
-                    'population': guess['population'],
-                }
-                if guess
-                else None
-            )
-            if round_number not in base_square_ids:
-                raise RuntimeError(
-                    f'Missing base square for game {int(session.GameId)} round {round_number}.'
+                cur.execute(
+                    """
+                    SELECT RoundNumber, SquareId
+                    FROM dbo.GameRounds
+                    WHERE GameId = ?
+                      AND ExpansionLevel = 0
+                    """,
+                    int(session.GameId),
                 )
-            reveal_square_id = base_square_ids[round_number]
-            round_data.append((round_number, base, guess, reveal_square_id, excluded_city))
+                base_square_ids = {
+                    int(row.RoundNumber): int(row.SquareId)
+                    for row in cur.fetchall()
+                }
 
-        reveal_batch_started_at = perf_counter()
-        reveal_cities_by_square = _get_reveal_cities_for_squares(
-            cur,
-            {reveal_square_id for _, _, _, reveal_square_id, _ in round_data},
-            {
-                reveal_square_id: excluded_city
-                for _, _, _, reveal_square_id, excluded_city in round_data
-            },
-        )
-        timings_ms['reveal_batch'] = (perf_counter() - reveal_batch_started_at) * 1000.0
-        timing(
-            'get_all_daily_square_data.reveal_batch',
-            timings_ms['reveal_batch'],
-        )
+                with timing_scope('get_all_daily_square_data.square_batch'):
+                    square_data_by_round = _get_all_daily_square_data(cur, session)
 
-    rounds = []
-    timings_ms['database'] = (perf_counter() - started_at) * 1000.0
-    timing(
-        'get_all_daily_square_data.database',
-        timings_ms['database'],
-    )
+                round_data = []
+                for round_number in range(1, 6):
+                    base = square_data_by_round[round_number]
+                    completed_round = completed_by_round.get(round_number)
+                    guess = (
+                        completed_round['guesses'][0]
+                        if completed_round and completed_round.get('guesses')
+                        else None
+                    )
+                    excluded_city = (
+                        {
+                            'city_id': guess['city_id'],
+                            'population': guess['population'],
+                        }
+                        if guess
+                        else None
+                    )
+                    if round_number not in base_square_ids:
+                        raise RuntimeError(
+                            f'Missing base square for game {int(session.GameId)} '
+                            f'round {round_number}.'
+                        )
+                    reveal_square_id = base_square_ids[round_number]
+                    round_data.append(
+                        (round_number, base, guess, reveal_square_id, excluded_city)
+                    )
 
-    for round_number, base, guess, reveal_square_id, _ in round_data:
-        round_started_at = perf_counter()
-        reveal_cities = reveal_cities_by_square[reveal_square_id]
+                with timing_scope('get_all_daily_square_data.reveal_batch'):
+                    reveal_cities_by_square = _get_reveal_cities_for_squares(
+                        cur,
+                        {item[3] for item in round_data},
+                        {
+                            reveal_square_id: excluded_city
+                            for _, _, _, reveal_square_id, excluded_city in round_data
+                        },
+                    )
 
-        rounds.append({
-            **base,
-            "levels": [{
-                "bounds": base["bounds"],
-                "expansion_level": base["expansion_level"],
-                "seed": base["seed"],
-            }],
-            "player_guess": guess,
-            "reveal_cities": reveal_cities,
-        })
+        rounds = []
+        for round_number, base, guess, reveal_square_id, _ in round_data:
+            with timing_scope(
+                'get_all_daily_square_data.round',
+                details={'round_number': round_number},
+            ):
+                reveal_cities = reveal_cities_by_square[reveal_square_id]
+                rounds.append({
+                    **base,
+                    "levels": [{
+                        "bounds": base["bounds"],
+                        "expansion_level": base["expansion_level"],
+                        "seed": base["seed"],
+                    }],
+                    "player_guess": guess,
+                    "reveal_cities": reveal_cities,
+                })
 
-        timings_ms[f'round_{round_number}'] = (
-            perf_counter() - round_started_at
-        ) * 1000.0
-        timing(
-            'get_all_daily_square_data.round',
-            timings_ms[f'round_{round_number}'],
-            details={'round_number': round_number},
-        )
-
-    timing(
-        'get_all_daily_square_data.total',
-        (perf_counter() - started_at) * 1000.0,
-        details={'timings_ms': timings_ms},
-    )
-
-    return {"rounds": rounds}, 200
+        return {"rounds": rounds}, 200
 
 def get_all_daily_square_data_preview(game_date: str):
     print(f'get_all_daily_square_data_preview: game_date={game_date}', flush=True)

@@ -1,7 +1,5 @@
 import os
 import json
-from time import perf_counter
-
 from flask import Blueprint, jsonify, render_template, request, current_app, url_for, redirect, make_response
 
 from app.core.auth import (
@@ -36,7 +34,7 @@ from app.core.session_service import (
 from app.core.side_missions.service import start_side_missions
 from app.core.user import is_username_available, set_username
 from app.core.feedback_service import send_feedback_email
-from app.core.logging import client_event, exception as log_exception, timing
+from app.core.logging import client_event, exception as log_exception, timing_scope
 
 main_bp = Blueprint("main", __name__)
 
@@ -109,57 +107,30 @@ def all_daily_squares():
 
 @main_bp.route("/api/game-state")
 def game_state():
-    started_at = perf_counter()
-    timings_ms = {}
+    total_details = {}
+    with timing_scope('game_state.total', details=total_details):
+        with timing_scope('game_state.identity'):
+            identity = resolve_request_identity()
 
-    identity_started_at = perf_counter()
-    identity = resolve_request_identity()
-    identity_elapsed_ms = (perf_counter() - identity_started_at) * 1000.0
-    timings_ms['identity'] = {
-        'total': identity_elapsed_ms,
-        **identity['timings_ms'],
-    }
-    timing(
-        'game_state.identity',
-        identity_elapsed_ms,
-    )
+        try:
+            payload_details = {}
+            with timing_scope(
+                'game_state.get_game_state_payload',
+                details=payload_details,
+            ):
+                body, status = get_game_state_payload(
+                    identity["user_id"],
+                    identity["session_id"],
+                )
+                payload_details['status'] = status
+        except Exception:
+            log_exception('game_state: exception in get_game_state_payload')
+            raise
 
-    try:
-        payload_started_at = perf_counter()
-        body, status, payload_timings_ms = get_game_state_payload(
-            identity["user_id"],
-            identity["session_id"],
-        )
-        payload_elapsed_ms = (
-            perf_counter() - payload_started_at
-        ) * 1000.0
-        timings_ms['get_game_state_payload'] = {
-            'total': payload_elapsed_ms,
-            **payload_timings_ms,
-        }
-        timing(
-            'game_state.get_game_state_payload',
-            payload_elapsed_ms,
-            details={'status': status},
-        )
-    except Exception:
-        log_exception('game_state: exception in get_game_state_payload')
-        raise
-
-    response_started_at = perf_counter()
-    resp = jsonify(body)
-    resp.status_code = status
-    timings_ms['response'] = (perf_counter() - response_started_at) * 1000.0
-    timing(
-        'game_state.response',
-        timings_ms['response'],
-        details={'status': status},
-    )
-    timing(
-        'game_state.total',
-        (perf_counter() - started_at) * 1000.0,
-        details={'status': status, 'timings_ms': timings_ms},
-    )
+        with timing_scope('game_state.response', details={'status': status}):
+            resp = jsonify(body)
+            resp.status_code = status
+        total_details['status'] = status
 
     return attach_request_session_cookie(resp, identity["user_id"], identity["session_id"])
 

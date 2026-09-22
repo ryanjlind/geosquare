@@ -1,7 +1,6 @@
 # core/session_service.py
 
 import os
-from time import perf_counter
 
 from flask import current_app, request
 from itsdangerous import URLSafeSerializer
@@ -9,6 +8,7 @@ from itsdangerous import URLSafeSerializer
 from app.constants import COOKIE_MAX_AGE_SECONDS, COOKIE_NAME
 from app.core.db import get_conn
 from app.core.game_queries import get_today_game, create_session
+from app.core.logging import timing_scope
 from app.core.user_queries import create_user, get_user_by_id
 
 
@@ -23,18 +23,13 @@ def get_current_session(
     cur,
     user_id: int,
     session_id: int | None,
-    *,
-    timings_ms: dict[str, float] | None = None,
 ):
-    today_game_started_at = perf_counter()
-    game_id = _require_today_game(cur)
-    if timings_ms is not None:
-        timings_ms['today_game'] = (perf_counter() - today_game_started_at) * 1000.0
+    with timing_scope('get_current_session.today_game'):
+        game_id = _require_today_game(cur)
     if game_id is None:
         return None
 
-    session_started_at = perf_counter()
-    try:
+    with timing_scope('get_current_session.session'):
         if session_id is not None:
             cur.execute(
                 """
@@ -64,21 +59,16 @@ def get_current_session(
             return row
 
         return create_session(cur, user_id, game_id)
-    finally:
-        if timings_ms is not None:
-            timings_ms['session'] = (perf_counter() - session_started_at) * 1000.0
 
 
 def resolve_request_identity():
-    timings_ms = {}
-    connection_started_at = perf_counter()
-    with get_conn() as conn:
-        timings_ms['connection'] = (perf_counter() - connection_started_at) * 1000.0
+    with timing_scope('resolve_request_identity.connection'):
+        connection_context = get_conn()
+    with connection_context as conn:
         cur = conn.cursor()
 
-        cookie_started_at = perf_counter()
-        cookie_identity = _get_identity_from_cookie()
-        timings_ms['cookie'] = (perf_counter() - cookie_started_at) * 1000.0
+        with timing_scope('resolve_request_identity.cookie'):
+            cookie_identity = _get_identity_from_cookie()
         cookie_user_id = (
             cookie_identity.get('user_id')
             if cookie_identity is not None
@@ -90,28 +80,25 @@ def resolve_request_identity():
             else None
         )
 
-        user_started_at = perf_counter()
-        if cookie_user_id is not None:
-            user = get_user_by_id(cur, cookie_user_id)
-        else:
-            user = None
+        with timing_scope('resolve_request_identity.user'):
+            if cookie_user_id is not None:
+                user = get_user_by_id(cur, cookie_user_id)
+            else:
+                user = None
 
-        if user is None:
-            user = create_user(cur)
-        timings_ms['user'] = (perf_counter() - user_started_at) * 1000.0
+            if user is None:
+                user = create_user(cur)
 
         user_id = int(user.UserId)
         session = get_current_session(
             cur,
             user_id,
             cookie_session_id,
-            timings_ms=timings_ms,
         )
 
         return {
             "user_id": user_id,
             "session_id": int(session.SessionId) if session else None,
-            "timings_ms": timings_ms,
         }
 
 

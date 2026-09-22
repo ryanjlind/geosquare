@@ -6,7 +6,7 @@ from app.constants import HISTORY_PAGE_SIZE
 from app.core.country_names import get_country_name, get_sovereign_country_code
 from app.core.db import get_conn
 from app.core.infinity_queries import get_started_infinity_pools
-from app.core.logging import info as log_info
+from app.core.logging import info as log_info, timing_scope
 
 REGION_ORDER = [
     'Nordic Europe',
@@ -35,17 +35,15 @@ def _log_profile_duration(label: str, start: float):
 
 @contextmanager
 def _profile_stage(label: str):
-    start = perf_counter()
     log_info(f'[profile] {label} started')
-    try:
-        yield
-    except Exception as error:
-        log_info(
-            f'[profile] {label} failed after {perf_counter() - start:.3f}s: '
-            f'{type(error).__name__}: {error}'
-        )
-        raise
-    log_info(f'[profile] {label} completed in {perf_counter() - start:.3f}s')
+    with timing_scope(f'[profile] {label}'):
+        try:
+            yield
+        except Exception as error:
+            log_info(
+                f'[profile] {label} failed: {type(error).__name__}: {error}'
+            )
+            raise
 
 
 def _fetchone_with_timing(cur, label: str):

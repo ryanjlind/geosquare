@@ -1,9 +1,8 @@
 from contextlib import contextmanager
-from time import perf_counter
 
 from app.constants import GAME_ROUND_COUNT as ROUND_COUNT
 from app.core.db import get_conn
-from app.core.logging import get_logger
+from app.core.logging import get_logger, timing_scope
 from app.core.game_mappers import map_completed_rounds, map_square
 from app.core.game_queries import (
     find_exact_city_in_expansions,
@@ -47,28 +46,25 @@ def _format_log_fields(fields: dict) -> str:
 
 @contextmanager
 def _logged_step(operation: str, step: str, **fields):
-    started_at = perf_counter()
     details = {}
     _logger.info('%s: %s started %s', operation, step, _format_log_fields(fields))
-    try:
-        yield details
-    except Exception:
-        _logger.exception(
-            '%s: %s failed elapsed_ms=%.1f %s',
-            operation,
-            step,
-            (perf_counter() - started_at) * 1000.0,
-            _format_log_fields(fields),
-        )
-        raise
-    completed_fields = {**fields, **details}
-    _logger.info(
-        '%s: %s completed elapsed_ms=%.1f %s',
-        operation,
-        step,
-        (perf_counter() - started_at) * 1000.0,
-        _format_log_fields(completed_fields),
-    )
+    timing_details = dict(fields)
+    with timing_scope(
+        f'{operation}: {step} completed',
+        details=timing_details,
+    ) as timing_node:
+        try:
+            yield details
+        except Exception:
+            timing_node.event_name = f'{operation}: {step} failed'
+            _logger.exception(
+                '%s: %s failed %s',
+                operation,
+                step,
+                _format_log_fields(fields),
+            )
+            raise
+        timing_details.update(details)
 
 
 def _require_round_number(round_number: int) -> None:
