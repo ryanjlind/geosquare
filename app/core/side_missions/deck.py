@@ -32,6 +32,22 @@ class SquareHasMultipleCountries:
 		}) > 1
 
 
+class OtherCountriesHavePopulousCity:
+	def __call__(self, context: SideMissionContext) -> bool:
+		answer_country = get_sovereign_country_code(context.answer['country_code'])
+		target_countries = {
+			get_sovereign_country_code(city['country_code'])
+			for city in context.cities
+			if get_sovereign_country_code(city['country_code']) != answer_country
+		}
+		populous_countries = {
+			get_sovereign_country_code(city['country_code'])
+			for city in context.cities
+			if int(city['population']) >= NAME_CHAIN_MINIMUM_STEP_POPULATION
+		}
+		return target_countries <= populous_countries
+
+
 class AnswerHasExtremeValue:
 	def __init__(self, field: str, extreme: str):
 		self.field = field
@@ -190,13 +206,22 @@ class AnswerHasThreeDirectionalCities:
 		self.comparison = comparison
 
 	def __call__(self, context: SideMissionContext) -> bool:
-		return sum(
-			{
+		matching_cities = tuple(
+			city
+			for city in context.cities
+			if {
 				'less_than': city[self.field] < context.answer[self.field],
 				'greater_than': city[self.field] > context.answer[self.field],
 			}[self.comparison]
-			for city in context.cities
-		) >= SIDE_MISSION_TARGET_COUNT
+		)
+		largest_populations = sorted(
+			(int(city['population']) for city in matching_cities),
+			reverse=True,
+		)[:SIDE_MISSION_TARGET_COUNT]
+		return (
+			len(largest_populations) == SIDE_MISSION_TARGET_COUNT
+			and sum(largest_populations) >= NAME_CHAIN_MINIMUM_STEP_POPULATION
+		)
 
 
 class AnswerHasNearestNeighbor:
@@ -526,6 +551,7 @@ ELIGIBILITY_SCENARIOS = {
 	'answer_is_capital': AnswerIsCapital(),
 	'square_has_multiple_capitals': SquareHasMultipleCapitals(),
 	'square_has_multiple_countries': SquareHasMultipleCountries(),
+	'other_countries_have_populous_city': OtherCountriesHavePopulousCity(),
 	'answer_is_northernmost': AnswerHasExtremeValue('latitude', 'maximum'),
 	'answer_is_southernmost': AnswerHasExtremeValue('latitude', 'minimum'),
 	'answer_is_easternmost': AnswerHasExtremeValue('longitude', 'maximum'),
@@ -699,6 +725,7 @@ MISSION_ELIGIBILITY = {
 	),
 	'country_coverage': (
 		'square_has_multiple_countries',
+		'other_countries_have_populous_city',
 	),
 	'north_to_south': (
 		'answer_is_northernmost',

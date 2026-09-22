@@ -519,7 +519,7 @@ def get_game_state_payload(user_id: int, session_id: int | None):
         )
 
         if session is None:
-            return {"error": "No game found for today."}, 404
+            return {"error": "No game found for today."}, 404, timings_ms
 
         completed_rounds_started_at = perf_counter()
         completed = map_completed_rounds(
@@ -555,7 +555,7 @@ def get_game_state_payload(user_id: int, session_id: int | None):
             details={'timings_ms': timings_ms},
         )
 
-        return result, 200
+        return result, 200, timings_ms
 
 
 def get_player_stats_payload(user_id: int):

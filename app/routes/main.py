@@ -122,16 +122,20 @@ def game_state():
 
     try:
         payload_started_at = perf_counter()
-        body, status = get_game_state_payload(
+        body, status, payload_timings_ms = get_game_state_payload(
             identity["user_id"],
             identity["session_id"],
         )
-        timings_ms['get_game_state_payload'] = (
+        payload_elapsed_ms = (
             perf_counter() - payload_started_at
         ) * 1000.0
+        timings_ms['get_game_state_payload'] = {
+            'total': payload_elapsed_ms,
+            **payload_timings_ms,
+        }
         timing(
             'game_state.get_game_state_payload',
-            timings_ms['get_game_state_payload'],
+            payload_elapsed_ms,
             details={'status': status},
         )
     except Exception:
