@@ -7,24 +7,39 @@ let expansionEntity = null;
 let currentBounds = null;
 let baseSquareEntity = null;
 const DEFAULT_GLOBE_ZOOM_HEIGHT = 10_000_000;
+const ARCGIS_IMAGERY_URL = 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer';
 
 export async function initCesium() {
     try {
         const arcGisImageryProvider = await Cesium.ArcGisMapServerImageryProvider.fromUrl(
-            'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer'
+            ARCGIS_IMAGERY_URL
         );
 
         if (arcGisImageryProvider.errorEvent) {
             arcGisImageryProvider.errorEvent.addEventListener(function (error) {
+                const tileUrl = `${ARCGIS_IMAGERY_URL}/tile/${error.level}/${error.y}/${error.x}`;
+                const resourceTimings = performance.getEntriesByName(tileUrl, 'resource').map(entry => ({
+                    duration: entry.duration,
+                    transferSize: entry.transferSize,
+                    encodedBodySize: entry.encodedBodySize,
+                    decodedBodySize: entry.decodedBodySize,
+                    nextHopProtocol: entry.nextHopProtocol,
+                    responseStatus: entry.responseStatus,
+                }));
                 postRateLimitedClientError('arcgis_provider_error', {
                     message: error?.message,
+                    name: error?.name,
                     timesRetried: error?.timesRetried,
                     retry: error?.retry,
                     x: error?.x,
                     y: error?.y,
                     level: error?.level,
+                    tileUrl,
+                    errorProperties: { ...error },
+                    providerErrorProperties: error?.error ? { ...error.error } : null,
                     providerErrorMessage: error?.error?.message,
-                    providerErrorStack: error?.error?.stack
+                    providerErrorStack: error?.error?.stack,
+                    resourceTimings,
                 });
             });
         }
