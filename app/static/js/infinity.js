@@ -717,9 +717,9 @@ async function submitGuess(revealedCity = null, confirmedCityId = null) {
         const scoreFeedback = isReveal
             ? `<b>${escapeHtml(acceptedNames)}</b> revealed`
             : `<b>${escapeHtml(acceptedNames)}</b> +${numberFmt(awardedScore)}${duplicateText}`;
-        const acknowledgements = newlyNamedTargets.map(
-            name => mission.progress.acknowledgements[name],
-        );
+        const acknowledgements = newlyNamedTargets
+            .filter(name => Object.hasOwn(mission.progress.acknowledgements, name))
+            .map(name => mission.progress.acknowledgements[name]);
         const acknowledgementMarkup = acknowledgements.length > 0
             ? `<div id="sideMissionAcknowledgement" class="side-mission-success">${acknowledgements.map(
                 acknowledgement => `<strong>${escapeHtml(acknowledgement)}</strong>`,

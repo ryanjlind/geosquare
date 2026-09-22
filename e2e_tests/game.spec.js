@@ -343,7 +343,16 @@ async function completeSideMission(
     await expect(page.locator('#infinityTotalScore')).toHaveText(
       result.total_score.toLocaleString('en-US'),
     );
-    await expect(page.locator('#sideMissionAcknowledgement')).toBeVisible();
+    const expectedAcknowledgements = updatedMission.progress.named
+      .filter((name) => Object.hasOwn(updatedMission.progress.acknowledgements, name))
+      .map((name) => updatedMission.progress.acknowledgements[name]);
+    if (expectedAcknowledgements.length > 0) {
+      await expect(page.locator('#sideMissionAcknowledgement')).toContainText(
+        expectedAcknowledgements[expectedAcknowledgements.length - 1],
+      );
+    } else {
+      await expect(page.locator('#sideMissionAcknowledgement')).toHaveCount(0);
+    }
   }
 
   const completedMission = result.side_missions.missions.find(
