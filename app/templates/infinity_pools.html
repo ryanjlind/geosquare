@@ -1,19 +1,20 @@
-<!doctype html>
-<html lang="en" class="profile-page">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>GeoSquare Infinity Pools</title>
-    <script src="{{ asset_url('js/browser_errors.js') }}"></script>
+{% extends "base.html" %}
+
+{% block html_attributes %} lang="en" class="profile-page"{% endblock %}
+{% block title %}GeoSquare Infinity Pools{% endblock %}
+
+{% block head %}
     <link rel="stylesheet" href="{{ asset_url('css/base.css') }}">
     <link rel="stylesheet" href="{{ asset_url('css/layout.css') }}">
     <link rel="stylesheet" href="{{ asset_url('css/stats.css') }}">
     <link rel="stylesheet" href="{{ asset_url('css/profile.css') }}">
     <link rel="stylesheet" href="{{ asset_url('css/infinity_pools.css') }}">
     <link rel="stylesheet" href="{{ asset_url('css/mobile.css') }}">
-    <link rel="icon" href="{{ asset_url('favicon.ico') }}">
-</head>
-<body class="profile-page infinity-pools-page">
+{% endblock %}
+
+{% block body_attributes %} class="profile-page infinity-pools-page"{% endblock %}
+
+{% block content %}
     <div class="layout profile-layout">
         <aside class="sidebar profile-sidebar" id="sidebar">
             <div class="sidebar-mobile-header">
@@ -37,9 +38,9 @@
             <div id="infinityPoolsStatus" class="profile-message">Loading Infinity Pools...</div>
         </main>
     </div>
+{% endblock %}
 
-    <script type="importmap">{{ {'imports': js_import_map()}|tojson }}</script>
+{% block scripts %}
     <script type="module" src="{{ asset_url('js/infinity_pools.js') }}"></script>
     <script type="module" src="{{ asset_url('js/mobile.js') }}"></script>
-</body>
-</html>
+{% endblock %}

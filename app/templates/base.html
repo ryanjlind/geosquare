@@ -1,0 +1,18 @@
+<!doctype html>
+<html{% block html_attributes %} lang="en"{% endblock %}>
+<head>
+    <meta charset="utf-8">
+    {% block head_meta %}<meta name="viewport" content="width=device-width, initial-scale=1">{% endblock %}
+    <title>{% block title %}GeoSquare{% endblock %}</title>
+    <script src="{{ asset_url('js/browser_errors.js') }}"></script>
+    {% block head %}{% endblock %}
+    {% block favicon %}<link rel="icon" href="{{ asset_url('favicon.ico') }}">{% endblock %}
+</head>
+<body{% block body_attributes %}{% endblock %}>
+    {% block content %}{% endblock %}
+    {% block pre_importmap_scripts %}{% endblock %}
+    <script type="importmap">{{ {'imports': js_import_map()}|tojson }}</script>
+    {% block scripts %}{% endblock %}
+    <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"91c4280685324ce9b8fedaa9fc862b58"}'></script>
+</body>
+</html>

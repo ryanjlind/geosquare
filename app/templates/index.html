@@ -1,11 +1,11 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
+{% extends "base.html" %}
+
+{% block head_meta %}
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Test your geography knoweldge by naming a city in each square!">
-    <title>GeoSquare</title>
-    <script src="{{ asset_url('js/browser_errors.js') }}"></script>
+{% endblock %}
+
+{% block head %}
     <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link rel="stylesheet" href="{{ asset_url('css/base.css') }}">
@@ -15,9 +15,9 @@
     <link rel="stylesheet" href="{{ asset_url('css/stats.css') }}">
     <link rel="stylesheet" href="{{ asset_url('css/mobile.css') }}">
     <link rel="stylesheet" href="{{ asset_url('css/feedback.css') }}">
-    <link rel="icon" href="{{ asset_url('favicon.ico') }}">
-</head>
-<body>
+{% endblock %}
+
+{% block content %}
     <div class="layout">
         <div class="sidebar" id="sidebar">
             <div class="sidebar-mobile-header">
@@ -375,11 +375,16 @@
             </div>
         </div>
     </div>
+{% endblock %}
+
+{% block pre_importmap_scripts %}
     <script>
         window.CESIUM_ION_TOKEN = {{ cesium_ion_token|tojson }};
     </script>
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
-    <script type="importmap">{{ {'imports': js_import_map()}|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
     <script type="module" src="{{ asset_url('js/app.js') }}"></script>
     <script type="module" src="{{ asset_url('js/mobile.js') }}"></script>
     <script>
@@ -390,6 +395,5 @@
                 guessInput.focus();
             }
         });
-</script>
-</body>
-</html>
+    </script>
+{% endblock %}

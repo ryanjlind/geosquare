@@ -1,10 +1,11 @@
-<!doctype html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>GeoSquare Preview</title>
-    <script src="{{ asset_url('js/browser_errors.js') }}"></script>
+{% extends "base.html" %}
 
+{% block html_attributes %}{% endblock %}
+{% block head_meta %}{% endblock %}
+{% block title %}GeoSquare Preview{% endblock %}
+{% block favicon %}{% endblock %}
+
+{% block head %}
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.118/Build/Cesium/Cesium.js"></script>
     <link href="https://cesium.com/downloads/cesiumjs/releases/1.118/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
 
@@ -16,12 +17,13 @@
             overflow: hidden;
         }
     </style>
-</head>
+{% endblock %}
 
-<body>
+{% block content %}
 <div id="cesiumContainer"></div>
+{% endblock %}
 
-<script type="importmap">{{ {'imports': js_import_map()}|tojson }}</script>
+{% block scripts %}
 <script type="module">
 import { initCesium, renderAllSquares } from '@geosquare/map.js';
 import { fetchJson } from '@geosquare/api.js';
@@ -39,6 +41,4 @@ async function load() {
 
 load();
 </script>
-
-</body>
-</html>
+{% endblock %}
