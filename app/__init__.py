@@ -4,6 +4,7 @@ from hashlib import sha256
 from pathlib import Path
 from flask import Flask, Response, request
 from app.constants import STATIC_ASSET_HASH_LENGTH
+from app.core.csrf import attach_csrf_cookie, enforce_csrf_protection
 from app.routes.daily_dashboard import daily_dashboard_bp
 from app.routes.main import main_bp
 from app.routes.profile import profile_bp
@@ -54,11 +55,13 @@ def create_app() -> Flask:
             'js_import_map': _static_js_import_map,
         }
 
+    app.before_request(enforce_csrf_protection)
+
     @app.after_request
     def require_static_asset_revalidation(response: Response) -> Response:
         if request.path.startswith(f'{app.static_url_path}/'):
             response.headers['Cache-Control'] = 'no-cache, max-age=0, must-revalidate'
-        return response
+        return attach_csrf_cookie(response)
 
     app.register_blueprint(daily_dashboard_bp)
     app.register_blueprint(main_bp)

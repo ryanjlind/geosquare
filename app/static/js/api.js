@@ -1,5 +1,31 @@
-export async function fetchJson(url, options) {
-    const response = await fetch(url, options);
+const CSRF_COOKIE_NAME = 'geosquare_csrf';
+const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+function getCookie(name) {
+    const prefix = `${encodeURIComponent(name)}=`;
+    const cookie = document.cookie
+        .split('; ')
+        .find(value => value.startsWith(prefix));
+    return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null;
+}
+
+export function fetchWithCsrf(url, options = {}) {
+    const method = (options.method || 'GET').toUpperCase();
+    if (!UNSAFE_METHODS.has(method)) {
+        return fetch(url, options);
+    }
+
+    const headers = new Headers(options.headers);
+    const csrfToken = getCookie(CSRF_COOKIE_NAME);
+    if (csrfToken !== null) {
+        headers.set('X-CSRF-Token', csrfToken);
+    }
+
+    return fetch(url, { ...options, headers });
+}
+
+export async function fetchJson(url, options = {}) {
+    const response = await fetchWithCsrf(url, options);
     const data = await response.json();
     return { response, data };
 }

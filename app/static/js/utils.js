@@ -1,3 +1,5 @@
+import { fetchWithCsrf } from '@geosquare/api.js';
+
 export function fmt(v) {
     return Number(v).toFixed(2);
 }
@@ -92,7 +94,7 @@ export function parseFormattedInt(value) {
 
 export async function postClientLog(eventType, details) {
     try {
-        await fetch('/api/client-log', {
+        await fetchWithCsrf('/api/client-log', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

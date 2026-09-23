@@ -15,7 +15,7 @@ export function login() {
 }
 
 export async function logout() {
-    await fetch('/logout', { method: 'POST' });
+    await fetchJson('/logout', { method: 'POST' });
     window.location.reload();
 }
 

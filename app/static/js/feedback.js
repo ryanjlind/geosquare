@@ -1,3 +1,5 @@
+import { fetchWithCsrf } from '@geosquare/api.js';
+
 async function collectUserAgentData() {
     if (!navigator.userAgentData) {
         return null;
@@ -167,7 +169,7 @@ export function initFeedback() {
             }
         }
 
-        await fetch('/api/feedback', {
+        await fetchWithCsrf('/api/feedback', {
             method: 'POST',
             body: formData
         });

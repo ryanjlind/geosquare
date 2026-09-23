@@ -5,7 +5,10 @@ STATIC_ASSET_HASH_LENGTH = 12
 # Authentication and sessions
 COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365 * 5
 COOKIE_NAME = 'geosquare_session'
+CSRF_COOKIE_NAME = 'geosquare_csrf'
+CSRF_SALT = 'geosquare-csrf'
 LASTLOGIN_PROVIDER = 'lastlogin'
+PRODUCTION_ORIGIN = 'https://geosquare.app'
 
 # Logging
 SLOW_EVENT_THRESHOLD_MILLISECONDS = 1000
