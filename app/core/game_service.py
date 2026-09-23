@@ -9,7 +9,6 @@ from app.core.game_queries import (
     complete_session,
     get_completed_round_rows,
     get_session_round,
-    get_ranked_square_cities,
     get_session_total_score,
     get_square_cities,
     get_square_city_count,
@@ -313,7 +312,7 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None):
         if square_id is None:
             return {"error": "No square found for that round."}, 404
 
-        rows = get_ranked_square_cities(cur, square_id)
+        rows = get_square_cities(cur, square_id)
 
         nearby_exact_match = find_exact_city_in_expansions(
             cur,
@@ -424,7 +423,7 @@ def submit_pass(payload: dict, user_id: int, session_id: int | None):
 
         set_round_passed(cur, session_id, round_number, square_id)
 
-        rows = get_ranked_square_cities(cur, square_id)
+        rows = get_square_cities(cur, square_id)
         largest = rows[0] if rows else None
 
         if round_number == 5:

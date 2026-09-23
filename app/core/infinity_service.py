@@ -8,7 +8,6 @@ from app.core.game_queries import (
     find_exact_city_in_expansions,
     get_base_square_id_for_round,
     get_completed_round_rows,
-    get_ranked_square_cities,
     get_square_by_id,
     get_square_cities,
     get_square_city_count,
@@ -403,7 +402,7 @@ def submit_infinity_guess(
             'load_ranked_cities',
             square_id=square_id,
         ) as details:
-            ranked_cities = get_ranked_square_cities(cur, square_id)
+            ranked_cities = get_square_cities(cur, square_id)
             details['city_count'] = len(ranked_cities)
 
         if is_reveal:

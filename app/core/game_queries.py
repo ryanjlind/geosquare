@@ -37,12 +37,18 @@ def get_square_cities(cur, square_id: int):
             city.Latitude,
             city.Longitude,
             city.Population,
+            ROW_NUMBER() OVER (
+                ORDER BY city.Population DESC, city.CityName ASC
+            ) AS PopRank,
+            geo.AltNames AS AlternateNames,
+            geo.ProvinceCodes,
             CASE WHEN geo.FeatureCode = 'PPLC' THEN 1 ELSE 0 END AS IsCapital
         FROM dbo.GameSquareCities city
-                INNER JOIN dbo.GeoCities geo
+        INNER JOIN dbo.GeoCities geo
             ON geo.CityId = city.CityId
         WHERE city.SquareId = ?
-                    AND geo.IsActive = 1
+            AND geo.IsActive = 1
+            AND geo.FeatureCode <> 'PPLX'
         ORDER BY city.Population DESC, city.CityName ASC
     """, square_id)
     return cur.fetchall()
@@ -56,6 +62,7 @@ def get_square_city_count(cur, square_id: int):
             ON geo.CityId = city.CityId
         WHERE city.SquareId = ?
           AND geo.IsActive = 1
+                    AND geo.FeatureCode <> 'PPLX'
     """, square_id)
     return cur.fetchone()
 
@@ -88,28 +95,6 @@ def get_square_id_for_round(cur, game_id: int, round_number: int):
         AND gr.RoundNumber = ?
     """, game_id, round_number)
     return cur.fetchone()
-
-def get_ranked_square_cities(cur, square_id: int):
-    cur.execute("""
-        SELECT
-            c.CityId,
-            c.CityName,
-            c.CountryCode,
-            c.Latitude,
-            c.Longitude,
-            c.Population,
-            ROW_NUMBER() OVER (ORDER BY c.Population DESC) AS PopRank,
-            gc.AltNames AS AlternateNames,
-            gc.ProvinceCodes
-        FROM dbo.GameSquareCities c
-        LEFT JOIN dbo.GeoCities gc
-            ON gc.CityId = c.CityId
-        WHERE c.SquareId = ?
-            AND gc.IsActive = 1
-            AND gc.FeatureCode <> 'PPLX'
-        ORDER BY c.Population DESC
-    """, square_id)
-    return cur.fetchall()
 
 def get_session_round(cur, session_id: int, round_number: int):
     cur.execute("""
