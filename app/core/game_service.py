@@ -208,11 +208,7 @@ def _get_all_daily_square_data(cur, session) -> dict[int, dict]:
                 WHERE later.GameId = selected.GameId
                   AND later.RoundNumber = selected.RoundNumber
                   AND later.ExpansionLevel > round_data.ExpansionLevel
-            ) THEN 1 ELSE 0 END AS HasNextExpansion,
-            capital.CityName AS CapitalCityName,
-            capital.CountryCode AS CapitalCountryCode,
-            capital.Latitude AS CapitalLatitude,
-            capital.Longitude AS CapitalLongitude
+                        ) THEN 1 ELSE 0 END AS HasNextExpansion
         FROM SelectedSquares selected
         INNER JOIN dbo.GameRounds round_data
             ON round_data.GameId = selected.GameId
@@ -225,14 +221,6 @@ def _get_all_daily_square_data(cur, session) -> dict[int, dict]:
         LEFT JOIN dbo.GeoCities geo
             ON geo.CityId = city.CityId
             AND geo.IsActive = 1
-        OUTER APPLY (
-            SELECT TOP 1 CityName, CountryCode, Latitude, Longitude
-            FROM dbo.GeoCities
-            WHERE FeatureCode = 'PPCL'
-              AND IsActive = 1
-              AND Latitude BETWEEN square.MinLat AND square.MaxLat
-              AND Longitude BETWEEN square.MinLon AND square.MaxLon
-        ) capital
         WHERE city.CityId IS NULL OR geo.CityId IS NOT NULL
         ORDER BY selected.RoundNumber, city.Population DESC, city.CityName ASC
         """,
@@ -245,14 +233,6 @@ def _get_all_daily_square_data(cur, session) -> dict[int, dict]:
         round_number = int(row.RoundNumber)
         result = results.get(round_number)
         if result is None:
-            capital_city = None
-            if row.CapitalCityName is not None:
-                capital_city = {
-                    'city_name': row.CapitalCityName,
-                    'country_code': row.CapitalCountryCode,
-                    'latitude': float(row.CapitalLatitude),
-                    'longitude': float(row.CapitalLongitude),
-                }
             result = {
                 'square_id': int(row.SquareId),
                 'expansion_level': int(row.ExpansionLevel),
@@ -273,7 +253,6 @@ def _get_all_daily_square_data(cur, session) -> dict[int, dict]:
                 'largest_city': None,
                 'round_number': round_number,
                 'game_id': int(row.GameId),
-                'capital_city': capital_city,
             }
             results[round_number] = result
         if row.CityId is None:
