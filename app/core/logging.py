@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import traceback
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -61,6 +62,52 @@ def _write_client_event(
                 ip_address,
                 user_agent,
                 referer,
+            ),
+        )
+        conn.commit()
+
+
+def _write_backend_error(
+    *,
+    exception_type: str,
+    message: str,
+    stack_trace: str,
+    request_method: str,
+    request_path: str,
+    endpoint: str | None,
+    user_id: int | None,
+    session_id: int | None,
+    request_id: str,
+) -> None:
+    with get_conn(for_logging=True) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO dbo.BackendErrorEvents (
+                OccurredAtUtc,
+                ExceptionType,
+                ErrorMessage,
+                StackTrace,
+                RequestMethod,
+                RequestPath,
+                Endpoint,
+                UserId,
+                SessionId,
+                RequestId
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                datetime.now(timezone.utc),
+                exception_type,
+                message,
+                stack_trace,
+                request_method,
+                request_path,
+                endpoint,
+                user_id,
+                session_id,
+                request_id,
             ),
         )
         conn.commit()
@@ -265,6 +312,59 @@ def error(message: str, *args, **kwargs) -> None:
 
 def exception(message: str, *args, **kwargs) -> None:
     _application_logger.exception(message, *args, **kwargs)
+
+
+def backend_exception(
+    exception_value: Exception,
+    *,
+    request_method: str,
+    request_path: str,
+    endpoint: str | None,
+    user_id: int | None,
+    session_id: int | None,
+    request_id: str,
+) -> None:
+    exception_type = (
+        f'{type(exception_value).__module__}.{type(exception_value).__qualname__}'
+    )
+    message = str(exception_value)
+    stack_trace = ''.join(traceback.format_exception(exception_value))
+    _logger.error(
+        'Unhandled backend exception request_id=%s method=%s path=%s endpoint=%s '
+        'user_id=%s session_id=%s',
+        request_id,
+        request_method,
+        request_path,
+        endpoint,
+        user_id,
+        session_id,
+        exc_info=(
+            type(exception_value),
+            exception_value,
+            exception_value.__traceback__,
+        ),
+    )
+
+    if _is_local():
+        return
+
+    try:
+        _write_backend_error(
+            exception_type=exception_type,
+            message=message,
+            stack_trace=stack_trace,
+            request_method=request_method,
+            request_path=request_path,
+            endpoint=endpoint,
+            user_id=user_id,
+            session_id=session_id,
+            request_id=request_id,
+        )
+    except Exception:
+        _logger.exception(
+            'Failed to write backend exception to database: request_id=%s',
+            request_id,
+        )
 
 
 def client_event(

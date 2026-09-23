@@ -2,7 +2,7 @@
 
 import os
 
-from flask import current_app, request
+from flask import current_app, g, request
 from itsdangerous import URLSafeSerializer
 
 from app.constants import COOKIE_MAX_AGE_SECONDS, COOKIE_NAME
@@ -95,10 +95,13 @@ def resolve_request_identity():
             user_id,
             cookie_session_id,
         )
+        session_id = int(session.SessionId) if session else None
+        g.user_id = user_id
+        g.session_id = session_id
 
         return {
             "user_id": user_id,
-            "session_id": int(session.SessionId) if session else None,
+            "session_id": session_id,
         }
 
 
@@ -123,8 +126,12 @@ def _get_identity_from_cookie() -> dict | None:
 def get_request_user_id():
     identity = _get_identity_from_cookie()
     if identity is None:
+        g.user_id = None
+        g.session_id = None
         return None
-    return identity.get('user_id')
+    g.user_id = identity.get('user_id')
+    g.session_id = identity.get('session_id')
+    return g.user_id
 
 
 def attach_request_session_cookie(response, user_id: int, session_id: int | None):

@@ -2,9 +2,14 @@ import logging
 import os
 from hashlib import sha256
 from pathlib import Path
-from flask import Flask, Response, request
+from uuid import uuid4
+
+from flask import Flask, Response, g, request
+from werkzeug.exceptions import HTTPException, InternalServerError
+
 from app.constants import STATIC_ASSET_HASH_LENGTH
 from app.core.csrf import attach_csrf_cookie, enforce_csrf_protection
+from app.core.logging import backend_exception
 from app.routes.daily_dashboard import daily_dashboard_bp
 from app.routes.main import main_bp
 from app.routes.profile import profile_bp
@@ -56,13 +61,36 @@ def create_app() -> Flask:
             'js_import_map': _static_js_import_map,
         }
 
+    @app.before_request
+    def initialize_request_context() -> None:
+        g.request_id = str(uuid4())
+        g.user_id = None
+        g.session_id = None
+
     app.before_request(enforce_csrf_protection)
 
     @app.after_request
     def require_static_asset_revalidation(response: Response) -> Response:
         if request.path.startswith(f'{app.static_url_path}/'):
             response.headers['Cache-Control'] = 'no-cache, max-age=0, must-revalidate'
+        response.headers['X-Request-ID'] = g.request_id
         return attach_csrf_cookie(response)
+
+    @app.errorhandler(Exception)
+    def handle_unhandled_exception(exception_value: Exception):
+        if isinstance(exception_value, HTTPException):
+            return exception_value
+
+        backend_exception(
+            exception_value,
+            request_method=request.method,
+            request_path=request.path,
+            endpoint=request.endpoint,
+            user_id=g.user_id,
+            session_id=g.session_id,
+            request_id=g.request_id,
+        )
+        return InternalServerError()
 
     app.register_blueprint(daily_dashboard_bp)
     app.register_blueprint(main_bp)
