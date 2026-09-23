@@ -29,7 +29,7 @@ class SquareHasMultipleCountries:
 		return len({
 			get_sovereign_country_code(city['country_code'])
 			for city in context.cities
-		}) > 1
+		}) >= 3
 
 
 class OtherCountriesHavePopulousCity:
@@ -239,26 +239,12 @@ class AnswerHasCitiesInEveryDirection:
 			if int(city['city_id']) != int(context.answer['city_id'])
 		)
 		directional_populations = {
-			'north': sum(
+			direction: sum(
 				int(city['population'])
 				for city in cities
-				if city['latitude'] > context.answer['latitude']
-			),
-			'south': sum(
-				int(city['population'])
-				for city in cities
-				if city['latitude'] < context.answer['latitude']
-			),
-			'east': sum(
-				int(city['population'])
-				for city in cities
-				if city['longitude'] > context.answer['longitude']
-			),
-			'west': sum(
-				int(city['population'])
-				for city in cities
-				if city['longitude'] < context.answer['longitude']
-			),
+				if _compass_direction_order(context.answer, city)[0] == direction
+			)
+			for direction in ('north', 'south', 'east', 'west')
 		}
 		return (
 			len(_match_compass_directions(context.answer, cities)) == 4

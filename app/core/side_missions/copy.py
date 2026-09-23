@@ -10,7 +10,7 @@ MISSION_COPY = {
 		'name': 'Conqueror',
 		'prompt': (
 			'You named a city in {country_name}. There are {other_countries} other '
-			'{country_noun} in this square. Can you name one city in each of them?'
+			'{country_noun} with eligible cities in this square. Can you name one in each of them?'
 		),
 	},
 	'north_to_south': {
