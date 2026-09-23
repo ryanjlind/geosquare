@@ -903,7 +903,9 @@ export function unlockInfinityMode(sideMissionAvailability) {
     infinityButton.disabled = false;
     infinityButton.removeAttribute('title');
     document.getElementById('statsInfinityInvite').classList.remove('hidden');
-    setSideMissionAvailability(sideMissionAvailability);
+    if (sideMissionAvailability != null) {
+        setSideMissionAvailability(sideMissionAvailability);
+    }
 }
 
 
