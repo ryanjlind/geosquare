@@ -18,7 +18,7 @@ from app.constants import (
     UNMATCHED_TRAILING_TOKEN_PENALTY,
 )
 from app.core.country_names import get_country_name
-from app.core.logging import get_logger
+from app.core.logging import get_logger, timing_scope
 from app.helpers.text import normalize_place_name
 
 _logger = get_logger('geosquare.matching')
@@ -336,19 +336,27 @@ def find_matching_city(
     nearby_exact_match,
     current_expansion_level: int,
 ):
-    guess_text = guess_text.strip()
+    preparation_details = {'input_candidate_count': len(rows)}
+    with timing_scope(
+        'find_matching_city.prepare',
+        details=preparation_details,
+    ):
+        guess_text = guess_text.strip()
 
-    if ',' in guess_text:
-        parts = [p.strip() for p in guess_text.split(',', 1)]
-        if len(parts) == 2:
-            guess_text, precision_part = parts
-            precision_filter = precision_part.upper()
+        if ',' in guess_text:
+            parts = [p.strip() for p in guess_text.split(',', 1)]
+            if len(parts) == 2:
+                guess_text, precision_part = parts
+                precision_filter = precision_part.upper()
+            else:
+                precision_filter = None
         else:
             precision_filter = None
-    else:
-        precision_filter = None
 
-    normalized_guess = normalize_place_name(guess_text)
+        normalized_guess = normalize_place_name(guess_text)
+        preparation_details['normalized_guess'] = normalized_guess
+        preparation_details['guess_token_count'] = len(normalized_guess.split())
+        preparation_details['precision_filter'] = precision_filter
 
     summary_parts = []
 
@@ -365,58 +373,83 @@ def find_matching_city(
             f'{nearby_penalty:.1f} penalty to fuzzy candidates.'
         )
 
-    candidate_rows = rows
-    if precision_filter:
-        province_filtered_rows = []
+    filtering_details = {'precision_filter': precision_filter}
+    with timing_scope(
+        'find_matching_city.filter_candidates',
+        details=filtering_details,
+    ):
+        candidate_rows = rows
+        if precision_filter:
+            province_filtered_rows = []
 
-        for r in rows:
-            if r.ProvinceCodes is None:
-                province_codes = set()
+            for r in rows:
+                if r.ProvinceCodes is None:
+                    province_codes = set()
+                else:
+                    province_codes = {
+                        code.strip().upper()
+                        for code in r.ProvinceCodes.split(',')
+                        if code.strip()
+                    }
+
+                if precision_filter in province_codes:
+                    province_filtered_rows.append(r)
+
+            if province_filtered_rows:
+                candidate_rows = province_filtered_rows
+                filtering_details['filter_type'] = 'province'
+                summary_parts.append(
+                    f'Province filter {precision_filter} reduced the field to '
+                    f'{len(candidate_rows)} candidates.'
+                )
             else:
-                province_codes = {
-                    code.strip().upper()
-                    for code in r.ProvinceCodes.split(',')
-                    if code.strip()
-                }
-
-            if precision_filter in province_codes:
-                province_filtered_rows.append(r)
-
-        if province_filtered_rows:
-            candidate_rows = province_filtered_rows
-            summary_parts.append(
-                f'Province filter {precision_filter} reduced the field to '
-                f'{len(candidate_rows)} candidates.'
-            )
-        else:
-            country_filtered_rows = [
-                r for r in rows
-                if r.CountryCode is not None and r.CountryCode.upper() == precision_filter
-            ]
-            candidate_rows = country_filtered_rows
-            summary_parts.append(
-                f'Country filter {precision_filter} reduced the field to '
-                f'{len(candidate_rows)} candidates.'
-            )
+                country_filtered_rows = [
+                    r for r in rows
+                    if r.CountryCode is not None
+                    and r.CountryCode.upper() == precision_filter
+                ]
+                candidate_rows = country_filtered_rows
+                filtering_details['filter_type'] = 'country'
+                summary_parts.append(
+                    f'Country filter {precision_filter} reduced the field to '
+                    f'{len(candidate_rows)} candidates.'
+                )
+        filtering_details['output_candidate_count'] = len(candidate_rows)
 
     scored_candidates = []
+    scoring_details = {'candidate_count': len(candidate_rows)}
+    with timing_scope(
+        'find_matching_city.score_candidates',
+        details=scoring_details,
+    ):
+        candidate_name_count = 0
+        for row in candidate_rows:
+            candidate_name_count += 1
+            if row.AlternateNames:
+                candidate_name_count += len(row.AlternateNames.split('|||'))
+            candidate_score = _score_candidate(normalized_guess, row)
+            raw_score = candidate_score[0]
+            source_type = candidate_score[3]
+            if raw_score == 100.0 or nearby_exact_match is None:
+                score = raw_score
+            else:
+                score = max(0.0, raw_score - nearby_penalty)
+            scored_candidates.append((score, row, source_type))
+        scoring_details['candidate_name_count'] = candidate_name_count
 
-    for row in candidate_rows:
-        candidate_score = _score_candidate(normalized_guess, row)
-        raw_score = candidate_score[0]
-        source_type = candidate_score[3]
-        if raw_score == 100.0 or nearby_exact_match is None:
-            score = raw_score
-        else:
-            score = max(0.0, raw_score - nearby_penalty)
-        scored_candidates.append((score, row, source_type))
-
-    surviving_candidates = [
-        (score, row, source_type)
-        for score, row, source_type in scored_candidates
-        if score >= FUZZY_LINE_SCORE
-    ]
-    discarded_count = len(scored_candidates) - len(surviving_candidates)
+    selection_details = {'scored_candidate_count': len(scored_candidates)}
+    with timing_scope(
+        'find_matching_city.select_candidates',
+        details=selection_details,
+    ):
+        surviving_candidates = [
+            (score, row, source_type)
+            for score, row, source_type in scored_candidates
+            if score >= FUZZY_LINE_SCORE
+        ]
+        discarded_count = len(scored_candidates) - len(surviving_candidates)
+        selection_details['surviving_candidate_count'] = len(surviving_candidates)
+        selection_details['discarded_candidate_count'] = discarded_count
 
     if not surviving_candidates:
         summary_parts.append(
@@ -446,17 +479,21 @@ def find_matching_city(
             "row": row,
         }
 
-    surviving_candidates.sort(
-        key=lambda candidate: (
-            normalize_place_name(candidate[1].CityName),
-            (
-                (0, candidate[1].CountryCode.upper())
-                if candidate[1].CountryCode is not None
-                else (1,)
-            ),
-            int(candidate[1].CityId),
+    with timing_scope(
+        'find_matching_city.sort_candidates',
+        details={'candidate_count': len(surviving_candidates)},
+    ):
+        surviving_candidates.sort(
+            key=lambda candidate: (
+                normalize_place_name(candidate[1].CityName),
+                (
+                    (0, candidate[1].CountryCode.upper())
+                    if candidate[1].CountryCode is not None
+                    else (1,)
+                ),
+                int(candidate[1].CityId),
+            )
         )
-    )
 
     viable_candidates = ', '.join(
         f'{row.CityName}, {row.CountryCode} ({score:.1f})'

@@ -45,13 +45,22 @@ def _format_log_fields(fields: dict) -> str:
 
 
 @contextmanager
-def _logged_step(operation: str, step: str, **fields):
+def _logged_step(
+    operation: str,
+    step: str,
+    *,
+    session_id: int | None = None,
+    **fields,
+):
     details = {}
     _logger.info('%s: %s started %s', operation, step, _format_log_fields(fields))
     timing_details = dict(fields)
+    if session_id is not None:
+        timing_details['session_id'] = session_id
     with timing_scope(
         f'{operation}: {step} completed',
         details=timing_details,
+        session_id=session_id,
     ) as timing_node:
         try:
             yield details
@@ -434,8 +443,13 @@ def submit_infinity_guess(
             with _logged_step(
                 operation,
                 'match_guess',
+                session_id=int(daily_session.SessionId),
                 infinity_session_id=infinity_session_id,
                 round_number=round_number,
+                guess_text=guess_text,
+                ranked_city_count=len(ranked_cities),
+                confirmed_city_id=confirmed_city_id,
+                has_nearby_exact_match=nearby_exact_match is not None,
             ) as details:
                 result = resolve_city_guess(
                     ranked_cities,

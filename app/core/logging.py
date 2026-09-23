@@ -24,6 +24,7 @@ class TimingNode:
     event_name: str
     duration_milliseconds: float = 0.0
     details: dict | None = None
+    session_id: int | None = None
     children: list['TimingNode'] = field(default_factory=list)
 
 
@@ -70,6 +71,7 @@ def _write_slow_event(
     event_name: str,
     duration_milliseconds: float,
     details: dict | None,
+    session_id: int | None,
 ) -> None:
     with get_conn(for_logging=True) as conn:
         cur = conn.cursor()
@@ -79,15 +81,17 @@ def _write_slow_event(
                 OccurredAtUtc,
                 EventName,
                 DurationMilliseconds,
-                DetailsJson
+                DetailsJson,
+                SessionId
             )
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             """,
             (
                 datetime.now(timezone.utc),
                 event_name,
                 duration_milliseconds,
                 json.dumps(details, ensure_ascii=False),
+                session_id,
             ),
         )
         conn.commit()
@@ -98,6 +102,7 @@ def _persist_slow_event(
     event_name: str,
     duration_milliseconds: float,
     details: dict | None,
+    session_id: int | None,
 ) -> None:
     if _is_local() or duration_milliseconds <= SLOW_EVENT_THRESHOLD_MILLISECONDS:
         return
@@ -106,6 +111,7 @@ def _persist_slow_event(
             event_name=event_name,
             duration_milliseconds=duration_milliseconds,
             details=details,
+            session_id=session_id,
         )
     except Exception:
         _logger.exception('Failed to write slow event to database: %s', event_name)
@@ -133,6 +139,8 @@ def _timing_details(node: TimingNode) -> dict | None:
 def _record_timing(node: TimingNode, level: int, *, emit_log: bool) -> None:
     stack = _timing_stack.get()
     if stack:
+        if node.session_id is None:
+            node.session_id = stack[-1].session_id
         stack[-1].children.append(node)
     details = _timing_details(node)
     if emit_log:
@@ -147,6 +155,7 @@ def _record_timing(node: TimingNode, level: int, *, emit_log: bool) -> None:
         event_name=node.event_name,
         duration_milliseconds=node.duration_milliseconds,
         details=details,
+        session_id=node.session_id,
     )
 
 
@@ -156,9 +165,16 @@ def timing_scope(
     *,
     details: dict | None = None,
     level: int = logging.INFO,
+    session_id: int | None = None,
 ):
-    node = TimingNode(event_name=event_name, details=details)
     stack = _timing_stack.get()
+    if session_id is None and stack:
+        session_id = stack[-1].session_id
+    node = TimingNode(
+        event_name=event_name,
+        details=details,
+        session_id=session_id,
+    )
     token = _timing_stack.set((*stack, node))
     started_at = perf_counter()
     try:
