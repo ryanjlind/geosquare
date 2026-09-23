@@ -35,8 +35,6 @@ export async function initCesium() {
                     y: error?.y,
                     level: error?.level,
                     tileUrl,
-                    errorProperties: { ...error },
-                    providerErrorProperties: error?.error ? { ...error.error } : null,
                     providerErrorMessage: error?.error?.message,
                     providerErrorStack: error?.error?.stack,
                     resourceTimings,
