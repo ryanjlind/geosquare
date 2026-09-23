@@ -613,8 +613,10 @@ async function submitGuess(revealedCity = null, confirmedCityId = null) {
     const button = document.getElementById('guessBtn');
     const isReveal = revealedCity !== null;
     const guess = isReveal ? '' : input.value.trim();
-    input.disabled = true;
-    button.disabled = true;
+    if (!isReveal) {
+        input.disabled = true;
+        button.disabled = true;
+    }
     console.info('pool_guess: started', {
         mode: infinityState.mode,
         round: infinityState.currentRound,
@@ -768,12 +770,11 @@ async function submitGuess(revealedCity = null, confirmedCityId = null) {
         });
         throw error;
     } finally {
-        input.disabled = false;
-        button.disabled = false;
         if (isReveal) {
             renderInfinityMeta();
-        }
-        if (!isReveal) {
+        } else {
+            input.disabled = false;
+            button.disabled = false;
             input.focus();
         }
     }

@@ -125,7 +125,7 @@ import { gameState } from '@geosquare/state.js';
             const totalPoints = document.getElementById('totalPoints');
             const meta = document.getElementById('meta');
 
-            if (mobileRoundStat) {
+            if (mobileRoundStat && !document.body.classList.contains('infinity-mode')) {
                 mobileRoundStat.textContent = String(gameState.currentRound);
             }
 
