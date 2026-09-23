@@ -238,7 +238,35 @@ class AnswerHasCitiesInEveryDirection:
 			city for city in context.cities
 			if int(city['city_id']) != int(context.answer['city_id'])
 		)
-		return len(_match_compass_directions(context.answer, cities)) == 4
+		directional_populations = {
+			'north': sum(
+				int(city['population'])
+				for city in cities
+				if city['latitude'] > context.answer['latitude']
+			),
+			'south': sum(
+				int(city['population'])
+				for city in cities
+				if city['latitude'] < context.answer['latitude']
+			),
+			'east': sum(
+				int(city['population'])
+				for city in cities
+				if city['longitude'] > context.answer['longitude']
+			),
+			'west': sum(
+				int(city['population'])
+				for city in cities
+				if city['longitude'] < context.answer['longitude']
+			),
+		}
+		return (
+			len(_match_compass_directions(context.answer, cities)) == 4
+			and all(
+				population > NAME_CHAIN_MINIMUM_STEP_POPULATION
+				for population in directional_populations.values()
+			)
+		)
 
 
 class CapitalSweepPrompt:
