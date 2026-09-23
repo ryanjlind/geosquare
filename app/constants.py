@@ -8,7 +8,6 @@ COOKIE_NAME = 'geosquare_session'
 CSRF_COOKIE_NAME = 'geosquare_csrf'
 CSRF_SALT = 'geosquare-csrf'
 LASTLOGIN_PROVIDER = 'lastlogin'
-PRODUCTION_ORIGIN = 'https://geosquare.app'
 
 # Logging
 SLOW_EVENT_THRESHOLD_MILLISECONDS = 1000

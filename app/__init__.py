@@ -38,6 +38,7 @@ def create_app() -> Flask:
         static_folder='static',
     )
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+    app.config['CSRF_ORIGIN'] = os.environ['CSRF_ORIGIN'].rstrip('/')
 
     logging.basicConfig(
         level=logging.INFO,
