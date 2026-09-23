@@ -13,6 +13,8 @@
     {% block pre_importmap_scripts %}{% endblock %}
     <script type="importmap">{{ {'imports': js_import_map()}|tojson }}</script>
     {% block scripts %}{% endblock %}
+    {% if request.host == 'geosquare.app' %}
     <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"91c4280685324ce9b8fedaa9fc862b58"}'></script>
+    {% endif %}
 </body>
 </html>
