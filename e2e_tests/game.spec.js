@@ -298,6 +298,52 @@ async function submitInfinityCandidate(
   return response.json();
 }
 
+async function revealLargestUnnamedCity(
+  page,
+  roundNumber,
+  infinityPoolSessionId,
+  dailyAnswerCityId,
+  projectName,
+) {
+  progress(projectName, `Infinity Pool square ${roundNumber}: revealing largest unnamed city`);
+  const revealControl = projectName === 'webkit-mobile'
+    ? page.locator('#mobileInfinityLargestUnnamed')
+    : page.locator('#infinityLargestUnnamed');
+  await expect(revealControl).toBeVisible();
+  await expect(revealControl).toHaveClass(/can-reveal/);
+  const initialChipCount = await page.locator('#infinityChips .infinity-chip').count();
+  const initialRoundScore = await page.locator('#infinityRoundScore').textContent();
+  const initialTotalScore = await page.locator('#infinityTotalScore').textContent();
+  const responsePromise = page.waitForResponse((response) => (
+    response.url().endsWith('/api/infinity-guess')
+    && response.request().method() === 'POST'
+  ));
+
+  await revealControl.click();
+  const response = await responsePromise;
+  const requestBody = response.request().postDataJSON();
+  expect(requestBody).toEqual({
+    guess: '',
+    round_number: roundNumber,
+    reveal_city_id: expect.any(Number),
+    infinity_pool_session_id: infinityPoolSessionId,
+  });
+  expect(requestBody.reveal_city_id).not.toBe(dailyAnswerCityId);
+  expect(response.ok()).toBe(true);
+  const result = await response.json();
+  expect(result.correct).toBe(true);
+  expect(result.duplicate).toBe(false);
+  expect(result.guesses).toHaveLength(1);
+  expect(result.guesses[0].city_id).toBe(requestBody.reveal_city_id);
+  expect(result.guesses[0].score).toBe(0);
+  await expect(page.locator('#infinityChips .infinity-chip')).toHaveCount(initialChipCount + 1);
+  await expect(page.locator('#infinityRoundScore')).toHaveText(initialRoundScore);
+  await expect(page.locator('#infinityTotalScore')).toHaveText(initialTotalScore);
+  await expect(page.locator('#guessFeedback')).toContainText(`${result.guesses[0].city} revealed`);
+  progress(projectName, `Infinity Pool square ${roundNumber}: reveal completed`);
+  return result;
+}
+
 async function completeSideMission(
   page,
   assignment,
@@ -568,6 +614,14 @@ test('completes and resumes a five-round game', async ({ page }, testInfo) => {
     infinityResult.total_score.toLocaleString('en-US'),
   );
   progress(projectName, 'Infinity Pool duplicate left scores unchanged');
+
+  latestResult = await revealLargestUnnamedCity(
+    page,
+    2,
+    infinityState.infinity_pool_session_id,
+    SIDE_MISSIONS_BY_ROUND[2].daily_answer.city_id,
+    projectName,
+  );
 
   await selectInfinityRound(
     page,

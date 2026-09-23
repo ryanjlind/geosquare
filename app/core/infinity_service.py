@@ -404,25 +404,58 @@ def submit_infinity_guess(
         ) as details:
             ranked_cities = get_square_cities(cur, square_id)
             details['city_count'] = len(ranked_cities)
+        original_answer_city_id = get_original_answer_city_id(
+            cur,
+            daily_session,
+            infinity_session_id,
+            round_number,
+        )
+        with _logged_step(
+            operation,
+            'load_guessed_city_ids',
+            infinity_session_id=infinity_session_id,
+            round_number=round_number,
+        ):
+            duplicate_city_ids = get_infinity_guess_city_ids(
+                cur,
+                infinity_session_id,
+                round_number,
+            )
 
         if is_reveal:
             reveal_city_id = int(payload['reveal_city_id'])
-            guessed_city_ids = {
-                int(guess.CityId)
-                for guess in get_infinity_guesses(cur, infinity_session_id)
-                if int(guess.RoundNumber) == round_number
-            }
+            guessed_city_ids = set(duplicate_city_ids)
+            if original_answer_city_id is not None:
+                guessed_city_ids.add(original_answer_city_id)
             unnamed_cities = [
                 city for city in ranked_cities
                 if int(city.CityId) not in guessed_city_ids
             ]
+            expected_reveal_city = unnamed_cities[0] if unnamed_cities else None
             matched_rows = [
                 city for city in unnamed_cities
                 if int(city.CityId) == reveal_city_id
             ]
+            _logger.info(
+                '%s: reveal validation infinity_session_id=%s round_number=%s '
+                'client_expected_city_id=%s server_expected_city_id=%s '
+                'server_expected_city_name=%s server_expected_population=%s '
+                'daily_answer_city_id=%s infinity_guess_count=%s ranked_city_count=%s',
+                operation,
+                infinity_session_id,
+                round_number,
+                reveal_city_id,
+                int(expected_reveal_city.CityId) if expected_reveal_city else None,
+                expected_reveal_city.CityName if expected_reveal_city else None,
+                int(expected_reveal_city.Population) if expected_reveal_city else None,
+                original_answer_city_id,
+                len(duplicate_city_ids),
+                len(ranked_cities),
+            )
             if (
                 not matched_rows
-                or int(matched_rows[0].Population) != int(unnamed_cities[0].Population)
+                or expected_reveal_city is None
+                or int(matched_rows[0].Population) != int(expected_reveal_city.Population)
             ):
                 return {'error': 'Reveal city must be the largest unnamed city.'}, 409
         else:
@@ -492,24 +525,6 @@ def submit_infinity_guess(
 
         added_guesses = []
         duplicate_cities = []
-        original_answer_city_id = get_original_answer_city_id(
-            cur,
-            daily_session,
-            infinity_session_id,
-            round_number,
-        )
-        with _logged_step(
-            operation,
-            'check_duplicates',
-            candidate_count=len(matched_rows),
-            infinity_session_id=infinity_session_id,
-            round_number=round_number,
-        ):
-            duplicate_city_ids = get_infinity_guess_city_ids(
-                cur,
-                infinity_session_id,
-                round_number,
-            )
         guesses_to_insert = []
         for matched in matched_rows:
             city_id = int(matched.CityId)

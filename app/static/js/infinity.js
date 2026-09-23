@@ -621,6 +621,9 @@ async function submitGuess(revealedCity = null, confirmedCityId = null) {
         mode: infinityState.mode,
         round: infinityState.currentRound,
         confirmedCityId,
+        clientExpectedRevealCityId: isReveal ? revealedCity.city_id : null,
+        clientExpectedRevealCityName: isReveal ? revealedCity.city_name : null,
+        clientExpectedRevealCityPopulation: isReveal ? revealedCity.population : null,
     });
     try {
         const { response, data } = await submitInfinityGuessRequest(
@@ -765,6 +768,9 @@ async function submitGuess(revealedCity = null, confirmedCityId = null) {
         console.error('pool_guess: failed', {
             mode: infinityState.mode,
             round: infinityState.currentRound,
+            clientExpectedRevealCityId: isReveal ? revealedCity.city_id : null,
+            clientExpectedRevealCityName: isReveal ? revealedCity.city_name : null,
+            clientExpectedRevealCityPopulation: isReveal ? revealedCity.population : null,
             elapsedMs: performance.now() - startedAt,
             error,
         });
