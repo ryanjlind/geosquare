@@ -1,7 +1,7 @@
 import { postClientLog, postRateLimitedClientError, numberFmt } from '@geosquare/utils.js';
 import { collectDiagnostics } from '@geosquare/feedback.js';
 import { gameState } from '@geosquare/state.js';
-import { expandSquareRequest } from '@geosquare/api.js';
+import { ApiResponseError, expandSquareRequest } from '@geosquare/api.js';
 
 let expansionEntity = null;
 let currentBounds = null;
@@ -506,7 +506,10 @@ export async function handleExpand() {
         const { response, data } = await expandSquareRequest(roundNumber);
 
         if (!response.ok) {
-            throw new Error(data?.error || 'Expand request failed');
+            throw new ApiResponseError(
+                response,
+                data?.error || 'Expand request failed',
+            );
         }
 
         if (!data || !data.square_id || !data.bounds) {

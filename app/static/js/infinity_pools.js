@@ -1,5 +1,5 @@
-import { fetchJson } from '@geosquare/api.js';
-import { numberFmt } from '@geosquare/utils.js';
+import { ApiResponseError, fetchJson } from '@geosquare/api.js';
+import { numberFmt, postCaughtClientError } from '@geosquare/utils.js';
 
 
 function formatDate(dateString) {
@@ -79,7 +79,10 @@ async function loadInfinityPools() {
     const { response, data } = await fetchJson('/api/profile/infinity-pools');
 
     if (!response.ok) {
-        throw new Error(data.error || 'Unable to load Infinity Pools.');
+        throw new ApiResponseError(
+            response,
+            data.error || 'Unable to load Infinity Pools.',
+        );
     }
 
     if (!data.pools.length) {
@@ -93,6 +96,7 @@ async function loadInfinityPools() {
 }
 
 
-loadInfinityPools().catch(error => {
+loadInfinityPools().catch(async error => {
     document.getElementById('infinityPoolsStatus').textContent = error.message;
+    await postCaughtClientError('infinity_pools_load_error', error, {});
 });

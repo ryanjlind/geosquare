@@ -1,6 +1,6 @@
-import { fetchGameState, fetchPlayerStats, fetchJson } from '@geosquare/api.js';
+import { ApiResponseError, fetchGameState, fetchPlayerStats, fetchJson } from '@geosquare/api.js';
 import { gameState } from '@geosquare/state.js';
-import { escapeHtml, numberFmt, ordinal, parseFormattedInt } from '@geosquare/utils.js';
+import { escapeHtml, numberFmt, ordinal, parseFormattedInt, postCaughtClientError } from '@geosquare/utils.js';
 
 const SHARE_FORMAT_DETAILED = 'detailed';
 const SHARE_FORMAT_DISCORD = 'discord';
@@ -482,8 +482,9 @@ async function copySelectedShareText() {
         if (shareStatus) {
             shareStatus.textContent = 'Copied';
         }
-    } catch (_error) {
+    } catch (error) {
         modalStatus.textContent = 'Copy failed';
+        await postCaughtClientError('clipboard_copy_error', error, {});
         return;
     }
 
@@ -705,7 +706,10 @@ export function renderEndGameFeedbackFromState(state) {
 export async function showEndGameSummary() {
     const { response, data: state } = await fetchGameState();
     if (!response.ok) {
-        throw new Error(state?.error || 'Failed to fetch game state.');
+        throw new ApiResponseError(
+            response,
+            state?.error || 'Failed to fetch game state.',
+        );
     }
 
     const rounds = buildRoundsFromState(state);

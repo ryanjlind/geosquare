@@ -1,6 +1,16 @@
 const CSRF_COOKIE_NAME = 'geosquare_csrf';
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+
+export class ApiResponseError extends Error {
+    constructor(response, message) {
+        super(message);
+        this.name = 'ApiResponseError';
+        this.httpStatus = response.status;
+        this.clientErrorReported = response.status >= 500;
+    }
+}
+
 function getCookie(name) {
     const prefix = `${encodeURIComponent(name)}=`;
     const cookie = document.cookie
@@ -9,19 +19,46 @@ function getCookie(name) {
     return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null;
 }
 
-export function fetchWithCsrf(url, options = {}) {
+export async function fetchWithCsrf(url, options = {}) {
     const method = (options.method || 'GET').toUpperCase();
-    if (!UNSAFE_METHODS.has(method)) {
-        return fetch(url, options);
+    let requestOptions = options;
+    if (UNSAFE_METHODS.has(method)) {
+        const headers = new Headers(options.headers);
+        const csrfToken = getCookie(CSRF_COOKIE_NAME);
+        if (csrfToken !== null) {
+            headers.set('X-CSRF-Token', csrfToken);
+        }
+        requestOptions = { ...options, headers };
     }
 
-    const headers = new Headers(options.headers);
-    const csrfToken = getCookie(CSRF_COOKIE_NAME);
-    if (csrfToken !== null) {
-        headers.set('X-CSRF-Token', csrfToken);
+    let response;
+    try {
+        response = await fetch(url, requestOptions);
+    } catch (error) {
+        await window.GeoSquareBrowserErrors.postRateLimitedClientError('api_network_error', {
+            message: `${method} ${String(url)} failed: ${String(error)}`,
+            method,
+            request_url: String(url),
+            error_name: error instanceof Error ? error.name : null,
+            stack: error instanceof Error ? error.stack : null,
+        });
+        if (error instanceof Error) {
+            error.clientErrorReported = true;
+        }
+        throw error;
     }
 
-    return fetch(url, { ...options, headers });
+    if (response.status >= 500) {
+        await window.GeoSquareBrowserErrors.postRateLimitedClientError('api_server_error', {
+            message: `${method} ${String(url)} returned ${response.status}`,
+            method,
+            request_url: String(url),
+            status: response.status,
+            status_text: response.statusText,
+        });
+    }
+
+    return response;
 }
 
 export async function fetchJson(url, options = {}) {
@@ -44,7 +81,10 @@ export async function fetchAllDailySquares() {
     const { response, data } = await fetchJson('/api/all-daily-squares');
 
     if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch all daily squares.');
+        throw new ApiResponseError(
+            response,
+            data.error || 'Failed to fetch all daily squares.',
+        );
     }
 
     return data.rounds;

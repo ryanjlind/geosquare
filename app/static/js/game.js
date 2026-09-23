@@ -1,6 +1,6 @@
 import { gameState } from '@geosquare/state.js';
-import { postClientLog, escapeHtml, numberFmt, ordinal } from '@geosquare/utils.js';
-import { fetchGameState, fetchRound, fetchAllDailySquares, submitGuessRequest, submitPassRequest } from '@geosquare/api.js';
+import { postCaughtClientError, escapeHtml, numberFmt, ordinal } from '@geosquare/utils.js';
+import { ApiResponseError, fetchGameState, fetchRound, fetchAllDailySquares, submitGuessRequest, submitPassRequest } from '@geosquare/api.js';
 import { getSfxCtx, playSuccess, playFail, playComplete, playPerfect } from '@geosquare/audio.js';
 import {
     initCesium,
@@ -74,7 +74,10 @@ async function enterEndGameGlobe() {
     gameState.gameCompleted = true;
     const { response, data } = await fetchGameState();
     if (!response.ok) {
-        throw new Error(data.error || 'Failed to refresh post-game availability.');
+        throw new ApiResponseError(
+            response,
+            data.error || 'Failed to refresh post-game availability.',
+        );
     }
     Object.assign(gameState, data);
     unlockInfinityMode(data.side_missions);
@@ -283,10 +286,8 @@ export async function submitGuess(confirmedCityId = null) {
 
         playFail();
     } catch (err) {
-        await postClientLog('submit_guess_error', {
+        await postCaughtClientError('submit_guess_error', err, {
             round: gameState.currentRound,
-            message: err?.message,
-            stack: err?.stack
         });
         throw err;
     } finally {

@@ -1,4 +1,5 @@
 import {
+    ApiResponseError,
     fetchInfinityState,
     selectInfinityRoundRequest,
     startSideMissionsRequest,
@@ -6,7 +7,7 @@ import {
 } from '@geosquare/api.js';
 import { playFail, playSuccess } from '@geosquare/audio.js';
 import { drawCities, renderRoundMap, showIncorrectGuessedCity } from '@geosquare/map.js';
-import { escapeHtml, numberFmt } from '@geosquare/utils.js';
+import { escapeHtml, numberFmt, postCaughtClientError } from '@geosquare/utils.js';
 
 
 const SIDE_MISSION_ACKNOWLEDGEMENT_MS = 2500;
@@ -548,7 +549,7 @@ async function selectRound(roundNumber) {
             infinityState.poolSessionId,
         );
         if (!response.ok) {
-            throw new Error(data.error);
+            throw new ApiResponseError(response, data.error);
         }
         validateRoundResponse(data);
         infinityState.currentRound = data.current_round;
@@ -628,7 +629,7 @@ async function submitGuess(revealedCity = null, confirmedCityId = null) {
             confirmedCityId,
         );
         if (!response.ok) {
-            throw new Error(data.error);
+            throw new ApiResponseError(response, data.error);
         }
         validateSubmitResponse(data);
         if (data.requires_confirmation === true) {
@@ -782,7 +783,7 @@ export async function enterInfinityMode(poolSessionId = null, requestedRound = n
     console.info('infinity_mode: started', { poolSessionId, requestedRound });
     const { response, data } = await fetchInfinityState(poolSessionId);
     if (!response.ok) {
-        throw new Error(data.error);
+        throw new ApiResponseError(response, data.error);
     }
     validateInfinityStateResponse(data);
     document.getElementById('statsOverlay').style.display = 'none';
@@ -821,7 +822,7 @@ async function startSideMissions() {
     try {
         const { response: startResponse, data: startData } = await startSideMissionsRequest();
         if (!startResponse.ok) {
-            throw new Error(startData.error);
+            throw new ApiResponseError(startResponse, startData.error);
         }
         requireInteger(
             startData.infinity_pool_session_id,
@@ -868,6 +869,9 @@ async function handleEnterInfinityClick() {
             elapsedMs: performance.now() - startedAt,
             error,
         });
+        await postCaughtClientError('infinity_mode_error', error, {
+            elapsed_ms: performance.now() - startedAt,
+        });
     }
 }
 
@@ -891,8 +895,12 @@ function setSideMissionAvailability(availability) {
 
 
 function handleEnterSideMissionsClick() {
-    startSideMissions().catch(error => {
+    startSideMissions().catch(async error => {
         console.error('Side Missions mode failed:', error);
+        await postCaughtClientError('side_missions_error', error, {
+            infinity_pool_session_id: infinityState.poolSessionId,
+            round: infinityState.currentRound,
+        });
     });
 }
 
@@ -966,8 +974,12 @@ export function initInfinityMode(dailyCompleted, sideMissionAvailability, callba
         enterInfinityMode(
             poolSessionId,
             Number.isInteger(requestedRound) ? requestedRound : null,
-        ).catch(error => {
+        ).catch(async error => {
             console.error('Infinity mode failed:', error);
+            await postCaughtClientError('infinity_mode_error', error, {
+                infinity_pool_session_id: poolSessionId,
+                requested_round: Number.isInteger(requestedRound) ? requestedRound : null,
+            });
         });
     }
 }

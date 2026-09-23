@@ -1,4 +1,5 @@
 import { fetchWithCsrf } from '@geosquare/api.js';
+import { postCaughtClientError } from '@geosquare/utils.js';
 
 async function collectUserAgentData() {
     if (!navigator.userAgentData) {
@@ -15,6 +16,7 @@ async function collectUserAgentData() {
             'wow64',
         ]);
     } catch (error) {
+        await postCaughtClientError('user_agent_data_error', error, {});
         return {
             error: error?.message,
         };
@@ -163,6 +165,7 @@ export function initFeedback() {
             try {
                 formData.append('diagnostics', JSON.stringify(await collectDiagnostics()));
             } catch (error) {
+                await postCaughtClientError('diagnostics_collection_error', error, {});
                 formData.append('diagnostics', JSON.stringify({
                     collectionError: error?.message || String(error),
                 }));

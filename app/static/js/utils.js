@@ -1,4 +1,8 @@
-import { fetchWithCsrf } from '@geosquare/api.js';
+export const postClientLog = (...args) => window.GeoSquareBrowserErrors.postClientLog(...args);
+export const postRateLimitedClientError = (...args) =>
+    window.GeoSquareBrowserErrors.postRateLimitedClientError(...args);
+export const postCaughtClientError = (...args) =>
+    window.GeoSquareBrowserErrors.postCaughtClientError(...args);
 
 export function fmt(v) {
     return Number(v).toFixed(2);
@@ -90,53 +94,4 @@ export function parseFormattedInt(value) {
         throw new Error(`Invalid integer: ${value}`);
     }
     return parsed;
-}
-
-export async function postClientLog(eventType, details) {
-    try {
-        await fetchWithCsrf('/api/client-log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                event_type: eventType,
-                url: window.location.href,
-                user_agent: navigator.userAgent,
-                details: details
-            })
-        });
-    } catch (err) {
-        console.error('Failed to send client log', err);
-    }
-}
-
-const clientErrorReports = new Map();
-const CLIENT_ERROR_REPORT_INTERVAL_MS = 60_000;
-
-export async function postRateLimitedClientError(eventType, details) {
-    if (!details || typeof details.message !== 'string') {
-        throw new TypeError('Client error details.message must be a string.');
-    }
-    const message = details.message;
-    const key = `${eventType}:${message}`;
-    const now = Date.now();
-    const previous = clientErrorReports.get(key);
-
-    if (previous && now - previous.lastReportedAt < CLIENT_ERROR_REPORT_INTERVAL_MS) {
-        previous.suppressedCount += 1;
-        return;
-    }
-
-    let suppressedCount = 0;
-    if (previous) {
-        suppressedCount = previous.suppressedCount;
-    }
-    clientErrorReports.set(key, {
-        lastReportedAt: now,
-        suppressedCount: 0,
-    });
-
-    await postClientLog(eventType, {
-        ...details,
-        suppressed_count_since_last_report: suppressedCount,
-    });
 }

@@ -1,5 +1,5 @@
-import { numberFmt, abbreviateNumber, abbreviatePopulationForDisplay, escapeHtml } from '@geosquare/utils.js';
-import { fetchJson } from '@geosquare/api.js';
+import { numberFmt, abbreviateNumber, abbreviatePopulationForDisplay, escapeHtml, postCaughtClientError } from '@geosquare/utils.js';
+import { ApiResponseError, fetchJson } from '@geosquare/api.js';
 
 let historyOffset = 0;
 let historyHasMore = false;
@@ -314,8 +314,9 @@ async function loadProfile() {
     renderProfile(data);
 }
 
-loadProfile().catch(() => {
+loadProfile().catch(async error => {
     renderNoProfile();
+    await postCaughtClientError('profile_load_error', error, {});
 });
 
 function wireAuthButtons(user) {
@@ -363,7 +364,10 @@ function wireRegionRowToggle() {
                 `/api/profile/region-details?region=${encodeURIComponent(region)}`
             );
             if (!response.ok) {
-                throw new Error(`Unable to load classification detail for ${region}.`);
+                throw new ApiResponseError(
+                    response,
+                    `Unable to load classification detail for ${region}.`,
+                );
             }
 
             detailRow.innerHTML = renderRegionDetailTable(data.region_classification_details);
