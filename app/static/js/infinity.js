@@ -773,7 +773,9 @@ async function submitGuess(revealedCity = null, confirmedCityId = null) {
         if (isReveal) {
             renderInfinityMeta();
         }
-        input.focus();
+        if (!isReveal) {
+            input.focus();
+        }
     }
 }
 

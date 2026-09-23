@@ -47,7 +47,10 @@ function shouldReportError(value) {
 
 
 function resourceUrl(target) {
-    if (target instanceof HTMLScriptElement || target instanceof HTMLImageElement) {
+    if (target instanceof HTMLScriptElement) {
+        return target.src;
+    }
+    if (target instanceof HTMLImageElement) {
         return target.currentSrc;
     }
     if (target instanceof HTMLLinkElement) {
