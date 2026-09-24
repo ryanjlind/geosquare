@@ -27,7 +27,8 @@ export async function initCesium() {
                     responseStatus: entry.responseStatus,
                 }));
                 postRateLimitedClientError('arcgis_provider_error', {
-                    message: error?.message,
+                    message: 'ArcGIS imagery tile request failed',
+                    providerMessage: error?.message,
                     name: error?.name,
                     timesRetried: error?.timesRetried,
                     retry: error?.retry,
