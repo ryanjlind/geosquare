@@ -89,8 +89,8 @@ def _get_reveal_cities_for_squares(cur, square_ids, excluded_cities) -> dict[int
     timing(
         '_get_reveal_cities_for_squares',
         (perf_counter() - started_at) * 1000.0,
-        details={
-            'square_count': len(square_ids),
+        workload={'square_count': len(square_ids)},
+        outcome={
             'reveal_count': sum(len(items) for items in reveals.values()),
         },
     )
@@ -272,7 +272,8 @@ def _get_all_daily_square_data(cur, session) -> dict[int, dict]:
     timing(
         '_get_all_daily_square_data',
         (perf_counter() - started_at) * 1000.0,
-        details={'session_id': int(session.SessionId), 'round_count': len(results)},
+        inputs={'session_id': int(session.SessionId)},
+        outcome={'round_count': len(results)},
     )
     return results
 
@@ -478,15 +479,14 @@ def get_game_state_payload(user_id: int, session_id: int | None):
         if session is None:
             return {"error": "No game found for today."}, 404
 
-        completed_details = {}
         with timing_scope(
             'get_game_state_payload.completed_rounds',
-            details=completed_details,
-        ):
+            inputs={'session_id': int(session.SessionId)},
+        ) as timing:
             completed = map_completed_rounds(
                 get_completed_round_rows(cur, int(session.SessionId))
             )
-            completed_details['count'] = len(completed)
+            timing.outcome['completed_round_count'] = len(completed)
 
         with timing_scope('get_game_state_payload.mapping'):
             result = map_game_state(session, completed, is_authenticated, username)
@@ -706,7 +706,12 @@ def get_all_daily_square_data(user_id: int, session_id: int | None):
         for round_number, base, guess, reveal_square_id, _ in round_data:
             with timing_scope(
                 'get_all_daily_square_data.round',
-                details={'round_number': round_number},
+                inputs={'round_number': round_number},
+                workload={
+                    'reveal_city_count': len(
+                        reveal_cities_by_square[reveal_square_id]
+                    ),
+                },
             ):
                 reveal_cities = reveal_cities_by_square[reveal_square_id]
                 rounds.append({

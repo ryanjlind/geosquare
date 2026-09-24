@@ -303,7 +303,8 @@ def get_completed_round_rows(cur, session_id: int):
     timing(
         'get_completed_round_rows',
         (perf_counter() - started_at) * 1000.0,
-        details={'session_id': session_id, 'row_count': len(rows)},
+        inputs={'session_id': session_id},
+        outcome={'row_count': len(rows)},
         level=logging.DEBUG,
     )
     return rows

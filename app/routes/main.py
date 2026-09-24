@@ -107,30 +107,34 @@ def all_daily_squares():
 
 @main_bp.route("/api/game-state")
 def game_state():
-    total_details = {}
-    with timing_scope('game_state.total', details=total_details):
+    with timing_scope('game_state.total') as total_timing:
         with timing_scope('game_state.identity'):
             identity = resolve_request_identity()
 
         try:
-            payload_details = {}
             with timing_scope(
                 'game_state.get_game_state_payload',
-                details=payload_details,
-            ):
+                inputs={
+                    'user_id': identity['user_id'],
+                    'session_id': identity['session_id'],
+                },
+            ) as payload_timing:
                 body, status = get_game_state_payload(
                     identity["user_id"],
                     identity["session_id"],
                 )
-                payload_details['status'] = status
+                payload_timing.outcome['status'] = status
         except Exception:
             log_exception('game_state: exception in get_game_state_payload')
             raise
 
-        with timing_scope('game_state.response', details={'status': status}):
+        with timing_scope(
+            'game_state.response',
+            inputs={'status': status},
+        ):
             resp = jsonify(body)
             resp.status_code = status
-        total_details['status'] = status
+        total_timing.outcome['status'] = status
 
     return attach_request_session_cookie(resp, identity["user_id"], identity["session_id"])
 

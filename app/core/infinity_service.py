@@ -51,18 +51,14 @@ def _logged_step(
     session_id: int | None = None,
     **fields,
 ):
-    details = {}
     _logger.info('%s: %s started %s', operation, step, _format_log_fields(fields))
-    timing_details = dict(fields)
-    if session_id is not None:
-        timing_details['session_id'] = session_id
     with timing_scope(
         f'{operation}: {step} completed',
-        details=timing_details,
+        inputs=fields,
         session_id=session_id,
     ) as timing_node:
         try:
-            yield details
+            yield timing_node.outcome
         except Exception:
             timing_node.event_name = f'{operation}: {step} failed'
             _logger.exception(
@@ -72,7 +68,6 @@ def _logged_step(
                 _format_log_fields(fields),
             )
             raise
-        timing_details.update(details)
 
 
 def _require_round_number(round_number: int) -> None:

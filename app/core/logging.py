@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from time import perf_counter
 
+from flask import g, has_request_context, request
+
 from app.constants import DEVELOPMENT_ENVIRONMENT, SLOW_EVENT_THRESHOLD_MILLISECONDS
 from app.core.db import get_conn
 
@@ -21,12 +23,42 @@ _timing_stack: ContextVar[tuple['TimingNode', ...]] = ContextVar(
 
 
 @dataclass
+class TimingDiagnostics:
+    inputs: dict = field(default_factory=dict)
+    workload: dict = field(default_factory=dict)
+    outcome: dict = field(default_factory=dict)
+    expected: dict = field(default_factory=dict)
+    actual: dict = field(default_factory=dict)
+    failure: dict = field(default_factory=dict)
+
+
+@dataclass
 class TimingNode:
     event_name: str
     duration_milliseconds: float = 0.0
-    details: dict | None = None
+    diagnostics: TimingDiagnostics = field(default_factory=TimingDiagnostics)
     session_id: int | None = None
     children: list['TimingNode'] = field(default_factory=list)
+
+    @property
+    def inputs(self) -> dict:
+        return self.diagnostics.inputs
+
+    @property
+    def workload(self) -> dict:
+        return self.diagnostics.workload
+
+    @property
+    def outcome(self) -> dict:
+        return self.diagnostics.outcome
+
+    @property
+    def expected(self) -> dict:
+        return self.diagnostics.expected
+
+    @property
+    def actual(self) -> dict:
+        return self.diagnostics.actual
 
 
 def _is_local() -> bool:
@@ -164,11 +196,36 @@ def _persist_slow_event(
         _logger.exception('Failed to write slow event to database: %s', event_name)
 
 
+def _request_details() -> dict:
+    if not has_request_context():
+        return {}
+    return {
+        'request_id': g.request_id,
+        'method': request.method,
+        'path': request.path,
+        'endpoint': request.endpoint,
+        'user_id': g.user_id,
+        'session_id': g.session_id,
+    }
+
+
+def _diagnostic_details(diagnostics: TimingDiagnostics) -> dict:
+    details = {
+        'inputs': diagnostics.inputs,
+        'workload': diagnostics.workload,
+        'outcome': diagnostics.outcome,
+    }
+    if diagnostics.expected:
+        details['expected'] = diagnostics.expected
+    if diagnostics.actual:
+        details['actual'] = diagnostics.actual
+    if diagnostics.failure:
+        details['failure'] = diagnostics.failure
+    return details
+
+
 def _timing_details(node: TimingNode) -> dict | None:
-    if node.details is None:
-        details = {}
-    else:
-        details = dict(node.details)
+    details = _diagnostic_details(node.diagnostics)
     if node.children:
         details['timings'] = [
             {
@@ -181,6 +238,48 @@ def _timing_details(node: TimingNode) -> dict | None:
     if not details:
         return None
     return details
+
+
+def _operation_timings(node: TimingNode) -> list[dict]:
+    timings = [{
+        'event_name': node.event_name,
+        'duration_milliseconds': node.duration_milliseconds,
+    }]
+    for child in node.children:
+        timings.extend(_operation_timings(child))
+    return timings
+
+
+def _persist_timing_tree(node: TimingNode, root: TimingNode) -> None:
+    request_details = _request_details()
+    operation_details = _diagnostic_details(root.diagnostics)
+    if node is root:
+        details = _timing_details(node)
+        if details is None:
+            details = {}
+        if request_details:
+            details['request'] = request_details
+    else:
+        details = {
+            'request': request_details,
+            'operation': {
+                'event_name': root.event_name,
+                **operation_details,
+            },
+            'stage': _timing_details(node),
+            'operation_timings': _operation_timings(root),
+        }
+    session_id = node.session_id
+    if session_id is None and request_details:
+        session_id = request_details['session_id']
+    _persist_slow_event(
+        event_name=node.event_name,
+        duration_milliseconds=node.duration_milliseconds,
+        details=details,
+        session_id=session_id,
+    )
+    for child in node.children:
+        _persist_timing_tree(child, root)
 
 
 def _record_timing(node: TimingNode, level: int, *, emit_log: bool) -> None:
@@ -198,34 +297,51 @@ def _record_timing(node: TimingNode, level: int, *, emit_log: bool) -> None:
             node.duration_milliseconds,
             json.dumps(details, ensure_ascii=False),
         )
-    _persist_slow_event(
-        event_name=node.event_name,
-        duration_milliseconds=node.duration_milliseconds,
-        details=details,
-        session_id=node.session_id,
-    )
+    if not stack:
+        _persist_timing_tree(node, node)
 
 
 @contextmanager
 def timing_scope(
     event_name: str,
     *,
-    details: dict | None = None,
+    inputs: dict | None = None,
+    workload: dict | None = None,
+    expected: dict | None = None,
+    actual: dict | None = None,
     level: int = logging.INFO,
     session_id: int | None = None,
 ):
     stack = _timing_stack.get()
     if session_id is None and stack:
         session_id = stack[-1].session_id
+    diagnostics = TimingDiagnostics()
+    if inputs is not None:
+        diagnostics.inputs.update(inputs)
+    if workload is not None:
+        diagnostics.workload.update(workload)
+    if expected is not None:
+        diagnostics.expected.update(expected)
+    if actual is not None:
+        diagnostics.actual.update(actual)
     node = TimingNode(
         event_name=event_name,
-        details=details,
+        diagnostics=diagnostics,
         session_id=session_id,
     )
     token = _timing_stack.set((*stack, node))
     started_at = perf_counter()
     try:
         yield node
+    except Exception as exception_value:
+        node.diagnostics.failure.update({
+            'exception_type': (
+                f'{type(exception_value).__module__}.'
+                f'{type(exception_value).__qualname__}'
+            ),
+            'message': str(exception_value),
+        })
+        raise
     finally:
         node.duration_milliseconds = (perf_counter() - started_at) * 1000.0
         _timing_stack.reset(token)
@@ -264,7 +380,10 @@ class UnifiedLogger:
             TimingNode(
                 event_name=event_name,
                 duration_milliseconds=duration_milliseconds,
-                details={'logger': self.name, 'message': rendered_message},
+                diagnostics=TimingDiagnostics(
+                    inputs={'logger': self.name},
+                    outcome={'message': rendered_message},
+                ),
             ),
             level,
             emit_log=False,
@@ -401,14 +520,29 @@ def timing(
     event_name: str,
     duration_milliseconds: float,
     *,
-    details: dict | None = None,
+    inputs: dict | None = None,
+    workload: dict | None = None,
+    outcome: dict | None = None,
+    expected: dict | None = None,
+    actual: dict | None = None,
     level: int = logging.INFO,
 ) -> None:
+    diagnostics = TimingDiagnostics()
+    if inputs is not None:
+        diagnostics.inputs.update(inputs)
+    if workload is not None:
+        diagnostics.workload.update(workload)
+    if outcome is not None:
+        diagnostics.outcome.update(outcome)
+    if expected is not None:
+        diagnostics.expected.update(expected)
+    if actual is not None:
+        diagnostics.actual.update(actual)
     _record_timing(
         TimingNode(
             event_name=event_name,
             duration_milliseconds=duration_milliseconds,
-            details=details,
+            diagnostics=diagnostics,
         ),
         level,
         emit_log=True,

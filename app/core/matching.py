@@ -275,7 +275,11 @@ def _candidate_name_options(row) -> list[tuple[str, str, str]]:
     return options
 
 
-def _score_candidate(guess_name: str, row) -> tuple[float, str, str, str, str]:
+def _score_candidate(
+    guess_name: str,
+    row,
+) -> tuple[float, str, str, str, str, int, int]:
+    name_options = _candidate_name_options(row)
     scored_options = [
         (
             score if source_type == 'canonical' or score == 100.0
@@ -285,11 +289,11 @@ def _score_candidate(guess_name: str, row) -> tuple[float, str, str, str, str]:
             source_type,
             source_name,
         )
-        for candidate_name, source_type, source_name in _candidate_name_options(row)
+        for candidate_name, source_type, source_name in name_options
         for score in [_score_name_pair(guess_name, candidate_name)]
     ]
 
-    return max(
+    best_option = max(
         scored_options,
         key=lambda option: (
             option[0],
@@ -297,6 +301,13 @@ def _score_candidate(guess_name: str, row) -> tuple[float, str, str, str, str]:
             option[2],
         ),
     )
+    canonical_token_count = len(name_options[0][0].split())
+    alternate_token_count = sum(
+        len(candidate_name.split())
+        for candidate_name, source_type, _source_name in name_options
+        if source_type == 'alternate'
+    )
+    return (*best_option, canonical_token_count, alternate_token_count)
 
 
 def _suggestion(row) -> dict:
@@ -329,18 +340,17 @@ def _nearby_intent_penalty(nearby_exact_match, current_expansion_level: int) -> 
     return distance_penalty * (notoriety_score / NEARBY_NOTORIETY_SCALE)
 
 
-def find_matching_city(
+def _find_matching_city(
     rows,
     guess_text: str,
     *,
     nearby_exact_match,
     current_expansion_level: int,
 ):
-    preparation_details = {'input_candidate_count': len(rows)}
     with timing_scope(
         'find_matching_city.prepare',
-        details=preparation_details,
-    ):
+        workload={'input_candidate_count': len(rows)},
+    ) as timing:
         guess_text = guess_text.strip()
 
         if ',' in guess_text:
@@ -354,9 +364,11 @@ def find_matching_city(
             precision_filter = None
 
         normalized_guess = normalize_place_name(guess_text)
-        preparation_details['normalized_guess'] = normalized_guess
-        preparation_details['guess_token_count'] = len(normalized_guess.split())
-        preparation_details['precision_filter'] = precision_filter
+        timing.inputs.update({
+            'guess_character_count': len(normalized_guess),
+            'guess_token_count': len(normalized_guess.split()),
+            'precision_filter': precision_filter,
+        })
 
     summary_parts = []
 
@@ -373,11 +385,11 @@ def find_matching_city(
             f'{nearby_penalty:.1f} penalty to fuzzy candidates.'
         )
 
-    filtering_details = {'precision_filter': precision_filter}
     with timing_scope(
         'find_matching_city.filter_candidates',
-        details=filtering_details,
-    ):
+        inputs={'precision_filter': precision_filter},
+        workload={'input_candidate_count': len(rows)},
+    ) as timing:
         candidate_rows = rows
         if precision_filter:
             province_filtered_rows = []
@@ -397,7 +409,7 @@ def find_matching_city(
 
             if province_filtered_rows:
                 candidate_rows = province_filtered_rows
-                filtering_details['filter_type'] = 'province'
+                timing.outcome['filter_type'] = 'province'
                 summary_parts.append(
                     f'Province filter {precision_filter} reduced the field to '
                     f'{len(candidate_rows)} candidates.'
@@ -409,47 +421,81 @@ def find_matching_city(
                     and r.CountryCode.upper() == precision_filter
                 ]
                 candidate_rows = country_filtered_rows
-                filtering_details['filter_type'] = 'country'
+                timing.outcome['filter_type'] = 'country'
                 summary_parts.append(
                     f'Country filter {precision_filter} reduced the field to '
                     f'{len(candidate_rows)} candidates.'
                 )
-        filtering_details['output_candidate_count'] = len(candidate_rows)
+        timing.outcome['output_candidate_count'] = len(candidate_rows)
 
     scored_candidates = []
-    scoring_details = {'candidate_count': len(candidate_rows)}
     with timing_scope(
         'find_matching_city.score_candidates',
-        details=scoring_details,
-    ):
+        inputs={
+            'guess_character_count': len(normalized_guess),
+            'guess_token_count': len(normalized_guess.split()),
+            'nearby_penalty_applied': nearby_exact_match is not None,
+        },
+        workload={'candidate_count': len(candidate_rows)},
+        expected={
+            'survival_score_minimum': FUZZY_LINE_SCORE,
+            'automatic_accept_score_minimum': AUTO_ACCEPT_SCORE,
+        },
+    ) as timing:
         candidate_name_count = 0
+        canonical_name_token_count = 0
+        alternate_name_count = 0
+        alternate_name_token_count = 0
+        exact_score_count = 0
         for row in candidate_rows:
             candidate_name_count += 1
             if row.AlternateNames:
-                candidate_name_count += len(row.AlternateNames.split('|||'))
+                alternate_names = row.AlternateNames.split('|||')
+                alternate_name_count += len(alternate_names)
+                candidate_name_count += len(alternate_names)
             candidate_score = _score_candidate(normalized_guess, row)
             raw_score = candidate_score[0]
             source_type = candidate_score[3]
+            canonical_name_token_count += candidate_score[5]
+            alternate_name_token_count += candidate_score[6]
+            if raw_score == 100.0:
+                exact_score_count += 1
             if raw_score == 100.0 or nearby_exact_match is None:
                 score = raw_score
             else:
                 score = max(0.0, raw_score - nearby_penalty)
             scored_candidates.append((score, row, source_type))
-        scoring_details['candidate_name_count'] = candidate_name_count
+        scores = [score for score, _row, _source_type in scored_candidates]
+        timing.workload.update({
+            'candidate_name_count': candidate_name_count,
+            'canonical_name_token_count': canonical_name_token_count,
+            'alternate_name_count': alternate_name_count,
+            'alternate_name_token_count': alternate_name_token_count,
+        })
+        timing.actual.update({
+            'minimum_score': min(scores) if scores else None,
+            'maximum_score': max(scores) if scores else None,
+            'exact_score_count': exact_score_count,
+            'surviving_score_count': sum(
+                score >= FUZZY_LINE_SCORE for score in scores
+            ),
+        })
 
-    selection_details = {'scored_candidate_count': len(scored_candidates)}
     with timing_scope(
         'find_matching_city.select_candidates',
-        details=selection_details,
-    ):
+        workload={'scored_candidate_count': len(scored_candidates)},
+        expected={'survival_score_minimum': FUZZY_LINE_SCORE},
+    ) as timing:
         surviving_candidates = [
             (score, row, source_type)
             for score, row, source_type in scored_candidates
             if score >= FUZZY_LINE_SCORE
         ]
         discarded_count = len(scored_candidates) - len(surviving_candidates)
-        selection_details['surviving_candidate_count'] = len(surviving_candidates)
-        selection_details['discarded_candidate_count'] = discarded_count
+        timing.actual.update({
+            'surviving_candidate_count': len(surviving_candidates),
+            'discarded_candidate_count': discarded_count,
+        })
 
     if not surviving_candidates:
         summary_parts.append(
@@ -481,7 +527,7 @@ def find_matching_city(
 
     with timing_scope(
         'find_matching_city.sort_candidates',
-        details={'candidate_count': len(surviving_candidates)},
+        workload={'candidate_count': len(surviving_candidates)},
     ):
         surviving_candidates.sort(
             key=lambda candidate: (
@@ -516,3 +562,35 @@ def find_matching_city(
     if nearby_exact_match is not None:
         result["nearby_exact_match"] = nearby_exact_match
     return result
+
+
+def find_matching_city(
+    rows,
+    guess_text: str,
+    *,
+    nearby_exact_match,
+    current_expansion_level: int,
+):
+    with timing_scope(
+        'find_matching_city',
+        inputs={
+            'guess_character_count': len(guess_text.strip()),
+            'nearby_exact_match_present': nearby_exact_match is not None,
+            'current_expansion_level': current_expansion_level,
+        },
+        workload={'input_candidate_count': len(rows)},
+        expected={
+            'survival_score_minimum': FUZZY_LINE_SCORE,
+            'automatic_accept_score_minimum': AUTO_ACCEPT_SCORE,
+        },
+    ) as timing:
+        result = _find_matching_city(
+            rows,
+            guess_text,
+            nearby_exact_match=nearby_exact_match,
+            current_expansion_level=current_expansion_level,
+        )
+        timing.outcome['decision'] = result['type']
+        if result['type'] == 'match':
+            timing.outcome['city_id'] = int(result['row'].CityId)
+        return result
