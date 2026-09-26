@@ -282,21 +282,12 @@ def _persist_timing_tree(node: TimingNode, root: TimingNode) -> None:
         _persist_timing_tree(child, root)
 
 
-def _record_timing(node: TimingNode, level: int, *, emit_log: bool) -> None:
+def _record_timing(node: TimingNode) -> None:
     stack = _timing_stack.get()
     if stack:
         if node.session_id is None:
             node.session_id = stack[-1].session_id
         stack[-1].children.append(node)
-    details = _timing_details(node)
-    if emit_log:
-        _logger.log(
-            level,
-            '%s elapsed_ms=%.1f details=%s',
-            node.event_name,
-            node.duration_milliseconds,
-            json.dumps(details, ensure_ascii=False),
-        )
     if not stack:
         _persist_timing_tree(node, node)
 
@@ -345,7 +336,7 @@ def timing_scope(
     finally:
         node.duration_milliseconds = (perf_counter() - started_at) * 1000.0
         _timing_stack.reset(token)
-        _record_timing(node, level, emit_log=True)
+        _record_timing(node)
 
 
 def _embedded_timing(message: str) -> tuple[str, float] | None:
@@ -384,9 +375,7 @@ class UnifiedLogger:
                     inputs={'logger': self.name},
                     outcome={'message': rendered_message},
                 ),
-            ),
-            level,
-            emit_log=False,
+            )
         )
 
     def debug(self, message: str, *args, **kwargs) -> None:
@@ -543,7 +532,5 @@ def timing(
             event_name=event_name,
             duration_milliseconds=duration_milliseconds,
             diagnostics=diagnostics,
-        ),
-        level,
-        emit_log=True,
+        )
     )
