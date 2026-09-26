@@ -67,6 +67,14 @@ export async function fetchJson(url, options = {}) {
     return { response, data };
 }
 
+export async function setChallengeModeRequest(enabled) {
+    return fetchJson('/api/challenge-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+    });
+}
+
 export async function fetchGameState() {
     const { response, data } = await fetchJson('/api/game-state');
     return { response, data };

@@ -133,13 +133,44 @@ def get_capital_city_in_bounds(cur, min_lat: float, min_lon: float, max_lat: flo
     }
 
 
-def insert_correct_guess(cur, session_round_id: int, city_name: str, population: int, score: int):
+def insert_correct_guess(
+    cur,
+    session_round_id: int,
+    matched_city_id: int,
+    city_name: str,
+    population: int,
+    score: int,
+):
     cur.execute("""
         INSERT INTO dbo.GameGuesses
-            (SessionRoundId, CityName, IsCorrect, Population, Score, GuessedAt)
+            (SessionRoundId, MatchedCityId, CityName, IsCorrect, Population, Score, GuessedAt)
         VALUES
-            (?, ?, 1, ?, ?, SYSUTCDATETIME())
-    """, session_round_id, city_name, population, score)
+            (?, ?, ?, 1, ?, ?, SYSUTCDATETIME())
+    """, session_round_id, matched_city_id, city_name, population, score)
+
+
+def get_most_recent_challenge_city_usage(cur, user_id: int, city_id: int):
+    cur.execute(
+        """
+        SELECT TOP 1 game.GameDate
+        FROM dbo.Users user_profile
+        INNER JOIN dbo.GameSessions session
+            ON session.UserId = user_profile.UserId
+        INNER JOIN dbo.GameSessionRounds session_round
+            ON session_round.SessionId = session.SessionId
+        INNER JOIN dbo.GameGuesses guess
+            ON guess.SessionRoundId = session_round.SessionRoundId
+        INNER JOIN dbo.Games game
+            ON game.GameId = session.GameId
+        WHERE user_profile.UserId = ?
+          AND user_profile.ChallengeModeEnabled = 1
+          AND guess.IsCorrect = 1
+          AND guess.MatchedCityId = ?
+        ORDER BY game.GameDate DESC, guess.GuessedAt DESC, guess.GuessId DESC
+        """,
+        (user_id, city_id),
+    )
+    return cur.fetchone()
 
 
 def increment_session_total_score(cur, session_id: int, score: int):

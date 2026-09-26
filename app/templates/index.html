@@ -57,6 +57,17 @@
                         <button id="expandBtn" type="button" class="hidden">Expand <br/><span id="penalty">(-20%)</span></button>
                         <button id="passBtn" type="button">Pass</button>
                     </div>
+                    <div id="challengeModeControl" class="challenge-mode-control hidden">
+                        <label class="challenge-mode-toggle">
+                            <span>Challenge Mode</span>
+                            <input id="challengeModeToggle" type="checkbox" role="switch">
+                            <span class="challenge-mode-track" aria-hidden="true"></span>
+                        </label>
+                        <span class="challenge-mode-help">
+                            <button id="challengeModeHelpBtn" type="button" aria-label="About Challenge Mode" aria-expanded="false" aria-describedby="challengeModeTooltip"><i class="fa-regular fa-circle-question" aria-hidden="true"></i></button>
+                            <span id="challengeModeTooltip" class="challenge-mode-tooltip" role="tooltip">Force me to name places I haven't used before.</span>
+                        </span>
+                    </div>
                 </div>
             </div>
 

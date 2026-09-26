@@ -10,6 +10,7 @@ from app.core.game_queries import (
     get_completed_round_rows,
     get_session_round,
     get_session_total_score,
+    get_most_recent_challenge_city_usage,
     get_square_cities,
     get_square_city_count,
     get_square_id_for_round,
@@ -358,6 +359,20 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None):
             return {"error": "Invalid match result."}, 500
         matched = result["row"]
 
+        prior_usage = get_most_recent_challenge_city_usage(
+            cur,
+            user_id,
+            int(matched.CityId),
+        )
+        if prior_usage is not None:
+            return {
+                "ok": True,
+                "correct": False,
+                "challenge_rejected": True,
+                "city": matched.CityName,
+                "message": f"{matched.CityName} used on {prior_usage.GameDate.isoformat()}.",
+            }, 200
+
         population = int(matched.Population)
         score = compute_score(rows, population)
         expansion_level = int(expansion_level)
@@ -372,6 +387,7 @@ def submit_guess(payload: dict, user_id: int, session_id: int | None):
         insert_correct_guess(
             cur,
             session_round_id,
+            int(matched.CityId),
             matched.CityName,
             population,
             score,
@@ -462,7 +478,7 @@ def get_game_state_payload(user_id: int, session_id: int | None):
         with timing_scope('get_game_state_payload.user_query'):
             cur.execute(
                 """
-                SELECT AuthProviderSubject, Username
+                SELECT AuthProviderSubject, Username, ChallengeModeEnabled
                 FROM Users
                 WHERE UserId = ?
                 """,
@@ -491,6 +507,7 @@ def get_game_state_payload(user_id: int, session_id: int | None):
         with timing_scope('get_game_state_payload.mapping'):
             result = map_game_state(session, completed, is_authenticated, username)
             result["game_date"] = game_date
+            result["challenge_mode_enabled"] = bool(user_row.ChallengeModeEnabled)
             result["side_missions"] = get_side_mission_availability(
                 cur,
                 session,

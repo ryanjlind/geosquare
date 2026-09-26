@@ -32,7 +32,7 @@ from app.core.session_service import (
     resolve_request_identity,
 )
 from app.core.side_missions.service import start_side_missions
-from app.core.user import is_username_available, set_username
+from app.core.user import is_username_available, set_challenge_mode, set_username
 from app.core.feedback_service import send_feedback_email
 from app.core.logging import client_event, exception as log_exception, timing_scope
 
@@ -102,6 +102,18 @@ def all_daily_squares():
 
     resp = jsonify(body)
     resp.status_code = status
+    return attach_request_session_cookie(resp, identity["user_id"], identity["session_id"])
+
+
+@main_bp.route("/api/challenge-mode", methods=["POST"])
+def challenge_mode():
+    identity = resolve_request_identity()
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or not isinstance(payload.get("enabled"), bool):
+        return jsonify({"error": "enabled must be a boolean."}), 400
+
+    set_challenge_mode(identity["user_id"], payload["enabled"])
+    resp = jsonify({"ok": True, "enabled": payload["enabled"]})
     return attach_request_session_cookie(resp, identity["user_id"], identity["session_id"])
 
 

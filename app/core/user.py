@@ -39,3 +39,13 @@ def set_username(user_id: int, username: str) -> tuple[bool, str | None]:
         conn.commit()
 
     return True, None
+
+
+def set_challenge_mode(user_id: int, enabled: bool) -> None:
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE dbo.Users SET ChallengeModeEnabled = ? WHERE UserId = ?",
+            (enabled, user_id),
+        )
+        conn.commit()

@@ -1,6 +1,6 @@
 import { gameState } from '@geosquare/state.js';
 import { postCaughtClientError, escapeHtml, numberFmt, ordinal } from '@geosquare/utils.js';
-import { ApiResponseError, fetchGameState, fetchRound, fetchAllDailySquares, submitGuessRequest, submitPassRequest } from '@geosquare/api.js';
+import { ApiResponseError, fetchGameState, fetchRound, fetchAllDailySquares, setChallengeModeRequest, submitGuessRequest, submitPassRequest } from '@geosquare/api.js';
 import { getSfxCtx, playSuccess, playFail, playComplete, playPerfect } from '@geosquare/audio.js';
 import {
     initCesium,
@@ -108,6 +108,48 @@ function wireGuessing() {
     input.onkeydown = handleGuessKeyDown;
 }
 
+function wireChallengeMode(enabled) {
+    const container = document.getElementById('challengeModeControl');
+    const toggle = document.getElementById('challengeModeToggle');
+    const help = document.querySelector('.challenge-mode-help');
+    const helpButton = document.getElementById('challengeModeHelpBtn');
+    toggle.checked = enabled;
+    container.classList.remove('hidden');
+
+    helpButton.onclick = (event) => {
+        event.stopPropagation();
+        const isOpen = help.classList.toggle('is-open');
+        helpButton.setAttribute('aria-expanded', String(isOpen));
+    };
+    document.addEventListener('click', () => {
+        help.classList.remove('is-open');
+        helpButton.setAttribute('aria-expanded', 'false');
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            help.classList.remove('is-open');
+            helpButton.setAttribute('aria-expanded', 'false');
+        }
+    });
+
+    toggle.onchange = async () => {
+        const previousEnabled = !toggle.checked;
+        toggle.disabled = true;
+        try {
+            const { response } = await setChallengeModeRequest(toggle.checked);
+            if (!response.ok) {
+                toggle.checked = previousEnabled;
+                return;
+            }
+            gameState.challenge_mode_enabled = toggle.checked;
+        } catch {
+            toggle.checked = previousEnabled;
+        } finally {
+            toggle.disabled = false;
+        }
+    };
+}
+
 function wireRoundButtons() {
     document.getElementById('nextBtn').onclick = handleNextRound;
     document.getElementById('passBtn').onclick = handlePass;
@@ -163,14 +205,14 @@ export async function handlePass() {
     const { response, data } = await submitPassRequest(gameState.currentRound);
 
     if (!response.ok) {
-        setGuessFeedback(escapeHtml(data.error || 'Pass failed.'));
+        setGuessFeedback(`<br>${escapeHtml(data.error || 'Pass failed.')}`);
         gameState.roundLocked = false;
         return;
     }
 
     const largestCity = data.largest_city;
 
-    setGuessFeedback(`No guess submitted.<br>
+    setGuessFeedback(`<br>No guess submitted.<br>
         Largest city: <b>${escapeHtml(largestCity.city_name)}</b><br>
         Population: ${numberFmt(largestCity.population)}<br>
         Points awarded: <b>0</b>`);
@@ -243,6 +285,12 @@ export async function submitGuess(confirmedCityId = null) {
             return;
         }
 
+        if (data.challenge_rejected) {
+            setGuessFeedback(`<br>${escapeHtml(data.message)}`);
+            playFail();
+            return;
+        }
+
         if (data.correct) {
             const expansionLevel = data.expansion_level;
 
@@ -254,7 +302,7 @@ export async function submitGuess(confirmedCityId = null) {
             }
 
             setGuessFeedback(
-                `<b>${escapeHtml(data.city.toUpperCase())}</b> is the ${data.rank === 1 ? 'largest' : `${ordinal(data.rank)} largest`} city in the square.<br><br>
+                `<br><b>${escapeHtml(data.city.toUpperCase())}</b> is the ${data.rank === 1 ? 'largest' : `${ordinal(data.rank)} largest`} city in the square.<br><br>
                 With a population of ${numberFmt(data.population)}${expansionText}, you are awarded <b>${numberFmt(data.score)}</b> points.<br>`
             );
 
@@ -322,6 +370,7 @@ export async function initGame() {
     restoreSavedState(state);
     adjustPopulationDisplay();
     wireGuessing();
+    wireChallengeMode(Boolean(state.challenge_mode_enabled));
     wireRoundButtons();
     wireExpandButton();
     document.addEventListener('squareExpanded', (e) => {

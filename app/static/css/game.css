@@ -1,3 +1,116 @@
+.challenge-mode-control {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    margin-top: 4px;
+    color: #b7c4d4;
+    font-size: 12px;
+}
+
+.challenge-mode-control.hidden,
+.infinity-mode .challenge-mode-control {
+    display: none;
+}
+
+.challenge-mode-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.challenge-mode-toggle input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+
+.challenge-mode-track {
+    position: relative;
+    width: 34px;
+    height: 18px;
+    flex: 0 0 auto;
+    border: 1px solid #51627c;
+    border-radius: 9px;
+    background: #111824;
+}
+
+.challenge-mode-track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #b7c4d4;
+}
+
+.challenge-mode-toggle input:checked + .challenge-mode-track {
+    border-color: #73b58c;
+    background: #264936;
+}
+
+.challenge-mode-toggle input:checked + .challenge-mode-track::after {
+    left: 18px;
+    background: #d8f3df;
+}
+
+.challenge-mode-toggle input:focus-visible + .challenge-mode-track {
+    outline: 2px solid #6ea8ff;
+    outline-offset: 2px;
+}
+
+.challenge-mode-toggle input:disabled + .challenge-mode-track {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.challenge-mode-help {
+    position: relative;
+    display: inline-flex;
+}
+
+.challenge-mode-help button {
+    padding: 2px;
+    border: 0;
+    background: transparent;
+    color: #9dacbf;
+    font: inherit;
+    cursor: help;
+}
+
+.challenge-mode-help button:focus-visible {
+    outline: 2px solid #6ea8ff;
+    outline-offset: 1px;
+}
+
+.challenge-mode-tooltip {
+    position: absolute;
+    z-index: 20;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    display: none;
+    width: max-content;
+    max-width: min(240px, calc(100vw - 40px));
+    padding: 8px 10px;
+    border: 1px solid #3a4658;
+    border-radius: 4px;
+    background: #111824;
+    color: #e9eef5;
+    line-height: 1.4;
+    transform: translateX(-50%);
+}
+
+.challenge-mode-help:hover .challenge-mode-tooltip,
+.challenge-mode-help:focus-within .challenge-mode-tooltip,
+.challenge-mode-help.is-open .challenge-mode-tooltip {
+    display: block;
+}
+
 .city-row {
     padding: 10px 0;
     border-top: 1px solid #262b34;
