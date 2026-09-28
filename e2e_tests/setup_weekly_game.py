@@ -5,7 +5,7 @@ from datetime import date
 from pathlib import Path
 
 from app.core.db import get_conn
-from app.core.game_generation import fetch_cities_in_bounds, persist_square
+from app.isolated_tools.game_squares import fetch_cities_in_bounds, persist_square
 from app.helpers.text import normalize_place_name
 from e2e_tests.setup_game import delete_existing_game, expansion_bounds
 

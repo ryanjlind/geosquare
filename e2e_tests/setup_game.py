@@ -4,7 +4,7 @@ from datetime import date
 from pathlib import Path
 
 from app.core.db import get_conn
-from app.core.game_generation import fetch_cities_in_bounds, persist_square
+from app.isolated_tools.game_squares import fetch_cities_in_bounds, persist_square
 
 FIXED_POOL_SQUARE_IDS = (242, 301, 289, 171, 236)
 FIXTURE_PATH = Path('e2e_tests/artifacts/game_fixture.json')
