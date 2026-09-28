@@ -170,7 +170,7 @@
 
     .mobile-bottomtray #guessControls {
         display: grid;
-        grid-template-columns: 1fr auto auto;
+        grid-template-columns: minmax(0, 1fr) auto;
         gap: 8px;
         align-items: center;
     }
@@ -186,6 +186,10 @@
     .mobile-bottomtray #passBtn {
         height: 40px;
         white-space: nowrap;
+    }
+
+    .mobile-bottomtray .challenge-mode-control {
+        grid-column: 1 / -1;
     }
 
     .mobile-bottomtray #guessFeedback {
