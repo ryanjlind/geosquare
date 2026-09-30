@@ -5,3 +5,5 @@ ne_land/**
 scripts/**
 app/admin/**
 *.pyc
+copilot-instructions.md
+.pre-commit-config.yaml
