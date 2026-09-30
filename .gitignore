@@ -7,3 +7,4 @@ app/admin/**
 *.pyc
 copilot-instructions.md
 .pre-commit-config.yaml
+copilot-instructions.md
