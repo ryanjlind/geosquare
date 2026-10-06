@@ -124,9 +124,19 @@ def phonetic_key(text: str) -> str:
     return ''.join(collapsed)
 
 
-def _token_similarity(guess_token: str, candidate_token: str) -> float:
-    guess_phonetic = phonetic_key(guess_token)
-    candidate_phonetic = phonetic_key(candidate_token)
+def _cached_phonetic_key(token: str, phonetic_keys: dict[str, str]) -> str:
+    if token not in phonetic_keys:
+        phonetic_keys[token] = phonetic_key(token)
+    return phonetic_keys[token]
+
+
+def _token_similarity(
+    guess_token: str,
+    candidate_token: str,
+    phonetic_keys: dict[str, str],
+) -> float:
+    guess_phonetic = _cached_phonetic_key(guess_token, phonetic_keys)
+    candidate_phonetic = _cached_phonetic_key(candidate_token, phonetic_keys)
     same_written_opening = guess_token[0] == candidate_token[0]
     same_phonetic_opening = (
         bool(guess_phonetic)
@@ -171,27 +181,12 @@ def _trailing_token_penalty(tokens: list[str]) -> float:
     )
 
 
-def _score_name_pair(guess_name: str, candidate_name: str) -> float:
-    guess_tokens = normalize_place_name(guess_name).split()
-    candidate_tokens = normalize_place_name(candidate_name).split()
-
-    if not guess_tokens or not candidate_tokens:
-        return 0.0
-
-    guess_substantive_tokens = _substantive_tokens(guess_tokens)
-    candidate_substantive_tokens = _substantive_tokens(candidate_tokens)
-
-    if not guess_substantive_tokens or not candidate_substantive_tokens:
-        return 100.0 if guess_tokens == candidate_tokens else 0.0
-
-    if (
-        _token_similarity(
-            guess_substantive_tokens[0],
-            candidate_substantive_tokens[0],
-        ) < FUZZY_LINE_SCORE
-    ):
-        return 0.0
-
+def _score_name_pair(
+    guess_tokens: list[str],
+    candidate_tokens: list[str],
+    candidate_substantive_tokens: list[str],
+    phonetic_keys: dict[str, str],
+) -> float:
     guess_token_weight = sum(_token_weight(token) for token in guess_tokens)
 
     @lru_cache(maxsize=None)
@@ -221,6 +216,7 @@ def _score_name_pair(guess_name: str, candidate_name: str) -> float:
             _token_similarity(
                 guess_tokens[guess_index],
                 candidate_tokens[candidate_index],
+                phonetic_keys,
             )
             * _token_weight(guess_tokens[guess_index])
             / guess_token_weight
@@ -262,36 +258,75 @@ def _score_name_pair(guess_name: str, candidate_name: str) -> float:
 
 
 def _candidate_name_options(row) -> list[tuple[str, str, str]]:
-    options = [
-        (normalize_place_name(row.CityName), 'canonical', row.CityName)
-    ]
+    options = []
+
+    for source_type, source_name in [('canonical', row.CityName)]:
+        candidate_name = normalize_place_name(source_name)
+        candidate_tokens = candidate_name.split()
+        options.append((
+            candidate_name,
+            candidate_tokens,
+            _substantive_tokens(candidate_tokens),
+            source_type,
+            source_name,
+        ))
 
     if row.AlternateNames:
         for alternate_name in row.AlternateNames.split('|||'):
-            options.append(
-                (normalize_place_name(alternate_name), 'alternate', alternate_name)
-            )
+            candidate_name = normalize_place_name(alternate_name)
+            candidate_tokens = candidate_name.split()
+            options.append((
+                candidate_name,
+                candidate_tokens,
+                _substantive_tokens(candidate_tokens),
+                'alternate',
+                alternate_name,
+            ))
 
     return options
 
 
 def _score_candidate(
     guess_name: str,
+    guess_tokens: list[str],
+    guess_substantive_tokens: list[str],
     row,
+    phonetic_keys: dict[str, str],
 ) -> tuple[float, str, str, str, str, int, int]:
     name_options = _candidate_name_options(row)
-    scored_options = [
-        (
+    scored_options = []
+    for (
+        candidate_name,
+        candidate_tokens,
+        candidate_substantive_tokens,
+        source_type,
+        source_name,
+    ) in name_options:
+        if not guess_tokens or not candidate_tokens:
+            score = 0.0
+        elif not guess_substantive_tokens or not candidate_substantive_tokens:
+            score = 100.0 if guess_tokens == candidate_tokens else 0.0
+        elif _token_similarity(
+            guess_substantive_tokens[0],
+            candidate_substantive_tokens[0],
+            phonetic_keys,
+        ) < FUZZY_LINE_SCORE:
+            score = 0.0
+        else:
+            score = _score_name_pair(
+                guess_tokens,
+                candidate_tokens,
+                candidate_substantive_tokens,
+                phonetic_keys,
+            )
+        scored_options.append((
             score if source_type == 'canonical' or score == 100.0
             else max(0.0, score - FUZZY_ALTERNATE_NAME_PENALTY),
             guess_name,
             candidate_name,
             source_type,
             source_name,
-        )
-        for candidate_name, source_type, source_name in name_options
-        for score in [_score_name_pair(guess_name, candidate_name)]
-    ]
+        ))
 
     best_option = max(
         scored_options,
@@ -301,10 +336,10 @@ def _score_candidate(
             option[2],
         ),
     )
-    canonical_token_count = len(name_options[0][0].split())
+    canonical_token_count = len(name_options[0][1])
     alternate_token_count = sum(
-        len(candidate_name.split())
-        for candidate_name, source_type, _source_name in name_options
+        len(candidate_tokens)
+        for _candidate_name, candidate_tokens, _substantive_tokens, source_type, _source_name in name_options
         if source_type == 'alternate'
     )
     return (*best_option, canonical_token_count, alternate_token_count)
@@ -364,9 +399,11 @@ def _find_matching_city(
             precision_filter = None
 
         normalized_guess = normalize_place_name(guess_text)
+        guess_tokens = normalized_guess.split()
+        guess_substantive_tokens = _substantive_tokens(guess_tokens)
         timing.inputs.update({
             'guess_character_count': len(normalized_guess),
-            'guess_token_count': len(normalized_guess.split()),
+            'guess_token_count': len(guess_tokens),
             'precision_filter': precision_filter,
         })
 
@@ -447,13 +484,20 @@ def _find_matching_city(
         alternate_name_count = 0
         alternate_name_token_count = 0
         exact_score_count = 0
+        phonetic_keys = {}
         for row in candidate_rows:
             candidate_name_count += 1
             if row.AlternateNames:
                 alternate_names = row.AlternateNames.split('|||')
                 alternate_name_count += len(alternate_names)
                 candidate_name_count += len(alternate_names)
-            candidate_score = _score_candidate(normalized_guess, row)
+            candidate_score = _score_candidate(
+                normalized_guess,
+                guess_tokens,
+                guess_substantive_tokens,
+                row,
+                phonetic_keys,
+            )
             raw_score = candidate_score[0]
             source_type = candidate_score[3]
             canonical_name_token_count += candidate_score[5]
